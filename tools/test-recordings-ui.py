@@ -55,6 +55,8 @@ def main():
   property alias testStopButton: stopButton
   property alias testBackButton: backButton
   property alias testForwardButton: forwardButton
+  property alias testFavoriteButton: favoriteButton
+  property alias testStationPicker: stationPicker
   property alias testName: stationName
   property var anchorItem: null''', 1))
         view = plugin / "RecordingsView.qml"

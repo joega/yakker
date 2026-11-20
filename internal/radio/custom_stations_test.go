@@ -47,7 +47,7 @@ func TestCustomControllerPlaybackAndCorruptStartup(t *testing.T) {
 	}
 	serial = h.send("deleteStation", "stationId", id)
 	removed := h.wait(func(s Status) bool { return s.CustomMutationSerial == serial && s.CustomMutationOK })
-	if removed.Wanted || removed.Station["id"] == id || removed.PlayerPID != 0 {
+	if removed.Wanted || len(removed.Station) != 0 || removed.PlayerPID != 0 {
 		t.Fatalf("active delete: %#v", removed)
 	}
 
@@ -146,7 +146,7 @@ func TestCustomStationControllerMutations(t *testing.T) {
 		t.Fatal("invalid edit changed active station")
 	}
 	command("deleteStation", id)
-	if !r.state.CustomMutationOK || r.state.Station["id"] != "stock" || r.state.Wanted {
+	if !r.state.CustomMutationOK || len(r.state.Station) != 0 || r.state.Wanted {
 		t.Fatalf("delete: %#v", r.state)
 	}
 	if got, err := LoadCustomStations(path, stock); err != nil || len(got) != 0 {

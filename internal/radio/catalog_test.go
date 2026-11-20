@@ -20,7 +20,7 @@ func TestBundledStationCatalogue(t *testing.T) {
 		"talksport": true, "talksport-2": true, "bbc-radio-5-live": true, "off-the-ball": true,
 	}
 	if len(stations) != len(want) || stations[0]["id"] != "wbz-fm" {
-		t.Fatal("expected the full catalogue with the existing WBZ default preserved")
+		t.Fatal("expected the full catalogue in its established order")
 	}
 	for _, station := range stations {
 		if !want[station["id"].(string)] {
@@ -41,6 +41,47 @@ func TestBundledStationCatalogue(t *testing.T) {
 	}
 	if len(want) > 0 {
 		t.Errorf("missing requested stations: %v", want)
+	}
+}
+
+func TestStationSelectionStartsEmptyAndConfigurePreservesOrClears(t *testing.T) {
+	h := newEmptyHarness(t, Config{}, false)
+	initial := h.barrier()
+	if len(initial.Station) != 0 || initial.Wanted {
+		t.Fatalf("fresh controller selected a station: %+v", initial)
+	}
+	serial := h.send("play")
+	state := h.wait(func(s Status) bool { return s.Serial == serial })
+	if state.Error == "" || state.Wanted || state.PlayerPID != 0 {
+		t.Fatalf("play without a station: %+v", state)
+	}
+	serial = h.send("configure", "stationId", "wfan")
+	h.wait(func(s Status) bool { return s.Serial == serial && s.Station["id"] == "wfan" })
+	serial = h.send("configure", "bufferMinutes", 5)
+	state = h.wait(func(s Status) bool { return s.Serial == serial })
+	if state.Station["id"] != "wfan" {
+		t.Fatalf("omitted station cleared selection: %+v", state)
+	}
+	h.play()
+	serial = h.send("configure", "stationId", "")
+	state = h.wait(func(s Status) bool { return s.Serial == serial })
+	if len(state.Station) != 0 || state.Wanted || state.PlayerPID != 0 {
+		t.Fatalf("clearing station did not stop live playback: %+v", state)
+	}
+	serial = h.send("configure", "stationId", "missing-saved-station")
+	state = h.wait(func(s Status) bool { return s.Serial == serial })
+	if len(state.Station) != 0 {
+		t.Fatalf("unknown station selected another broadcaster: %+v", state)
+	}
+}
+
+func TestSelectingStationFromStoppedRecordingDoesNotPlay(t *testing.T) {
+	r := &controller{stations: []Station{{"id": "one", "name": "One", "streamUrl": "https://example.test"}}, state: Status{State: "stopped", PlaybackKind: "recording", Station: Station{}, RecordingID: "recording"}}
+	if _, err := r.command([]byte(`{"action":"configure","stationId":"one"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if r.state.PlaybackKind != "live" || r.state.Station["id"] != "one" || r.state.Wanted || r.player != nil || r.state.State != "stopped" {
+		t.Fatalf("selecting a station started playback: %+v", r.state)
 	}
 }
 

@@ -282,7 +282,7 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 	}
 	defer lock.Close()
 	r := &controller{cfg: cfg, stations: stations, bundled: bundled, custom: custom, customPath: customPath, customLoadErr: customErr, socket: filepath.Join(dir, "mpv.sock"), events: make(chan playerEvent, 64), output: json.NewEncoder(output), logs: logs,
-		state: Status{State: "stopped", PlaybackKind: "live", Volume: 65, Station: stations[0], Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
+		state: Status{State: "stopped", PlaybackKind: "live", Volume: 65, Station: Station{}, Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
 	if customErr != nil {
 		r.state.CustomStationError = "Unable to load custom stations; repair the file and restart Yakker."
 	}
@@ -458,8 +458,7 @@ func (r *controller) command(raw []byte) (bool, error) {
 			}
 			window = time.Duration(minutes) * time.Minute
 		}
-		var id, plugin string
-		_ = json.Unmarshal(data["stationId"], &id)
+		var plugin string
 		if raw, ok := data["mprisPlugin"]; ok {
 			if string(raw) == "null" || json.Unmarshal(raw, &plugin) != nil {
 				return false, errors.New("MPRIS plugin path does not exist")
@@ -471,17 +470,25 @@ func (r *controller) command(raw []byte) (bool, error) {
 				return false, errors.New("MPRIS plugin path does not exist")
 			}
 		}
-		station := r.stations[0]
-		for _, s := range r.stations {
-			if s["id"] == id {
-				station = s
-				break
+		station := r.state.Station
+		if raw, ok := data["stationId"]; ok {
+			var id string
+			if string(raw) == "null" || json.Unmarshal(raw, &id) != nil {
+				return false, errors.New("Station ID must be a string")
+			}
+			station = Station{}
+			for _, s := range r.stations {
+				if s["id"] == id {
+					station = s
+					break
+				}
 			}
 		}
 		// Station IDs are unique across the current merged catalogue.
 		bufferChanged := window != r.cfg.DVRWindow
 		stationChanged := station["id"] != r.state.Station["id"]
-		changed := stationChanged || plugin != r.mpris || (bufferChanged && r.state.PlaybackKind != "recording")
+		switchToLive := stationChanged && len(station) != 0
+		changed := (stationChanged && (r.state.PlaybackKind != "recording" || switchToLive)) || plugin != r.mpris || (bufferChanged && r.state.PlaybackKind != "recording")
 		r.cfg.DVRWindow = window
 		if bufferChanged {
 			r.cfg.DVRBytes = dvrByteLimit(window)
@@ -494,12 +501,12 @@ func (r *controller) command(raw []byte) (bool, error) {
 			wanted, paused := r.state.Wanted, r.state.Paused && !bufferChanged && !r.state.TemporaryBuffer
 			wasRecording := r.state.PlaybackKind == "recording"
 			r.stop()
-			if stationChanged {
+			if stationChanged && (!wasRecording || switchToLive) {
 				r.selectLivePlayback()
 			}
-			if wanted {
+			if wanted && (wasRecording || len(station) != 0) {
 				r.state.Paused = paused
-				if wasRecording && !stationChanged {
+				if wasRecording && !switchToLive {
 					r.startRecordingPlayback()
 				} else {
 					r.play()
@@ -509,6 +516,9 @@ func (r *controller) command(raw []byte) (bool, error) {
 	case "play":
 		if r.state.Wanted {
 			return false, r.setPaused(false)
+		}
+		if len(r.state.Station) == 0 {
+			return false, errors.New("Choose a station before playing live radio.")
 		}
 		r.selectLivePlayback()
 		r.play()
@@ -528,6 +538,12 @@ func (r *controller) command(raw []byte) (bool, error) {
 		}
 		return false, r.seekDVR(value)
 	case "live":
+		if len(r.state.Station) == 0 {
+			if !r.state.Wanted {
+				r.selectLivePlayback()
+			}
+			return false, errors.New("Choose a station before playing live radio.")
+		}
 		if r.state.PlaybackKind == "recording" {
 			r.stop()
 			r.selectLivePlayback()
@@ -647,12 +663,14 @@ func (r *controller) start() {
 	}
 	cacheSeconds := window.Seconds() + 10
 	backBytes := bytes
-	input, title := r.state.Station["streamUrl"].(string), r.state.Station["name"].(string)
+	var input, title string
 	cacheEnabled := "yes"
 	if r.state.PlaybackKind == "recording" {
 		input, title, cacheEnabled = r.recordingPath, r.state.RecordingTitle, "no"
 		// File decoding still needs a forward packet queue even with cache=no.
 		cacheSeconds, bytes, backBytes = 3, 2*1024*1024, 0
+	} else {
+		input, title = r.state.Station["streamUrl"].(string), r.state.Station["name"].(string)
 	}
 	args = append(args, "--no-config", "--load-scripts=no", "--no-video", "--no-audio-display", "--idle=no", "--terminal=no", "--input-terminal=no", "--keep-open=no",
 		"--cache="+cacheEnabled, fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", bytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",

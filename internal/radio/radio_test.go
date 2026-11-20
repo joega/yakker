@@ -225,6 +225,21 @@ func tempDir(t *testing.T) string {
 	return dir
 }
 func newHarness(t *testing.T, cfg Config, subprocess bool) *harness {
+	h := newEmptyHarness(t, cfg, subprocess)
+	path := cfg.StationFile
+	if path == "" || subprocess {
+		path = stationFile
+	}
+	stations, err := LoadStations(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	serial := h.send("configure", "stationId", stations[0]["id"])
+	h.wait(func(s Status) bool { return s.Serial == serial })
+	return h
+}
+
+func newEmptyHarness(t *testing.T, cfg Config, subprocess bool) *harness {
 	t.Helper()
 	h := &harness{t: t, states: make(chan Status, 256), done: make(chan error, 1), base: tempDir(t), logs: &safeBuffer{}}
 	ctx, cancel := context.WithCancel(context.Background())

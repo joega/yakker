@@ -39,7 +39,8 @@ Ui.Panel {
       order = order.concat([5,17,10])
       if (radio.station.custom) order = order.concat([11,12])
     }
-    order = order.concat([0,13])
+    order.push(0)
+    if (favoriteButton.enabled) order.push(13)
     if (backButton.enabled) order.push(7)
     if (stopButton.enabled) order.push(6)
     if (playButton.enabled) order.push(1)
@@ -89,9 +90,9 @@ Ui.Panel {
     else if (cursor === 10) openStationEditor(false)
     else if (cursor === 11 && radio.station.custom) openStationEditor(true)
     else if (cursor === 12 && radio.station.custom) deleteStation()
-    else if (cursor === 13) radio.toggleFavorite(radio.stationId)
+    else if (cursor === 13 && favoriteButton.enabled) radio.toggleFavorite(radio.stationId)
     else if (cursor === 14) openRecordings(false)
-    else if (cursor === 16) radio.goLive()
+    else if (cursor === 16) returnLiveButton.clicked()
     else if (cursor === 17 && settingsOpen) openRecordings(true)
   }
   function openRecordings(storage) {
@@ -128,7 +129,10 @@ Ui.Panel {
     confirmStationDelete = false
     keyCatcher.forceActiveFocus()
   }
-  onOpenedChanged: if (!opened) { stationPicker.close(); bufferPicker.close(); stationEditorOpen = false; confirmStationDelete = false }
+  onOpenedChanged: {
+    if (!opened) { stationPicker.close(); bufferPicker.close(); stationEditorOpen = false; confirmStationDelete = false }
+    else if (!radio.hasStation && radio.playbackKind !== "recording") cursor = 0
+  }
   Connections {
     target: root.radio
     function onStationIdChanged() { stationPicker.value = root.radio.stationId; root.confirmStationDelete = false }
@@ -436,7 +440,7 @@ Ui.Panel {
                 id: stationPicker
                 width: parent.width - favoriteButton.width - parent.spacing
                 showLabel: false
-                placeholderText: "Station, city or country"
+                placeholderText: root.radio.hasStation ? "Station, city or country" : "Choose a station"
                 emptyText: "No matching stations"
                 value: root.radio.stationId
                 options: root.radio.stationOptions
@@ -458,6 +462,8 @@ Ui.Panel {
                 Accessible.name: favoriteButton.tooltipText
                 Accessible.checkable: true
                 Accessible.checked: favoriteButton.selected
+                enabled: root.radio.hasStation
+                opacity: enabled ? 1 : 0.35
                 foreground: root.barForeground
                 bordered: true
                 hasCursor: root.cursor === 13
@@ -561,13 +567,13 @@ Ui.Panel {
             id: playButton
             width: parent.buttonWidth
             iconText: root.radio.wanted && !root.radio.paused ? "󰏤" : "󰐊"
-            tooltipText: root.radio.wanted ? (root.radio.paused ? "Resume" : "Pause") : root.radio.playbackState === "error" ? "Retry" : "Play"
+            tooltipText: !root.radio.hasStation && !root.radio.wanted ? "Choose a station first" : root.radio.wanted ? (root.radio.paused ? "Resume" : "Pause") : root.radio.playbackState === "error" ? "Retry" : "Play"
             Accessible.role: Accessible.Button
             Accessible.name: tooltipText
             foreground: root.barForeground
             selected: true
             bordered: true
-            enabled: !root.radio.wanted || root.radio.paused || root.radio.playbackState === "playing"
+            enabled: (root.radio.hasStation || root.radio.wanted) && (!root.radio.wanted || root.radio.paused || root.radio.playbackState === "playing")
             opacity: enabled ? 1 : 0.35
             hasCursor: root.cursor === 1
             onHovered: hovered => { if (hovered) root.cursor = 1 }
@@ -629,12 +635,12 @@ Ui.Panel {
             id: returnLiveButton
             width: parent.width
             visible: root.radio.playbackKind === "recording"
-            text: "Return to live"
+            text: root.radio.hasStation ? "Return to live" : "Choose live station"
             foreground: root.barForeground
             bordered: true
             hasCursor: root.cursor === 16
             onHovered: hovered => { if (hovered) root.cursor = 16 }
-            onClicked: root.radio.goLive()
+            onClicked: root.radio.hasStation ? root.radio.goLive() : root.chooseStation()
           }
           Row {
             width: parent.width

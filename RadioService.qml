@@ -49,7 +49,9 @@ Item {
   property int customMutationSerial: 0
   property bool customMutationOK: false
   property string title: ""
-  property var station: ({id: "wbz-fm", name: "98.5 The Sports Hub", subtitle: "WBZ-FM · Boston", icon: "󰐹", artwork: "assets/sports-hub.png"})
+  readonly property var noStation: ({id: "", name: "Choose a station", subtitle: "", icon: "󰐹"})
+  property var station: noStation
+  readonly property bool hasStation: stationId.length > 0 && station.id === stationId
   property var stations: []
   property var favoriteIds: []
   readonly property var countryNames: ({US: "United States (US)", CA: "Canada (CA)", GB: "United Kingdom (UK)", IE: "Ireland (IE)"})
@@ -68,14 +70,14 @@ Item {
   property int retry: 0
   property int retryDelay: 0
   property int playerPid: 0
-  property string stationId: "wbz-fm"
+  property string stationId: ""
   property string mprisPlugin: ""
   property int pendingVolume: -1
   readonly property string statusText: playbackState === "playing" ? (playbackKind === "recording" ? "Playing recording" : (dvr && behindLive > 3 ? "Delayed · " + clock(behindLive) : "Live"))
     : playbackState === "paused" ? "Paused"
     : playbackState === "connecting" ? "Connecting…"
     : playbackState === "retrying" ? "Reconnecting in " + retryDelay + "s · attempt " + retry + "/5"
-    : playbackState === "error" ? "Unable to play" : "Stopped"
+    : playbackState === "error" ? "Unable to play" : !hasStation ? "Choose a station to start listening" : "Stopped"
   signal preferencesChanged(int volume, bool muted, string stationId, int bufferMinutes)
   signal favoritesUpdated()
   signal statusReceived(int serial)
@@ -137,7 +139,7 @@ Item {
   }
   function configureSettings(settings) {
     favoriteIds = normalizeFavorites(settings.favorites)
-    const selected = String(settings.stationId || "wbz-fm")
+    const selected = String(settings.stationId || "")
     const mpris = String(settings.mprisPlugin || "")
     const minutes = [0,5,15,30].indexOf(Number(settings.bufferMinutes)) >= 0 ? Number(settings.bufferMinutes) : 0
     if (stationId === selected && mprisPlugin === mpris && bufferMinutes === minutes) return
@@ -164,6 +166,7 @@ Item {
     }
   }
   function play() {
+    if (!hasStation && !(playbackKind === "recording" && wanted)) return
     helperRetry.stop()
     helperRestarts = 0
     wanted = true
@@ -313,12 +316,11 @@ Item {
             if ([0,5,15,30].indexOf(next.bufferMinutes) >= 0) root.bufferMinutes = next.bufferMinutes
             root.error = next.error || ""
             root.title = next.title || ""
-            if (next.station) {
-              const changedStation = root.stationId !== next.station.id
-              root.station = next.station
-              root.stationId = next.station.id
-              if (changedStation) root.preferencesChanged(root.volume, root.muted, root.stationId, root.bufferMinutes)
-            }
+            const selectedStation = next.station && next.station.id ? next.station : root.noStation
+            const changedStation = root.stationId !== selectedStation.id
+            root.station = selectedStation
+            root.stationId = selectedStation.id
+            if (changedStation) root.preferencesChanged(root.volume, root.muted, root.stationId, root.bufferMinutes)
             root.retry = next.retry || 0
             root.retryDelay = next.retryDelay || 0
             root.playerPid = next.playerPid || 0

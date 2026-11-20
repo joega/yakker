@@ -290,18 +290,20 @@ func (r *controller) updateCustomStation(action string, data map[string]json.Raw
 	r.state.Stations = r.stations
 	if oldStation["id"] == id {
 		if action == "deleteStation" {
-			r.stop()
-			r.state.Station = r.stations[0]
+			if r.state.PlaybackKind != "recording" {
+				r.stop()
+			}
+			r.state.Station = Station{}
 		} else {
 			for _, station := range r.stations {
 				if station["id"] == id {
 					urlChanged := oldStation["streamUrl"] != station["streamUrl"]
 					wanted := r.state.Wanted
-					if urlChanged {
+					if urlChanged && r.state.PlaybackKind != "recording" {
 						r.stop()
 					}
 					r.state.Station = station
-					if urlChanged && wanted {
+					if urlChanged && wanted && r.state.PlaybackKind != "recording" {
 						r.play()
 					}
 					break

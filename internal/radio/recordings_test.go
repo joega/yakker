@@ -292,6 +292,8 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 		}
 		return false
 	})
+	serial = h.send("configure", "stationId", "")
+	h.wait(func(s Status) bool { return s.Serial == serial && len(s.Station) == 0 })
 	serial = h.send("playRecording", "id", id)
 	file := h.wait(func(s Status) bool {
 		return s.Serial == serial && s.PlaybackKind == "recording" && s.State == "playing"
@@ -306,8 +308,15 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 	}
 	h.send("seekRecording", "value", 2)
 	h.wait(func(s Status) bool { return s.Paused && s.Position > 1.5 && s.Position < 2.5 })
-	h.send("live")
-	returned := h.wait(func(s Status) bool { return s.PlaybackKind == "live" && s.State == "playing" })
+	serial = h.send("live")
+	withoutStation := h.wait(func(s Status) bool { return s.Serial == serial })
+	if withoutStation.Error == "" || withoutStation.PlaybackKind != "recording" || withoutStation.RecordingID != id || !withoutStation.Wanted {
+		t.Fatal("return to live without station interrupted recording", withoutStation)
+	}
+	h.send("play")
+	h.wait(func(s Status) bool { return s.PlaybackKind == "recording" && s.State == "playing" })
+	serial = h.send("configure", "stationId", "two")
+	returned := h.wait(func(s Status) bool { return s.Serial == serial && s.PlaybackKind == "live" && s.State == "playing" })
 	if returned.Station["id"] != "two" || returned.Recordings.ActiveCount != 1 {
 		t.Fatal("return to live affected capture or selection", returned)
 	}
