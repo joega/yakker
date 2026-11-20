@@ -605,6 +605,7 @@ Ui.Panel {
           Ui.BorderSurface {
             width: parent.width
             height: fileTimeline.implicitHeight + Style.space(8)
+            color: "transparent"
             visible: root.radio.playbackKind === "recording"
             radius: Style.cornerRadius
             borderSpec: root.cursor === 15 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
