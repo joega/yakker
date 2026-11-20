@@ -99,7 +99,11 @@ func listen(ctx context.Context, root string, options listenOptions, cfg radio.C
 		if path == "" {
 			path = filepath.Join(root, "stations.json")
 		}
-		stations, err := radio.LoadStations(path)
+		loader := radio.LoadStationCatalog
+		if options.stationFile != "" {
+			loader = radio.LoadStations
+		}
+		stations, err := loader(path)
 		if err != nil {
 			return err
 		}
@@ -137,7 +141,11 @@ func preparePlayback(root string, options listenOptions, cfg radio.Config) (*pla
 	if options.streamURL != "" {
 		stations = []radio.Station{{"id": "cli", "name": "CLI test stream", "subtitle": "Standalone radio", "streamUrl": options.streamURL}}
 	} else {
-		stations, err = radio.LoadStations(stationFile)
+		loader := radio.LoadStationCatalog
+		if options.stationFile != "" {
+			loader = radio.LoadStations
+		}
+		stations, err = loader(stationFile)
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +176,7 @@ func preparePlayback(root string, options listenOptions, cfg radio.Config) (*pla
 			_ = os.RemoveAll(base)
 		}
 	}()
-	if options.streamURL != "" {
+	if options.streamURL != "" || options.stationFile == "" {
 		stationFile = filepath.Join(base, "stations.json")
 		data, err := json.Marshal(stations)
 		if err != nil {
@@ -223,7 +231,7 @@ func listenSession(parent context.Context, cfg radio.Config, stationID string, o
 	go func() {
 		defer close(states)
 		scanner := bufio.NewScanner(outR)
-		scanner.Buffer(make([]byte, 4096), 1024*1024)
+		scanner.Buffer(make([]byte, 4096), 2*1024*1024)
 		for scanner.Scan() {
 			var status radio.Status
 			err := json.Unmarshal(scanner.Bytes(), &status)

@@ -32,6 +32,10 @@ Item {
       + ((paused || behindLive > 3) ? clock(behindLive) + " behind live · " : "")
       + clock(bufferEnd - bufferStart) + " available"
   property string error: ""
+  property string customStationError: ""
+  property string customCatalogError: ""
+  property int customMutationSerial: 0
+  property bool customMutationOK: false
   property string title: ""
   property var station: ({id: "wbz-fm", name: "98.5 The Sports Hub", subtitle: "WBZ-FM · Boston", icon: "󰐹", artwork: "assets/sports-hub.png"})
   property var stations: []
@@ -79,13 +83,14 @@ Item {
     if (!clients) retire.restart()
   }
   function send(command) {
-    if (!ready || !helper.running) return
+    if (!ready || !helper.running) return 0
     command.serial = ++serial
     if (["play", "stop", "pause", "seek", "skip", "live"].indexOf(command.action) >= 0) latestIntent = serial
     if (command.action === "configure") latestStationIntent = serial
     if (command.action === "volume") latestVolumeIntent = serial
     if (command.action === "mute") latestMuteIntent = serial
     helper.write(JSON.stringify(command) + "\n")
+    return command.serial
   }
   function configureSettings(settings) {
     const selected = String(settings.stationId || "wbz-fm")
@@ -155,17 +160,15 @@ Item {
     send({action: "mute", value: muted})
     preferencesChanged(volume, muted, stationId, bufferMinutes)
   }
-
-  FileView {
-    id: stationCatalog
-    path: decodeURIComponent(Qt.resolvedUrl("stations.json").toString().replace(/^file:\/\//, ""))
-    onLoaded: {
-      try {
-        const items = JSON.parse(text())
-        if (!Array.isArray(items) || !items.length) throw new Error("Empty station catalogue")
-        root.stations = items
-      } catch (e) { console.warn("Yakker: unable to load station catalogue: " + e) }
-    }
+  function saveCustomStation(station) {
+    if (!ready || !helper.running) { customStationError = "Station manager is unavailable. Try again when Yakker reconnects."; return 0 }
+    customStationError = ""
+    return send({action: "upsertStation", station: station})
+  }
+  function deleteCustomStation(id) {
+    if (!ready || !helper.running) { customStationError = "Station manager is unavailable. Try again when Yakker reconnects."; return 0 }
+    customStationError = ""
+    return send({action: "deleteStation", stationId: id})
   }
 
   Timer {
@@ -199,6 +202,7 @@ Item {
     onStarted: {
       root.retiring = false
       root.ready = true
+      root.customCatalogError = ""
       root.configure()
       root.send({action: "volume", value: root.volume})
       root.send({action: "mute", value: root.muted})
@@ -208,6 +212,13 @@ Item {
       onRead: data => {
         try {
           const next = JSON.parse(data)
+          if (Array.isArray(next.stations)) root.stations = next.stations
+          if (typeof next.customStationError === "string") root.customStationError = next.customStationError
+          if (!next.customMutationSerial && typeof next.customStationError === "string") root.customCatalogError = next.customStationError
+          if (typeof next.customMutationSerial === "number" && next.customMutationSerial > root.customMutationSerial) {
+            root.customMutationOK = next.customMutationOK === true
+            root.customMutationSerial = next.customMutationSerial
+          }
           if ((next.serial || 0) >= Math.max(root.latestIntent, root.latestStationIntent)) {
             root.playbackState = next.state || "error"
             root.wanted = next.wanted === true
@@ -222,8 +233,10 @@ Item {
             root.error = next.error || ""
             root.title = next.title || ""
             if (next.station) {
+              const changedStation = root.stationId !== next.station.id
               root.station = next.station
               root.stationId = next.station.id
+              if (changedStation) root.preferencesChanged(root.volume, root.muted, root.stationId, root.bufferMinutes)
             }
             root.retry = next.retry || 0
             root.retryDelay = next.retryDelay || 0

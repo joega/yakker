@@ -69,6 +69,56 @@ func stationFixture(t *testing.T) string {
 	return root
 }
 
+func TestDefaultCLIIncludesSavedStationsAndExplicitSourcesAreIsolated(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	root := stationFixture(t)
+	id, err := radio.NewCustomStationID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path, err := radio.CustomStationPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	custom := radio.CustomStation{ID: id, Name: "Saved", StreamURL: "https://example.test/saved"}
+	if err := radio.SaveCustomStations(path, []radio.CustomStation{custom}, nil); err != nil {
+		t.Fatal(err)
+	}
+	setup, err := preparePlayback(root, listenOptions{station: id, volume: 60}, radio.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer setup.close()
+	stations, err := radio.LoadStations(setup.cfg.StationFile)
+	if err != nil || setup.selected["id"] != id || len(stations) != 3 || stations[2]["id"] != id {
+		t.Fatalf("merged snapshot: %#v %v", stations, err)
+	}
+	var output bytes.Buffer
+	if err := Listen(context.Background(), root, []string{"--list-stations"}, strings.NewReader(""), &output, io.Discard); err != nil || !strings.Contains(output.String(), id) {
+		t.Fatalf("list: %s %v", output.String(), err)
+	}
+	_, err = preparePlayback(root, listenOptions{station: id, stationFile: filepath.Join(root, "stations.json")}, radio.Config{})
+	if err == nil {
+		t.Fatal("explicit station catalogue included saved station")
+	}
+	if err := os.WriteFile(path, []byte("bad"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := preparePlayback(root, listenOptions{}, radio.Config{}); err == nil {
+		t.Fatal("default hid corrupt custom catalogue")
+	}
+	explicit, err := preparePlayback(root, listenOptions{stationFile: filepath.Join(root, "stations.json")}, radio.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	explicit.close()
+	url, err := preparePlayback(root, listenOptions{streamURL: "https://example.test/audio"}, radio.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	url.close()
+}
+
 // The peer checks the CLI/controller boundary. Process/audio lifecycle itself
 // is exercised by radio's suite and TestListenWithRealMPV below.
 type consolePeer struct {

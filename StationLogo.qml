@@ -1,10 +1,11 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: root
   property var station: ({})
-  property color fallbackColor: Color.foreground
+  property color fallbackColor: Commons.Color.foreground
   readonly property string artwork: station.artwork || ""
 
   Rectangle {

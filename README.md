@@ -284,6 +284,10 @@ This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
 
+In Settings, use **Add custom station** to save a name and HTTP(S) audio stream URL; city, country, and website are optional. Select a saved custom station in the station picker to edit or delete it. Deleting the selected station stops playback and selects the first bundled station. Editing its stream URL reconnects if it was playing. Yakker does not fetch or test a URL until you play it.
+
+Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error. URLs can contain credentials, so protect this file when sharing backups.
+
 The selected station, volume, mute and listening buffer length are saved through Quattro's inline entry persistence in
 `~/.config/omarchy/shell.json`. The widget entry also accepts:
 

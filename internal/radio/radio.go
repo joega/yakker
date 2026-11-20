@@ -27,42 +27,48 @@ import (
 type Station map[string]any
 
 type Status struct {
-	State           string  `json:"state"`
-	Wanted          bool    `json:"wanted"`
-	Error           string  `json:"error"`
-	Volume          int     `json:"volume"`
-	Muted           bool    `json:"muted"`
-	Title           string  `json:"title"`
-	Station         Station `json:"station"`
-	Retry           int     `json:"retry"`
-	RetryDelay      float64 `json:"retryDelay"`
-	PlayerPID       int     `json:"playerPid"`
-	MPRIS           bool    `json:"mpris"`
-	Serial          int64   `json:"serial"`
-	Paused          bool    `json:"paused"`
-	BufferMinutes   int     `json:"bufferMinutes"`
-	TemporaryBuffer bool    `json:"temporaryBuffer"`
-	DVR             bool    `json:"dvr"`
-	Position        float64 `json:"position"`
-	BufferStart     float64 `json:"bufferStart"`
-	BufferEnd       float64 `json:"bufferEnd"`
-	BufferExpired   bool    `json:"bufferExpired"`
+	State                string    `json:"state"`
+	Wanted               bool      `json:"wanted"`
+	Error                string    `json:"error"`
+	Volume               int       `json:"volume"`
+	Muted                bool      `json:"muted"`
+	Title                string    `json:"title"`
+	Station              Station   `json:"station"`
+	Stations             []Station `json:"stations"`
+	CustomStationError   string    `json:"customStationError"`
+	CustomMutationSerial int64     `json:"customMutationSerial"`
+	CustomMutationOK     bool      `json:"customMutationOK"`
+	Retry                int       `json:"retry"`
+	RetryDelay           float64   `json:"retryDelay"`
+	PlayerPID            int       `json:"playerPid"`
+	MPRIS                bool      `json:"mpris"`
+	Serial               int64     `json:"serial"`
+	Paused               bool      `json:"paused"`
+	BufferMinutes        int       `json:"bufferMinutes"`
+	TemporaryBuffer      bool      `json:"temporaryBuffer"`
+	DVR                  bool      `json:"dvr"`
+	Position             float64   `json:"position"`
+	BufferStart          float64   `json:"bufferStart"`
+	BufferEnd            float64   `json:"bufferEnd"`
+	BufferExpired        bool      `json:"bufferExpired"`
 }
 
 // Config overrides are used by the standalone CLI and tests; normal plugin
 // startup uses the executable's adjacent stations.json and the real mpv.
 type Config struct {
-	RuntimeBase     string
-	StationFile     string
-	MPV             string
-	MPVArgs         []string
-	ConnectTimeout  time.Duration
-	StallTimeout    time.Duration
-	RetryDelays     []time.Duration
-	ResetAfter      time.Duration
-	DVRWindow       time.Duration
-	DVRPollInterval time.Duration
-	DVRBytes        int64
+	RuntimeBase           string
+	StationFile           string
+	CustomStationFile     string
+	DisableCustomStations bool
+	MPV                   string
+	MPVArgs               []string
+	ConnectTimeout        time.Duration
+	StallTimeout          time.Duration
+	RetryDelays           []time.Duration
+	ResetAfter            time.Duration
+	DVRWindow             time.Duration
+	DVRPollInterval       time.Duration
+	DVRBytes              int64
 }
 
 func LoadStations(path string) ([]Station, error) {
@@ -156,8 +162,9 @@ type player struct {
 
 type playerLog struct {
 	sync.Mutex
-	last   string
-	output io.Writer
+	last    string
+	output  io.Writer
+	private bool
 }
 
 func (l *playerLog) Write(data []byte) (int, error) {
@@ -165,6 +172,9 @@ func (l *playerLog) Write(data []byte) (int, error) {
 	defer l.Unlock()
 	message := strings.TrimSpace(string(data))
 	if message != "" {
+		if l.private {
+			message = "Custom stream reported a playback error."
+		}
 		l.last = tail(message, 300)
 		fmt.Fprintln(l.output, "yakker/mpv:", l.last)
 	}
@@ -202,38 +212,62 @@ type inputLine struct {
 }
 
 type controller struct {
-	cfg       Config
-	state     Status
-	stations  []Station
-	socket    string
-	mpris     string
-	player    *player
-	events    chan playerEvent
-	timer     *time.Timer
-	timerKind string
-	output    *json.Encoder
-	logs      io.Writer
-	writeErr  error
-	dvrTicker *time.Ticker
+	cfg           Config
+	state         Status
+	stations      []Station
+	bundled       []Station
+	custom        []CustomStation
+	customPath    string
+	customLoadErr error
+	socket        string
+	mpris         string
+	player        *player
+	events        chan playerEvent
+	timer         *time.Timer
+	timerKind     string
+	output        *json.Encoder
+	logs          io.Writer
+	writeErr      error
+	dvrTicker     *time.Ticker
 }
 
 func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Writer) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
+	useCustom := !cfg.DisableCustomStations && (cfg.StationFile == "" || cfg.CustomStationFile != "")
 	if err := cfg.defaults(); err != nil {
 		return err
 	}
-	stations, err := LoadStations(cfg.StationFile)
+	bundled, err := LoadStations(cfg.StationFile)
 	if err != nil {
 		return err
+	}
+	stations := bundled
+	var custom []CustomStation
+	var customErr error
+	customPath := ""
+	if useCustom {
+		customPath = cfg.CustomStationFile
+		if customPath == "" {
+			customPath, customErr = CustomStationPath()
+		}
+		if customErr == nil {
+			custom, customErr = LoadCustomStations(customPath, bundled)
+		}
+		if customErr == nil {
+			stations = MergeCustomStations(bundled, custom)
+		}
 	}
 	dir, lock, err := acquireRuntime(cfg.RuntimeBase)
 	if err != nil {
 		return err
 	}
 	defer lock.Close()
-	r := &controller{cfg: cfg, stations: stations, socket: filepath.Join(dir, "mpv.sock"), events: make(chan playerEvent, 64), output: json.NewEncoder(output), logs: logs,
-		state: Status{State: "stopped", Volume: 65, Station: stations[0], BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
+	r := &controller{cfg: cfg, stations: stations, bundled: bundled, custom: custom, customPath: customPath, customLoadErr: customErr, socket: filepath.Join(dir, "mpv.sock"), events: make(chan playerEvent, 64), output: json.NewEncoder(output), logs: logs,
+		state: Status{State: "stopped", Volume: 65, Station: stations[0], Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
+	if customErr != nil {
+		r.state.CustomStationError = "Unable to load custom stations; repair the file and restart Yakker."
+	}
 	defer r.cleanup()
 	defer r.clearTimer()
 	lines := make(chan inputLine)
@@ -369,6 +403,8 @@ func (r *controller) command(raw []byte) (bool, error) {
 	var action string
 	_ = json.Unmarshal(data["action"], &action)
 	switch action {
+	case "upsertStation", "deleteStation":
+		r.updateCustomStation(action, data)
 	case "configure":
 		window := r.cfg.DVRWindow
 		if raw, ok := data["bufferMinutes"]; ok {
@@ -398,7 +434,7 @@ func (r *controller) command(raw []byte) (bool, error) {
 				break
 			}
 		}
-		// Station IDs are unique and records are immutable after startup.
+		// Station IDs are unique across the current merged catalogue.
 		bufferChanged := window != r.cfg.DVRWindow
 		changed := station["id"] != r.state.Station["id"] || plugin != r.mpris || bufferChanged
 		r.cfg.DVRWindow = window
@@ -557,7 +593,7 @@ func (r *controller) start() {
 	args = append(args, "--", r.state.Station["streamUrl"].(string))
 	cmd := exec.Command(r.cfg.MPV, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
-	logs := &playerLog{output: r.logs}
+	logs := &playerLog{output: r.logs, private: r.state.Station["custom"] == true || r.state.Station["id"] == "cli"}
 	cmd.Stderr = logs
 	if err := cmd.Start(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, os.ErrNotExist) {

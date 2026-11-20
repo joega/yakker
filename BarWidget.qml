@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui as Ui
 import "." as Radio
 
@@ -93,9 +94,9 @@ Ui.BarWidget {
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : branding.implicitWidth + button.scaledHorizontalMargin * 2
     fontSize: Style.font.icon
-    foreground: Radio.RadioService.playbackState === "error" ? Color.urgent
-      : Radio.RadioService.playbackState === "playing" ? Color.accent
-      : root.bar ? root.bar.barForeground : Color.foreground
+    foreground: Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
+      : Radio.RadioService.playbackState === "playing" ? Commons.Color.accent
+      : root.bar ? root.bar.barForeground : Commons.Color.foreground
     tooltipText: Radio.RadioService.station.name + " · " + Radio.RadioService.statusText + "\nClick for controls · Right-click for stations"
     onPressed: buttonCode => {
       if (buttonCode === Qt.LeftButton) root.toggle()
@@ -133,8 +134,8 @@ Ui.BarWidget {
       anchors.bottom: parent.bottom
       anchors.margins: Style.space(3)
       visible: Radio.RadioService.playbackState !== "stopped"
-      color: Radio.RadioService.playbackState === "error" ? Color.urgent
-        : Radio.RadioService.playbackState === "playing" ? Color.accent : button.foreground
+      color: Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
+        : Radio.RadioService.playbackState === "playing" ? Commons.Color.accent : button.foreground
     }
   }
 }
