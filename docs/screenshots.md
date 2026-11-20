@@ -22,18 +22,9 @@ desktop theme or modify desktop configuration. Images use a two-times display
 scale for sharpness. Review every image after a capture, especially dropdown
 placement, text wrapping, and long editor screens.
 
-Each of the eight screenshots uses a different Omarchy theme:
-
-| Screenshot | Theme |
-| --- | --- |
-| `yakker-popup.png` | Solitude |
-| `yakker-dvr.png` | Nord |
-| `yakker-recordings.png` | Jade Horse |
-| `yakker-stations.png` | Lupine |
-| `yakker-schedule.png` | Catppuccin Latte |
-| `yakker-settings.png` | Ristretto |
-| `yakker-recording-player.png` | Tokyo Night |
-| `yakker-storage.png` | Flexoki Light |
+All eight screenshots use **Catppuccin Latte** for a consistent presentation.
+Yakker follows the user's active Omarchy theme; the screenshots are a shared
+visual reference, not a separate theme setting in Yakker.
 
 The images render the checkout's actual `Panel.qml`, `RecordingsView.qml`, and
 shared native controls. A headless wrapper reproduces the popup card's border,

@@ -1,10 +1,10 @@
 {
-  "popup": "solitude",
-  "dvr": "nord",
-  "recordings": "jade-horse",
-  "stations": "lupine",
+  "popup": "catppuccin-latte",
+  "dvr": "catppuccin-latte",
+  "recordings": "catppuccin-latte",
+  "stations": "catppuccin-latte",
   "schedule": "catppuccin-latte",
-  "settings": "ristretto",
-  "recording-player": "tokyo-night",
-  "storage": "flexoki-light"
+  "settings": "catppuccin-latte",
+  "recording-player": "catppuccin-latte",
+  "storage": "catppuccin-latte"
 }

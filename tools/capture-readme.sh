@@ -42,7 +42,7 @@ while IFS= read -r theme; do
     printf 'Unresolved shell template for %s\n' "$theme" >&2
     exit 1
   fi
-done < <(jq -r '.[]' "$capture_dir/themes.json")
+done < <(jq -r '[.[]] | unique[]' "$capture_dir/themes.json")
 cp -r "$shell_dir/Ui" "$capture_dir/imports/qs/Ui"
 cp "$project_dir/tools/readme/KeyboardPanel.qml" "$capture_dir/imports/qs/Ui/KeyboardPanel.qml"
 ln -s "$shell_dir/Commons" "$capture_dir/imports/qs/Commons"
@@ -71,4 +71,4 @@ if ! rg -q 'YAKKER_README_SCREENSHOTS_PASS' "$capture_dir/render.log"; then
   cat "$capture_dir/render.log"
   exit 1
 fi
-printf 'Rendered eight README screenshots with distinct themes in %s\n' "$output_dir"
+printf 'Rendered eight README screenshots in %s\n' "$output_dir"

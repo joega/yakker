@@ -62,7 +62,6 @@ ShellRoot {
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
           compare(Object.keys(themes).length, 8)
-          compare(new Set(Object.values(themes)).size, 8)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
