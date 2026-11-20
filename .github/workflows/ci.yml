@@ -1,0 +1,48 @@
+name: Linux checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.26.x', '1.27.x']
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+      - name: Install local audio-test dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends mpv
+      - name: Format, vet, module verification, race and real-player tests
+        env:
+          YAKKER_TEST_REAL_MPV: '1'
+        run: make check
+      - name: Build and check command help
+        run: |
+          make build
+          ./yakker --help
+          ./yakker listen --help
+          ./yakker tui --help
+      - name: Build release archives for Linux
+        if: matrix.go == '1.27.x'
+        run: |
+          make release TARGET_ARCH=amd64
+          make release TARGET_ARCH=arm64

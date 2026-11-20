@@ -1,0 +1,25 @@
+/yakker-controller
+/yakker
+/build/
+/dist/
+*.test
+*.pprof
+*.prof
+/.agents/
+/.codex/
+/.aws/
+
+# Local settings, credentials, and editor files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
+*.bak
+.local-source.json
+.idea/
+.vscode/
+.DS_Store
