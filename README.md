@@ -26,7 +26,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, cassette and settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with a weekday schedule, an active capture, and a saved show ready to play" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, Recordings and Settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with a weekday schedule, an active capture, and a saved show ready to play" width="240">](docs/yakker-recordings.png) |
 
 | Favorites and search | Weekly schedules | Settings and custom stations |
 | :---: | :---: | :---: |
@@ -220,7 +220,7 @@ independent of the desktop widget.
 
 ## Scheduled recordings
 
-Open the **cassette icon → New schedule**, choose a bundled or custom station, select
+Open the **Recordings icon → New schedule**, choose a bundled or custom station, select
 weekdays, enter start/end times in 24-hour format, and choose the timezone. Use
 **Preview next time** to check the resolved occurrence before saving. For example,
 WBZ-FM can record Fridays from `14:00` to `14:20` in `America/New_York`. A time
@@ -235,7 +235,7 @@ ones you want.
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
 playing a saved recording leaves those captures running. The bar dot turns red
-while capturing; the cassette button highlights and its tooltip shows the active count. The machine must be awake
+while capturing; the Recordings button highlights and its tooltip shows the active count. The machine must be awake
 with the plugin loaded in the bar. Disabling/removing the last widget, restarting
 the shell, or shutting down the helper interrupts captures. Recoverable output is
 retained as partial; when the plugin returns during the scheduled interval it can
