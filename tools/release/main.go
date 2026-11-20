@@ -37,7 +37,7 @@ var bundleFiles = []string{
 	"assets/README.md", "assets/sports-hub.png", "assets/weei-fm.png",
 	"assets/wscr.webp", "assets/wxyt-fm.webp", "assets/espn-new-york.png",
 	"assets/wfan.webp", "assets/wip-fm.webp", "assets/kdka-fm.png",
-	"assets/tsn-1050.png", "docs/yakker-popup.png",
+	"assets/tsn-1050.png", "docs/yakker-popup.png", "docs/yakker-stations.png",
 }
 
 type entry struct {

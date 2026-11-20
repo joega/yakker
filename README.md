@@ -8,10 +8,44 @@ Twenty-four stations across the US, Canada, UK and Ireland, streamed through hea
 The widget starts playback only when you press Play; the standalone CLI starts
 when you run `yakker listen` or `yakker tui`.
 
-![Yakker playback controls in the native popup](docs/yakker-popup.png)
-
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
+
+[Install](#install-locally) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+
+<p>
+  <img src="docs/yakker-popup.png" alt="Yakker playback controls" width="320">
+  <img src="docs/yakker-stations.png" alt="Yakker station picker with city search and live playback" width="320">
+</p>
+
+## Stations
+
+| Country | City | Station | CLI station ID |
+| --- | --- | --- | --- |
+| US | Atlanta | 92.9 The Game | `wzgc-fm` |
+| US | Boston | 98.5 The Sports Hub | `wbz-fm` |
+| US | Boston | WEEI 93.7 | `weei-fm` |
+| US | Chicago | 104.3 The Score | `wscr` |
+| US | Cleveland | 92.3 The Fan | `wkrk-fm` |
+| US | Columbus | 97.1 The Fan | `wbns-fm` |
+| US | Dallas–Fort Worth | 105.3 The Fan | `krld-fm` |
+| US | Denver | 104.3 The Fan | `kkfn-fm` |
+| US | Detroit | 97.1 The Ticket | `wxyt-fm` |
+| US | Los Angeles | AM 570 LA Sports | `klac` |
+| US | Minneapolis | KFAN 100.3 | `kfan` |
+| US | New York | ESPN New York 880 | `espn-new-york` |
+| US | New York | WFAN 101.9 / 660 | `wfan` |
+| US | Philadelphia | SportsRadio 94WIP | `wip-fm` |
+| US | Pittsburgh | 93.7 The Fan | `kdka-fm` |
+| US | San Diego | 97.3 The Fan | `kwfn-fm` |
+| US | Seattle | Seattle Sports 710 | `kiro-am` |
+| Canada | Montreal | TSN 690 | `tsn-690` |
+| Canada | Toronto | Sportsnet 590 The FAN | `sportsnet-590` |
+| Canada | Toronto | TSN 1050 | `tsn-1050` |
+| UK | London | BBC Radio 5 Live | `bbc-radio-5-live` |
+| UK | London | talkSPORT | `talksport` |
+| UK | London | talkSPORT 2 | `talksport-2` |
+| Ireland | Dublin | Off The Ball | `off-the-ball` |
 
 ## Requirements
 
@@ -203,34 +237,7 @@ The selected station, volume and mute are saved through Quattro's inline entry p
 }
 ```
 
-The bundled catalogue includes:
-
-| Country | City | Station | CLI station ID |
-| --- | --- | --- | --- |
-| US | Atlanta | 92.9 The Game | `wzgc-fm` |
-| US | Boston | 98.5 The Sports Hub | `wbz-fm` |
-| US | Boston | WEEI 93.7 | `weei-fm` |
-| US | Chicago | 104.3 The Score | `wscr` |
-| US | Cleveland | 92.3 The Fan | `wkrk-fm` |
-| US | Columbus | 97.1 The Fan | `wbns-fm` |
-| US | Dallas–Fort Worth | 105.3 The Fan | `krld-fm` |
-| US | Denver | 104.3 The Fan | `kkfn-fm` |
-| US | Detroit | 97.1 The Ticket | `wxyt-fm` |
-| US | Los Angeles | AM 570 LA Sports | `klac` |
-| US | Minneapolis | KFAN 100.3 | `kfan` |
-| US | New York | ESPN New York 880 | `espn-new-york` |
-| US | New York | WFAN 101.9 / 660 | `wfan` |
-| US | Philadelphia | SportsRadio 94WIP | `wip-fm` |
-| US | Pittsburgh | 93.7 The Fan | `kdka-fm` |
-| US | San Diego | 97.3 The Fan | `kwfn-fm` |
-| US | Seattle | Seattle Sports 710 | `kiro-am` |
-| Canada | Montreal | TSN 690 | `tsn-690` |
-| Canada | Toronto | Sportsnet 590 The FAN | `sportsnet-590` |
-| Canada | Toronto | TSN 1050 | `tsn-1050` |
-| UK | London | BBC Radio 5 Live | `bbc-radio-5-live` |
-| UK | London | talkSPORT | `talksport` |
-| UK | London | talkSPORT 2 | `talksport-2` |
-| Ireland | Dublin | Off The Ball | `off-the-ball` |
+Choose a station by ID from the [catalogue above](#stations).
 
 For example: `./yakker tui --station tsn-690 --volume 60` or
 `./yakker tui --station talksport --volume 60`.
