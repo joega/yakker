@@ -411,6 +411,13 @@ func TestEngineFinalizationCannotReplaceExistingFile(t *testing.T) {
 	if m.Snapshot().Recordings[0].Filename != r.Filename {
 		t.Fatal("unfinalized partial was lost")
 	}
+	if err := m.DeleteRecording(m.Snapshot().Revision, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	b, err = os.ReadFile(final)
+	if err != nil || string(b) != "existing retained file" {
+		t.Fatal("deleting the partial removed an unrelated final-name collision", err)
+	}
 }
 
 func TestEnginePostRenameSyncFailureFailsClosedAtDiskRevision(t *testing.T) {
@@ -482,9 +489,19 @@ func TestEngineMissingOutputRecoveryAndTransactionalResume(t *testing.T) {
 	if starts != 0 || len(m2.state.Recordings) != 1 || !m2.state.Recordings[0].Resume {
 		t.Fatal("failed successor commit consumed durable resume intent")
 	}
-	m2.persist = persistState
-	tick(m2)
-	if starts != 1 || len(m2.state.Recordings) != 2 || m2.state.Recordings[0].Resume {
+	// A storage failure stops the manager until the location is repaired and
+	// reopened; its durable resume intent must survive that restart.
+	if err := m2.Close(); err != nil {
+		t.Fatal(err)
+	}
+	m3, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m3.Close()
+	m3.startCapture, m3.freeBytes, m3.dependencyError = m2.startCapture, m2.freeBytes, ""
+	tick(m3)
+	if starts != 1 || len(m3.state.Recordings) != 2 || m3.state.Recordings[0].Resume {
 		t.Fatal("successor was not atomically linked")
 	}
 }
@@ -757,5 +774,142 @@ func TestLongUnavailablePeriodUsesBoundedMissedSummary(t *testing.T) {
 	}
 	if summaries != 1 || len(s.Recordings) > 4 {
 		t.Fatalf("unbounded or missing catch-up summary: %+v", s.Recordings)
+	}
+}
+
+func TestRetainedAudioAvailabilityRecoversWhenFolderReturns(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	row := m.Snapshot().Recordings[0]
+	path := filepath.Join(row.Folder, row.Filename)
+	if err := os.Rename(path, path+".away"); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := m.Snapshot(); snapshot.Recordings[0].Playable || snapshot.Recordings[0].Status != "missing" || snapshot.UsedBytes != 0 {
+		t.Fatal("missing file was offered for playback")
+	}
+	if err := os.Rename(path+".away", path); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := m.Snapshot(); !snapshot.Recordings[0].Playable || snapshot.UsedBytes == 0 {
+		t.Fatal("returned audio remained unavailable")
+	}
+}
+
+func TestUnexpectedStreamEndRetriesWithBoundedBackoff(t *testing.T) {
+	m, now, count := engineFixture(t)
+	m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		*count++
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		result := CaptureResult{Bytes: 40, DurationSeconds: 5, Err: errors.New("fixture disconnect")}
+		return &finishedCapture{result: result, done: resultChannel(result)}, nil
+	}
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	tick(m)
+	if *count != 1 || m.Snapshot().ActiveCount != 0 {
+		t.Fatal("first failure did not wait before retry")
+	}
+	*now = now.Add(time.Second)
+	tick(m)
+	tick(m)
+	if *count != 2 {
+		t.Fatal("first bounded retry missing")
+	}
+	*now = now.Add(time.Second)
+	tick(m)
+	if *count != 2 {
+		t.Fatal("second retry ignored its backoff")
+	}
+	*now = now.Add(time.Second)
+	tick(m)
+	tick(m)
+	if *count != 3 || m.Snapshot().ActiveCount != 0 {
+		t.Fatal("retry count or cleanup incorrect")
+	}
+	*now = now.Add(30 * time.Second)
+	tick(m)
+	if *count != 3 {
+		t.Fatal("retry budget allowed another encoder")
+	}
+	found := false
+	for _, row := range m.Snapshot().Recordings {
+		if strings.Contains(row.Reason, "retry limit") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("retry exhaustion was not surfaced")
+	}
+}
+
+func TestPersistenceFailureReapsActiveCapturesWithoutWaitingForShutdown(t *testing.T) {
+	for _, afterRename := range []bool{false, true} {
+		t.Run(fmt.Sprint(afterRename), func(t *testing.T) {
+			m, now, _ := engineFixture(t)
+			saveRule(t, m, rule("a"))
+			*now = now.Add(time.Hour)
+			tick(m)
+			old := m.Snapshot()
+			m.persist = func(path string, state diskState) error {
+				if afterRename {
+					if err := persistState(path, state); err != nil {
+						return err
+					}
+					return committedWriteError{errors.New("fixture sync failure")}
+				}
+				return errors.New("fixture write failure")
+			}
+			settings := old.Settings
+			settings.StorageCapBytes++
+			if err := m.SetSettings(old.Revision, settings); err == nil {
+				t.Fatal("write failure hidden")
+			}
+			deadline := time.Now().Add(time.Second)
+			for m.Snapshot().ActiveCount != 0 {
+				if time.Now().After(deadline) {
+					t.Fatal("active capture survived durability failure")
+				}
+				time.Sleep(time.Millisecond)
+			}
+			if m.Snapshot().Available {
+				t.Fatal("writes remained available after persistence failure")
+			}
+			disk, err := loadState(m.path)
+			if err != nil || len(disk.Recordings) != 1 || disk.Recordings[0].Filename == "" {
+				t.Fatal("recoverable file identity lost", err)
+			}
+		})
+	}
+}
+
+func TestIndexCapacityStopsCapturesWithoutBlockingHistoryCleanup(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	old := m.Snapshot()
+	m.persist = func(string, diskState) error { return errIndexFull }
+	settings := old.Settings
+	settings.StorageCapBytes++
+	if err := m.SetSettings(old.Revision, settings); !errors.Is(err, errIndexFull) {
+		t.Fatal(err)
+	}
+	if !m.Snapshot().Available || m.Snapshot().Settings != old.Settings {
+		t.Fatal("capacity rejection blocked cleanup or published settings")
+	}
+	m.persist = persistState
+	waitFinished(t, m)
+	row := m.Snapshot().Recordings[0]
+	if err := m.DeleteRecording(m.Snapshot().Revision, row.ID); err != nil {
+		t.Fatal("history could not be removed after capacity rejection", err)
 	}
 }

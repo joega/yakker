@@ -14,10 +14,12 @@ import (
 
 type entry struct {
 	Recording
-	StreamURL  string `json:"streamUrl,omitempty"`
-	Occurrence string `json:"occurrence"`
-	Resume     bool   `json:"resume,omitempty"`
-	Deleting   bool   `json:"deleting,omitempty"`
+	StreamURL   string `json:"streamUrl,omitempty"`
+	Occurrence  string `json:"occurrence"`
+	Resume      bool   `json:"resume,omitempty"`
+	Deleting    bool   `json:"deleting,omitempty"`
+	Failures    int    `json:"failures,omitempty"`
+	ResumeAfter string `json:"resumeAfter,omitempty"`
 }
 
 type diskState struct {
@@ -32,6 +34,8 @@ type diskState struct {
 }
 
 type committedWriteError struct{ error }
+
+var errIndexFull = errors.New("recording history index is full; delete retained history entries")
 
 func (s diskState) clone() diskState {
 	n := s
@@ -79,6 +83,9 @@ func validateState(s diskState) error {
 	}
 	ids = map[string]bool{}
 	for _, r := range s.Recordings {
+		if r.Failures < 0 || r.Failures > 3 || (r.ResumeAfter != "" && parseTime(r.ResumeAfter).IsZero()) {
+			return errors.New("invalid recording retry state")
+		}
 		if !identifier.MatchString(r.ID) || ids[r.ID] || !identifier.MatchString(r.ScheduleID) || !identifier.MatchString(r.StationID) || !textOK(r.Label, 256) || !textOK(r.StationName, 256) || !textOK(r.Reason, 1024) || r.Bytes < 0 || r.DurationSeconds < 0 {
 			return errors.New("invalid recording index entry")
 		}
@@ -148,7 +155,7 @@ func persistState(path string, s diskState) error {
 		return err
 	}
 	if len(b) > maxIndexBytes {
-		return errors.New("recording index exceeds 8 MiB")
+		return errIndexFull
 	}
 	f, err := os.CreateTemp(filepath.Dir(path), ".recordings-*.tmp")
 	if err != nil {
@@ -227,7 +234,19 @@ func removeManaged(r entry) error {
 		return errors.New("recording folder is unavailable")
 	}
 	defer root.Close()
-	for _, name := range []string{r.ID + ".partial", r.ID + ".opus"} {
+	names := []string{r.Filename}
+	other := r.ID + ".partial"
+	if other == r.Filename {
+		other = r.ID + ".opus"
+	}
+	current, currentErr := root.Lstat(r.Filename)
+	alternate, alternateErr := root.Lstat(other)
+	if currentErr == nil && alternateErr == nil && os.SameFile(current, alternate) {
+		// An interrupted finalization may leave two links to our audio. Remove
+		// the alternate first so the persisted primary remains recoverable.
+		names = []string{other, r.Filename}
+	}
+	for _, name := range names {
 		info, err := root.Lstat(name)
 		if errors.Is(err, os.ErrNotExist) {
 			continue

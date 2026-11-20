@@ -124,16 +124,55 @@ func (m *Manager) notify() {
 	}
 }
 func (m *Manager) fail(err error) { m.err = err.Error(); m.notify() }
-func (m *Manager) commit(s diskState) error {
-	s.Revision = m.state.Revision + 1
-	if err := m.persist(m.path, s); err != nil {
-		var committed committedWriteError
-		if errors.As(err, &committed) {
-			m.state = s
-			m.readOnly = true
+func (m *Manager) persistenceFailed(s diskState, err error) error {
+	if errors.Is(err, errIndexFull) {
+		// Capacity rejection happens before any disk replacement. Keep deletion
+		// available so the user can make room, while stopping further media growth.
+		for _, job := range m.jobs {
+			m.requestStop(job, "recording history index is full", false)
 		}
 		m.fail(err)
 		return err
+	}
+	var committed committedWriteError
+	if errors.As(err, &committed) {
+		m.state = s
+	}
+	m.readOnly = true
+	m.fail(errors.New(err.Error() + ". Repair the metadata location and reopen the plugin"))
+	// A recorder must not keep writing media once its durable transitions can
+	// no longer be saved. Stop/reap in parallel without holding the state lock.
+	jobs := make(map[string]*activeJob, len(m.jobs))
+	captures := make([]captureJob, 0, len(m.jobs))
+	for id, job := range m.jobs {
+		jobs[id] = job
+		captures = append(captures, job.capture)
+		job.stopping = true
+	}
+	if len(jobs) > 0 {
+		go func() {
+			var wg sync.WaitGroup
+			for _, capture := range captures {
+				wg.Add(1)
+				go func(c captureJob) { defer wg.Done(); c.Stop() }(capture)
+			}
+			wg.Wait()
+			m.mu.Lock()
+			defer m.mu.Unlock()
+			for id, job := range jobs {
+				if m.jobs[id] == job {
+					delete(m.jobs, id)
+				}
+			}
+			m.notify()
+		}()
+	}
+	return err
+}
+func (m *Manager) commit(s diskState) error {
+	s.Revision = m.state.Revision + 1
+	if err := m.persist(m.path, s); err != nil {
+		return m.persistenceFailed(s, err)
 	}
 	m.state = s
 	m.err = ""
@@ -166,9 +205,21 @@ func (m *Manager) Snapshot() Snapshot {
 	}
 	for _, r := range m.state.Recordings {
 		rec := r.Recording
+		rec.Playable = false
 		if info, _, err := managedInfo(r); err == nil {
 			rec.Bytes = info.Size()
 			s.UsedBytes += info.Size()
+			rec.Playable = r.Status != "recording" && r.DurationSeconds > 0 && info.Size() > 0
+			if r.Status == "missing" && rec.Playable {
+				rec.Status = "partial"
+				rec.Reason = "Retained audio is available again"
+			}
+		} else if r.Filename != "" && (r.Status == "complete" || r.Status == "partial" || r.Status == "missing") {
+			rec.Status, rec.Bytes, rec.Reason = "missing", 0, "Recording audio is currently unavailable"
+		}
+		if r.Status == "recording" && m.readOnly && m.jobs[r.ID] == nil {
+			rec.Status = "partial"
+			rec.Reason = "Capture stopped because recording metadata could not be saved"
 		}
 		s.Recordings = append(s.Recordings, rec)
 	}
@@ -428,6 +479,9 @@ func (m *Manager) usedLocked() int64 {
 }
 
 func (m *Manager) tickLocked() {
+	if m.closed || m.readOnly {
+		return
+	}
 	now := m.config.Now()
 	if len(m.jobs) == 0 {
 		work := false
@@ -497,12 +551,15 @@ func (m *Manager) tickLocked() {
 			}
 		}
 	}
-	// Remainder segments are permitted only for explicitly interrupted jobs.
+	// Persisted resume intent creates a separate, linked remainder segment.
 	for _, r := range append([]entry{}, m.state.Recordings...) {
 		if !r.Resume {
 			continue
 		}
 		if _, ok := m.jobs[r.ID]; ok {
+			continue
+		}
+		if r.ResumeAfter != "" && now.Before(parseTime(r.ResumeAfter)) && now.Before(parseTime(r.PlannedEnd)) {
 			continue
 		}
 		if now.Before(parseTime(r.PlannedEnd)) && !now.Before(parseTime(r.PlannedStart)) {
@@ -548,12 +605,7 @@ func (m *Manager) tickLocked() {
 		s.Cursor = timestamp(now)
 		pruneSeen(&s)
 		if err := m.persist(m.path, s); err != nil {
-			var committed committedWriteError
-			if errors.As(err, &committed) {
-				m.state = s
-				m.readOnly = true
-			}
-			m.fail(err)
+			m.persistenceFailed(s, err)
 			return
 		}
 		m.state = s
@@ -643,7 +695,9 @@ func (m *Manager) startLocked(rule Schedule, o occurrence, now time.Time, parent
 	if parent != "" {
 		for i := range s.Recordings {
 			if s.Recordings[i].ID == parent {
+				r.Failures = s.Recordings[i].Failures
 				s.Recordings[i].Resume = false
+				s.Recordings[i].ResumeAfter = ""
 			}
 		}
 	}
@@ -696,6 +750,18 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	}
 	if result.Err != nil && r.Reason == "" {
 		r.Reason = "stream or encoder interrupted"
+	}
+	if job.reason == "" && m.config.Now().Before(parseTime(r.PlannedEnd).Add(-2*time.Second)) {
+		// Unexpected EOF and stream/encoder failures retry at most twice, while
+		// explicit user/storage/lifecycle stops keep their own resume policy.
+		r.Failures++
+		if r.Failures < 3 {
+			r.Resume = true
+			r.ResumeAfter = timestamp(m.config.Now().Add(time.Duration(r.Failures) * time.Second))
+		} else {
+			r.Resume = false
+			r.Reason = "stream interrupted; recording retry limit reached"
+		}
 	}
 	if result.Bytes > 0 && result.DurationSeconds > 0 {
 		r.Status = "complete"
@@ -854,13 +920,7 @@ func (m *Manager) compactLocked() error {
 
 func (m *Manager) checkpointLocked(s diskState) error {
 	if err := m.persist(m.path, s); err != nil {
-		var committed committedWriteError
-		if errors.As(err, &committed) {
-			m.state = s
-			m.readOnly = true
-		}
-		m.fail(err)
-		return err
+		return m.persistenceFailed(s, err)
 	}
 	m.state = s
 	return nil

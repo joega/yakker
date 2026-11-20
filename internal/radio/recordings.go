@@ -58,7 +58,16 @@ func (r *controller) recordingCommand(action string, data map[string]json.RawMes
 	r.refreshRecordings()
 }
 
-func (r *controller) resolveRecordingStation(schedule *recording.Schedule) error {
+func (r *controller) resolveRecordingStation(schedule *recording.Schedule, refresh bool) error {
+	if refresh {
+		for _, station := range r.stations {
+			if station["id"] == schedule.StationID {
+				schedule.StationName, _ = station["name"].(string)
+				schedule.StreamURL, _ = station["streamUrl"].(string)
+				return nil
+			}
+		}
+	}
 	if r.recorder != nil {
 		for _, saved := range r.recorder.Snapshot().Schedules {
 			if saved.ID == schedule.ID && saved.StationID == schedule.StationID {
@@ -83,10 +92,14 @@ func (r *controller) previewScheduleCommand(data map[string]json.RawMessage) {
 	var schedule recording.Schedule
 	err := decodeRecordingField(data, "schedule", &schedule)
 	if err == nil {
-		err = r.resolveRecordingStation(&schedule)
+		err = r.resolveRecordingStation(&schedule, false)
 	}
 	if err == nil {
-		schedule, err = recording.PreviewSchedule(schedule, time.Now())
+		now := time.Now()
+		if r.cfg.RecordingConfig != nil && r.cfg.RecordingConfig.Now != nil {
+			now = r.cfg.RecordingConfig.Now()
+		}
+		schedule, err = recording.PreviewSchedule(schedule, now)
 	}
 	if err != nil {
 		r.state.SchedulePreviewError = head(err.Error(), 240)
@@ -115,8 +128,26 @@ func (r *controller) applyRecordingCommand(action string, data map[string]json.R
 		if err := decodeRecordingField(data, "schedule", &schedule); err != nil {
 			return err
 		}
+		if schedule.ID != "" {
+			found := false
+			for _, saved := range r.recorder.Snapshot().Schedules {
+				if saved.ID == schedule.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return errors.New("This schedule was removed. Create a new schedule instead.")
+			}
+		}
 		// Resolve identity independently of metadata supplied over IPC.
-		if err := r.resolveRecordingStation(&schedule); err != nil {
+		refresh := false
+		if _, present := data["refreshStation"]; present {
+			if err := decodeRecordingField(data, "refreshStation", &refresh); err != nil {
+				return err
+			}
+		}
+		if err := r.resolveRecordingStation(&schedule, refresh); err != nil {
 			return err
 		}
 		return r.recorder.UpsertSchedule(revision, schedule)
@@ -189,7 +220,7 @@ func (r *controller) seekRecordingCommand(data map[string]json.RawMessage) error
 }
 
 func (r *controller) seekFile(value float64) error {
-	if !r.state.Wanted || r.player == nil || r.state.PlaybackKind != "recording" {
+	if !r.state.Wanted || r.player == nil || r.player.conn == nil || r.state.PlaybackKind != "recording" {
 		return errors.New("Play a recording before seeking.")
 	}
 	if math.IsNaN(value) || math.IsInf(value, 0) {

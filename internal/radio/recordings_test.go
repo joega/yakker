@@ -92,6 +92,41 @@ func TestExplicitSessionsDoNotOpenRecordingStorage(t *testing.T) {
 	}
 }
 
+func TestScheduleRefreshUsesTrustedStationAndPreservesSavedSourceUntilSave(t *testing.T) {
+	base := tempDir(t)
+	h := newHarness(t, Config{CustomStationFile: filepath.Join(base, "custom.json"), RecordingConfig: &recording.Config{DataDir: filepath.Join(base, "data"), DefaultFolder: filepath.Join(base, "media"), PollInterval: time.Hour}}, false)
+	custom := CustomStation{Name: "Custom", StreamURL: "https://example.test/old"}
+	serial := h.send("upsertStation", "station", custom)
+	state := h.wait(func(s Status) bool { return s.CustomMutationSerial == serial })
+	if !state.CustomMutationOK {
+		t.Fatal(state.CustomStationError)
+	}
+	for _, station := range state.Stations {
+		if station["custom"] == true {
+			custom.ID, _ = station["id"].(string)
+		}
+	}
+	rule := recording.Schedule{StationID: custom.ID, Weekdays: []int{1}, StartTime: "10:00", EndTime: "10:20", Timezone: "UTC"}
+	serial = h.send("upsertSchedule", "revision", state.Recordings.Revision, "schedule", rule)
+	state = h.wait(func(s Status) bool { return s.RecordingMutationSerial == serial })
+	if !state.RecordingMutationOK {
+		t.Fatal(state.RecordingError)
+	}
+	rule = state.Recordings.Schedules[0]
+	custom.StreamURL = "https://example.test/new"
+	serial = h.send("upsertStation", "station", custom)
+	state = h.wait(func(s Status) bool { return s.CustomMutationSerial == serial })
+	if state.Recordings.Schedules[0].StreamURL != "https://example.test/old" {
+		t.Fatal("station edit silently changed a saved recording source")
+	}
+	rule.StreamURL = "file:///untrusted"
+	serial = h.send("upsertSchedule", "revision", state.Recordings.Revision, "schedule", rule, "refreshStation", true)
+	state = h.wait(func(s Status) bool { return s.RecordingMutationSerial == serial })
+	if !state.RecordingMutationOK || state.Recordings.Schedules[0].StreamURL != custom.StreamURL || state.Wanted {
+		t.Fatal("explicit refresh did not use trusted current stream", state.RecordingError)
+	}
+}
+
 func TestRecordedFilePauseSeekAndEOFAreIndependentOfLiveBuffer(t *testing.T) {
 	client, server := net.Pipe()
 	defer client.Close()

@@ -41,6 +41,7 @@ type Recording struct {
 	Folder          string  `json:"folder"`
 	Filename        string  `json:"filename"`
 	ParentID        string  `json:"parentId,omitempty"`
+	Playable        bool    `json:"playable"`
 }
 
 type Snapshot struct {
