@@ -30,7 +30,7 @@ jobs:
       - name: Install local audio-test dependency
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends mpv
+          sudo apt-get install -y --no-install-recommends mpv ffmpeg
       - name: Format, vet, module verification, race and real-player tests
         env:
           YAKKER_TEST_REAL_MPV: '1'

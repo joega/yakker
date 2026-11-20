@@ -108,7 +108,7 @@ func (r *controller) setPaused(paused bool) error {
 	if paused == r.state.Paused {
 		return nil
 	}
-	if paused {
+	if paused && r.state.PlaybackKind != "recording" {
 		if err := r.enableTemporaryBuffer(); err != nil {
 			return err
 		}

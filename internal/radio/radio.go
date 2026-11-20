@@ -22,35 +22,48 @@ import (
 	"syscall"
 	"time"
 	"unicode/utf8"
+
+	"github.com/joega/yakker/internal/recording"
 )
 
 type Station map[string]any
 
 type Status struct {
-	State                string    `json:"state"`
-	Wanted               bool      `json:"wanted"`
-	Error                string    `json:"error"`
-	Volume               int       `json:"volume"`
-	Muted                bool      `json:"muted"`
-	Title                string    `json:"title"`
-	Station              Station   `json:"station"`
-	Stations             []Station `json:"stations"`
-	CustomStationError   string    `json:"customStationError"`
-	CustomMutationSerial int64     `json:"customMutationSerial"`
-	CustomMutationOK     bool      `json:"customMutationOK"`
-	Retry                int       `json:"retry"`
-	RetryDelay           float64   `json:"retryDelay"`
-	PlayerPID            int       `json:"playerPid"`
-	MPRIS                bool      `json:"mpris"`
-	Serial               int64     `json:"serial"`
-	Paused               bool      `json:"paused"`
-	BufferMinutes        int       `json:"bufferMinutes"`
-	TemporaryBuffer      bool      `json:"temporaryBuffer"`
-	DVR                  bool      `json:"dvr"`
-	Position             float64   `json:"position"`
-	BufferStart          float64   `json:"bufferStart"`
-	BufferEnd            float64   `json:"bufferEnd"`
-	BufferExpired        bool      `json:"bufferExpired"`
+	State                   string              `json:"state"`
+	Wanted                  bool                `json:"wanted"`
+	Error                   string              `json:"error"`
+	Volume                  int                 `json:"volume"`
+	Muted                   bool                `json:"muted"`
+	Title                   string              `json:"title"`
+	Station                 Station             `json:"station"`
+	Stations                []Station           `json:"stations"`
+	CustomStationError      string              `json:"customStationError"`
+	CustomMutationSerial    int64               `json:"customMutationSerial"`
+	CustomMutationOK        bool                `json:"customMutationOK"`
+	Retry                   int                 `json:"retry"`
+	RetryDelay              float64             `json:"retryDelay"`
+	PlayerPID               int                 `json:"playerPid"`
+	MPRIS                   bool                `json:"mpris"`
+	Serial                  int64               `json:"serial"`
+	Paused                  bool                `json:"paused"`
+	BufferMinutes           int                 `json:"bufferMinutes"`
+	TemporaryBuffer         bool                `json:"temporaryBuffer"`
+	DVR                     bool                `json:"dvr"`
+	Position                float64             `json:"position"`
+	BufferStart             float64             `json:"bufferStart"`
+	BufferEnd               float64             `json:"bufferEnd"`
+	BufferExpired           bool                `json:"bufferExpired"`
+	Recordings              *recording.Snapshot `json:"recordings,omitempty"`
+	RecordingMutationSerial int64               `json:"recordingMutationSerial"`
+	RecordingMutationOK     bool                `json:"recordingMutationOK"`
+	RecordingError          string              `json:"recordingError"`
+	SchedulePreview         *recording.Schedule `json:"schedulePreview,omitempty"`
+	SchedulePreviewSerial   int64               `json:"schedulePreviewSerial"`
+	SchedulePreviewError    string              `json:"schedulePreviewError"`
+	PlaybackKind            string              `json:"playbackKind"`
+	RecordingID             string              `json:"recordingId"`
+	RecordingTitle          string              `json:"recordingTitle"`
+	Duration                float64             `json:"duration"`
 }
 
 // Config overrides are used by the standalone CLI and tests; normal plugin
@@ -60,6 +73,8 @@ type Config struct {
 	StationFile           string
 	CustomStationFile     string
 	DisableCustomStations bool
+	RecordingConfig       *recording.Config
+	DisableRecordings     bool
 	MPV                   string
 	MPVArgs               []string
 	ConnectTimeout        time.Duration
@@ -229,12 +244,15 @@ type controller struct {
 	logs          io.Writer
 	writeErr      error
 	dvrTicker     *time.Ticker
+	recorder      *recording.Manager
+	recordingPath string
 }
 
 func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Writer) error {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	useCustom := !cfg.DisableCustomStations && (cfg.StationFile == "" || cfg.CustomStationFile != "")
+	useRecordings := !cfg.DisableRecordings && (cfg.StationFile == "" || cfg.RecordingConfig != nil)
 	if err := cfg.defaults(); err != nil {
 		return err
 	}
@@ -264,12 +282,18 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 	}
 	defer lock.Close()
 	r := &controller{cfg: cfg, stations: stations, bundled: bundled, custom: custom, customPath: customPath, customLoadErr: customErr, socket: filepath.Join(dir, "mpv.sock"), events: make(chan playerEvent, 64), output: json.NewEncoder(output), logs: logs,
-		state: Status{State: "stopped", Volume: 65, Station: stations[0], Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
+		state: Status{State: "stopped", PlaybackKind: "live", Volume: 65, Station: stations[0], Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
 	if customErr != nil {
 		r.state.CustomStationError = "Unable to load custom stations; repair the file and restart Yakker."
 	}
 	defer r.cleanup()
 	defer r.clearTimer()
+	if useRecordings {
+		r.openRecorder()
+		if r.recorder != nil {
+			defer func() { r.stop(); _ = r.recorder.Close() }()
+		}
+	}
 	lines := make(chan inputLine)
 	done := make(chan struct{})
 	defer close(done)
@@ -305,6 +329,10 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 		if r.dvrTicker != nil {
 			dvrTick = r.dvrTicker.C
 		}
+		var recordingUpdates <-chan struct{}
+		if r.recorder != nil {
+			recordingUpdates = r.recorder.Updates()
+		}
 		var exited <-chan struct{}
 		if r.player != nil && r.player.conn == nil {
 			// Once connected, consume socket events in order, including end-file stop
@@ -329,7 +357,15 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 				return nil
 			}
 		case <-dvrTick:
-			r.updateDVR()
+			if r.state.PlaybackKind == "recording" {
+				r.state.Position = r.currentPosition()
+				_ = r.publish()
+			} else {
+				r.updateDVR()
+			}
+		case <-recordingUpdates:
+			r.refreshRecordings()
+			_ = r.publish()
 		case <-exited:
 			r.fail(r.player.logs.message("The player disconnected"))
 		case event := <-r.events:
@@ -403,6 +439,14 @@ func (r *controller) command(raw []byte) (bool, error) {
 	var action string
 	_ = json.Unmarshal(data["action"], &action)
 	switch action {
+	case "previewSchedule":
+		r.previewScheduleCommand(data)
+	case "recordingSettings", "upsertSchedule", "deleteSchedule", "stopRecording", "deleteRecording":
+		r.recordingCommand(action, data)
+	case "playRecording":
+		return false, r.playRecordingCommand(data)
+	case "seekRecording":
+		return false, r.seekRecordingCommand(data)
 	case "upsertStation", "deleteStation":
 		r.updateCustomStation(action, data)
 	case "configure":
@@ -436,7 +480,8 @@ func (r *controller) command(raw []byte) (bool, error) {
 		}
 		// Station IDs are unique across the current merged catalogue.
 		bufferChanged := window != r.cfg.DVRWindow
-		changed := station["id"] != r.state.Station["id"] || plugin != r.mpris || bufferChanged
+		stationChanged := station["id"] != r.state.Station["id"]
+		changed := stationChanged || plugin != r.mpris || (bufferChanged && r.state.PlaybackKind != "recording")
 		r.cfg.DVRWindow = window
 		if bufferChanged {
 			r.cfg.DVRBytes = dvrByteLimit(window)
@@ -447,16 +492,25 @@ func (r *controller) command(raw []byte) (bool, error) {
 		r.state.MPRIS = plugin != ""
 		if changed {
 			wanted, paused := r.state.Wanted, r.state.Paused && !bufferChanged && !r.state.TemporaryBuffer
+			wasRecording := r.state.PlaybackKind == "recording"
 			r.stop()
+			if stationChanged {
+				r.selectLivePlayback()
+			}
 			if wanted {
 				r.state.Paused = paused
-				r.play()
+				if wasRecording && !stationChanged {
+					r.startRecordingPlayback()
+				} else {
+					r.play()
+				}
 			}
 		}
 	case "play":
 		if r.state.Wanted {
 			return false, r.setPaused(false)
 		}
+		r.selectLivePlayback()
 		r.play()
 	case "pause":
 		return false, r.setPaused(true)
@@ -469,8 +523,17 @@ func (r *controller) command(raw []byte) (bool, error) {
 		if action == "skip" {
 			value += r.currentPosition()
 		}
+		if r.state.PlaybackKind == "recording" {
+			return false, r.seekFile(value)
+		}
 		return false, r.seekDVR(value)
 	case "live":
+		if r.state.PlaybackKind == "recording" {
+			r.stop()
+			r.selectLivePlayback()
+			r.play()
+			return false, nil
+		}
 		if !r.state.Wanted {
 			r.play()
 			return false, nil
@@ -584,13 +647,20 @@ func (r *controller) start() {
 	}
 	cacheSeconds := window.Seconds() + 10
 	backBytes := bytes
+	input, title := r.state.Station["streamUrl"].(string), r.state.Station["name"].(string)
+	cacheEnabled := "yes"
+	if r.state.PlaybackKind == "recording" {
+		input, title, cacheEnabled = r.recordingPath, r.state.RecordingTitle, "no"
+		// File decoding still needs a forward packet queue even with cache=no.
+		cacheSeconds, bytes, backBytes = 3, 2*1024*1024, 0
+	}
 	args = append(args, "--no-config", "--load-scripts=no", "--no-video", "--no-audio-display", "--idle=no", "--terminal=no", "--input-terminal=no", "--keep-open=no",
-		"--cache=yes", fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", bytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",
-		"--input-ipc-server="+r.socket, fmt.Sprintf("--volume=%d", r.state.Volume), "--mute="+map[bool]string{true: "yes", false: "no"}[r.state.Muted], "--force-media-title="+r.state.Station["name"].(string))
+		"--cache="+cacheEnabled, fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", bytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",
+		"--input-ipc-server="+r.socket, fmt.Sprintf("--volume=%d", r.state.Volume), "--mute="+map[bool]string{true: "yes", false: "no"}[r.state.Muted], "--force-media-title="+title)
 	if r.mpris != "" {
 		args = append(args, "--script="+r.mpris)
 	}
-	args = append(args, "--", r.state.Station["streamUrl"].(string))
+	args = append(args, "--", input)
 	cmd := exec.Command(r.cfg.MPV, args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGTERM}
 	logs := &playerLog{output: r.logs, private: r.state.Station["custom"] == true || r.state.Station["id"] == "cli"}
@@ -636,7 +706,9 @@ func (r *controller) connect() {
 		}
 	}
 	observed := []string{"volume", "mute", "metadata", "core-idle", "pause", "time-pos"}
-	if r.effectiveWindow() > 0 {
+	if r.state.PlaybackKind == "recording" {
+		observed = append(observed, "duration")
+	} else if r.effectiveWindow() > 0 {
 		observed = append(observed, "demuxer-cache-state")
 	}
 	for i, name := range observed {
@@ -646,7 +718,9 @@ func (r *controller) connect() {
 		}
 	}
 	r.after("deadline", r.cfg.ConnectTimeout)
-	if r.effectiveWindow() > 0 {
+	if r.state.PlaybackKind == "recording" {
+		r.fileTicker()
+	} else if r.effectiveWindow() > 0 {
 		r.dvrTicker = time.NewTicker(r.cfg.DVRPollInterval)
 	}
 	go func() {
@@ -696,7 +770,7 @@ func (r *controller) fail(message string) {
 		return
 	}
 	r.state.Error = head(message, 240)
-	if r.state.Retry >= len(r.cfg.RetryDelays) {
+	if r.state.PlaybackKind == "recording" || r.state.Retry >= len(r.cfg.RetryDelays) {
 		r.state.Wanted = false
 		r.state.Paused = false
 		r.state.TemporaryBuffer = false
@@ -732,6 +806,9 @@ func (r *controller) watchdogRemaining() time.Duration {
 	if p == nil || (r.state.State != "playing" && r.state.State != "paused") {
 		return 0
 	}
+	if r.pausedFile() {
+		return r.cfg.StallTimeout
+	}
 	last := max(time.Duration(p.lastProgress.Load()), p.playbackSince)
 	if r.state.Paused {
 		last = max(time.Duration(p.lastIntake.Load()), p.playbackSince)
@@ -748,11 +825,12 @@ type playbackProperties struct {
 	volume              int
 	muted               bool
 	retryDelay          float64
+	duration            float64
 }
 
 func (r *controller) properties() playbackProperties {
 	s := &r.state
-	return playbackProperties{s.State, s.Error, s.Title, s.Volume, s.Muted, s.RetryDelay}
+	return playbackProperties{s.State, s.Error, s.Title, s.Volume, s.Muted, s.RetryDelay, s.Duration}
 }
 
 func (r *controller) event(event mpvEvent) {
@@ -761,7 +839,7 @@ func (r *controller) event(event mpvEvent) {
 	kind, name, value := event.Event, event.Name, event.Data
 	if kind == "end-file" {
 		reason := event.Reason
-		if reason == "stop" {
+		if reason == "stop" || (r.state.PlaybackKind == "recording" && reason == "eof") {
 			r.stop()
 			_ = r.publish()
 			return
@@ -790,6 +868,8 @@ func (r *controller) event(event mpvEvent) {
 	}
 	if kind == "property-change" {
 		switch name {
+		case "duration":
+			r.fileDuration(value)
 		case "core-idle":
 			if value == true && r.state.State == "playing" && !r.state.Paused {
 				r.state.State = "connecting"
@@ -824,7 +904,7 @@ func (r *controller) event(event mpvEvent) {
 					}
 					r.player.pendingPause = nil
 				}
-				if paused && r.effectiveWindow() == 0 {
+				if paused && r.effectiveWindow() == 0 && r.state.PlaybackKind != "recording" {
 					if err := r.enableTemporaryBuffer(); err != nil {
 						r.fail(err.Error())
 						return

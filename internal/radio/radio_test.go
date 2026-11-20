@@ -238,7 +238,7 @@ func newHarness(t *testing.T, cfg Config, subprocess bool) *harness {
 		if os.Getenv("YAKKER_FAKE_OWNER") == "1" {
 			cmd = exec.Command(testBinary, "--fake-owner", controllerBinary)
 		}
-		cmd.Env = append(os.Environ(), "XDG_RUNTIME_DIR="+h.base, "PATH="+h.base+":"+os.Getenv("PATH"), "GORACE=atexit_sleep_ms=0")
+		cmd.Env = append(os.Environ(), "XDG_RUNTIME_DIR="+h.base, "XDG_DATA_HOME="+filepath.Join(h.base, "data"), "PATH="+h.base+":"+os.Getenv("PATH"), "GORACE=atexit_sleep_ms=0")
 		var err error
 		h.input, err = cmd.StdinPipe()
 		if err != nil {
@@ -273,6 +273,7 @@ func newHarness(t *testing.T, cfg Config, subprocess bool) *harness {
 	go func() {
 		defer close(h.states)
 		scanner := bufio.NewScanner(output)
+		scanner.Buffer(make([]byte, 4096), 16*1024*1024)
 		for scanner.Scan() {
 			var s Status
 			if err := json.Unmarshal(scanner.Bytes(), &s); err != nil {

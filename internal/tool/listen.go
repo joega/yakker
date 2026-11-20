@@ -231,7 +231,7 @@ func listenSession(parent context.Context, cfg radio.Config, stationID string, o
 	go func() {
 		defer close(states)
 		scanner := bufio.NewScanner(outR)
-		scanner.Buffer(make([]byte, 4096), 2*1024*1024)
+		scanner.Buffer(make([]byte, 4096), 16*1024*1024)
 		for scanner.Scan() {
 			var status radio.Status
 			err := json.Unmarshal(scanner.Bytes(), &status)

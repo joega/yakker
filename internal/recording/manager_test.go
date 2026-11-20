@@ -40,6 +40,7 @@ func engineFixture(t *testing.T) (*Manager, *time.Time, *int) {
 		}
 		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
 	}
+	m.dependencyError = "" // The deterministic fixture replaces the encoder.
 	m.freeBytes = func(string) (int64, error) { return 1 << 40, nil }
 	t.Cleanup(func() {
 		if err := m.Close(); err != nil {
@@ -354,6 +355,7 @@ func TestEngineCloseReapsAndReloadSuppresses(t *testing.T) {
 		}
 		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
 	}
+	m2.dependencyError = ""
 	m2.freeBytes = m.freeBytes
 	tick(m2)
 	rows := m2.Snapshot().Recordings
@@ -466,6 +468,7 @@ func TestEngineMissingOutputRecoveryAndTransactionalResume(t *testing.T) {
 		t.Fatal("missing output lost interrupted intent")
 	}
 	starts := 0
+	m2.dependencyError = ""
 	m2.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
 		starts++
 		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
@@ -658,6 +661,7 @@ func TestEnginePeriodicLoopConcurrentReadersAndClose(t *testing.T) {
 	}
 	defer m.Close()
 	m.mu.Lock()
+	m.dependencyError = ""
 	m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
 		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
 			return nil, err
