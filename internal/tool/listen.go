@@ -36,7 +36,7 @@ func parsePlaybackOptions(args []string, output io.Writer, mode string) (listenO
 	var options listenOptions
 	flags := flag.NewFlagSet(mode, flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
-	flags.StringVar(&options.station, "station", "", "station ID from stations.json (default: first station)")
+	flags.StringVar(&options.station, "station", "", "station ID (default: last chosen terminal station)")
 	flags.StringVar(&options.streamURL, "url", "", "HTTP(S) stream URL instead of a configured station")
 	flags.StringVar(&options.stationFile, "stations", "", "alternate stations.json file")
 	flags.IntVar(&options.bufferMinutes, "buffer", 0, "DVR buffer in minutes: 0 (live only), 5, 15 or 30")
@@ -118,15 +118,19 @@ func listen(ctx context.Context, root string, options listenOptions, cfg radio.C
 	}
 	defer setup.close()
 	selected := setup.selected
+	if selected == nil {
+		return errors.New("choose a station with --station ID; use yakker listen --list-stations to see stations, or yakker tui to choose interactively")
+	}
 	cfg = setup.cfg
 	fmt.Fprintf(output, "Listening to %s at %d%% volume.\n%s", terminalText(selected["name"].(string)), options.volume, listenCommands)
-	return listenSession(ctx, cfg, selected["id"].(string), options, input, output, logs, run)
+	return listenSession(ctx, cfg, selected["id"].(string), options, input, output, logs, run, setup.remember)
 }
 
 type playbackSetup struct {
 	cfg      radio.Config
 	stations []radio.Station
 	selected radio.Station
+	remember func(string) error
 }
 
 func (p *playbackSetup) close() { _ = os.RemoveAll(p.cfg.RuntimeBase) }
@@ -151,16 +155,29 @@ func preparePlayback(root string, options listenOptions, cfg radio.Config) (*pla
 		}
 	}
 
-	selected := stations[0]
-	if options.station != "" {
-		selected = nil
+	var selected radio.Station
+	var remember func(string) error
+	selectedID := options.station
+	if options.streamURL != "" {
+		selected = stations[0]
+	} else if options.stationFile == "" {
+		path, pathErr := terminalPreferencePath()
+		if pathErr != nil {
+			return nil, pathErr
+		}
+		remember = func(id string) error { return saveTerminalStation(path, id) }
+		if selectedID == "" {
+			selectedID = loadTerminalStation(path)
+		}
+	}
+	if selectedID != "" {
 		for _, station := range stations {
-			if station["id"] == options.station {
+			if station["id"] == selectedID {
 				selected = station
 				break
 			}
 		}
-		if selected == nil {
+		if selected == nil && options.station != "" {
 			return nil, fmt.Errorf("unknown station %q; use listen --list-stations", options.station)
 		}
 	}
@@ -190,7 +207,7 @@ func preparePlayback(root string, options listenOptions, cfg radio.Config) (*pla
 	cfg.RuntimeBase = base
 	cfg.StationFile = stationFile
 	ready = true
-	return &playbackSetup{cfg: cfg, stations: stations, selected: selected}, nil
+	return &playbackSetup{cfg: cfg, stations: stations, selected: selected, remember: remember}, nil
 }
 
 type consoleLine struct {
@@ -203,7 +220,7 @@ type statusEvent struct {
 	err    error
 }
 
-func listenSession(parent context.Context, cfg radio.Config, stationID string, options listenOptions, input io.Reader, output, logs io.Writer, run controllerRunner) (result error) {
+func listenSession(parent context.Context, cfg radio.Config, stationID string, options listenOptions, input io.Reader, output, logs io.Writer, run controllerRunner, remember func(string) error) (result error) {
 	ctx, cancel := context.WithCancel(parent)
 	inR, inW := io.Pipe()
 	outR, outW := io.Pipe()
@@ -302,6 +319,7 @@ func listenSession(parent context.Context, cfg radio.Config, stationID string, o
 		}
 	}
 	lastStatus := ""
+	remembered := false
 	replies := make(map[int64]bool)
 	for {
 		select {
@@ -317,6 +335,14 @@ func listenSession(parent context.Context, cfg radio.Config, stationID string, o
 			state := event.status
 			if state.Serial >= muteSerial {
 				muted = state.Muted
+			}
+			// Configure is command 1. Remember its accepted choice even if the
+			// stream later fails to connect; playback success is independent.
+			if !remembered && remember != nil && state.Serial >= 1 && state.Station["id"] == stationID {
+				remembered = true
+				if err := remember(stationID); err != nil {
+					fmt.Fprintf(logs, "Could not remember terminal station: %v\n", err)
+				}
 			}
 			// Ignore initialization acknowledgements; render once Play was received.
 			if state.Serial < 4 {

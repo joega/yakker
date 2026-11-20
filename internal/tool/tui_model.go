@@ -27,6 +27,9 @@ type tuiModel struct {
 	fatal                                                 error
 	send                                                  tuiSend
 	states                                                <-chan statusEvent
+	remember                                              func(string) error
+	remembered                                            string
+	readySerial                                           int64
 }
 
 func newTUIModel(stations []radio.Station, selected string, options listenOptions, send tuiSend, states <-chan statusEvent) tuiModel {
@@ -36,9 +39,15 @@ func newTUIModel(stations []radio.Station, selected string, options listenOption
 			cursor = i
 		}
 	}
-	return tuiModel{stations: stations, cursor: cursor, target: selected, volume: options.volume, muted: options.muted, wanted: true,
-		volumeSerial: 2, muteSerial: 3, intentSerial: 4, stationSerial: 4, width: 80, height: 24, dark: true, send: send, states: states,
-		status: radio.Status{State: "connecting", Station: stations[cursor], Volume: options.volume, Muted: options.muted}}
+	var station radio.Station
+	state, serial := "stopped", int64(3)
+	if selected != "" {
+		station = stations[cursor]
+		state, serial = "connecting", 4
+	}
+	return tuiModel{stations: stations, cursor: cursor, target: selected, volume: options.volume, muted: options.muted, wanted: selected != "",
+		volumeSerial: 2, muteSerial: 3, intentSerial: serial, stationSerial: serial, readySerial: serial, width: 80, height: 24, dark: true, send: send, states: states,
+		status: radio.Status{State: state, Station: station, Volume: options.volume, Muted: options.muted}}
 }
 
 func (m tuiModel) Init() tea.Cmd { return tea.Batch(m.waitStatus(), tea.RequestBackgroundColor) }
@@ -61,6 +70,10 @@ func (m *tuiModel) command(action string, fields map[string]any) (int64, bool) {
 	return serial, true
 }
 func (m *tuiModel) setWanted(wanted bool) {
+	if wanted && m.target == "" {
+		m.notice = "Choose a station with ↑/↓, then press Enter."
+		return
+	}
 	action := "stop"
 	if wanted {
 		action = "play"
@@ -115,7 +128,7 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		s := event.status
-		if s.Serial >= 4 {
+		if s.Serial >= m.readySerial {
 			m.ready = true
 			if s.Serial >= m.status.Serial {
 				m.status = s
@@ -131,6 +144,12 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if s.Serial >= m.intentSerial {
 				m.wanted = s.Wanted
+			}
+			if m.remember != nil && m.target != "" && m.remembered != m.target && s.Serial >= m.status.Serial && s.Serial >= m.stationSerial && s.Serial >= m.intentSerial && s.Station["id"] == m.target {
+				m.remembered = m.target
+				if err := m.remember(m.target); err != nil {
+					m.notice = "Could not remember station: " + err.Error()
+				}
 			}
 		}
 		return m, m.waitStatus()
@@ -189,8 +208,13 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m tuiModel) pendingStation() bool { return !m.ready || m.status.Serial < m.stationSerial }
+func (m tuiModel) pendingStation() bool {
+	return m.target != "" && (!m.ready || m.status.Serial < m.stationSerial)
+}
 func (m tuiModel) displayStation() radio.Station {
+	if m.target == "" {
+		return radio.Station{"name": "Choose a station", "subtitle": "Select a station below and press Enter to listen."}
+	}
 	if m.pendingStation() {
 		for _, station := range m.stations {
 			if station["id"] == m.target {
@@ -228,6 +252,9 @@ func (m tuiModel) badge() (string, string) {
 func (m tuiModel) playbackDetail() string {
 	if m.notice != "" {
 		return terminalText(m.notice)
+	}
+	if m.target == "" {
+		return "Choose a station with ↑/↓, then press Enter."
 	}
 	if m.pendingStation() {
 		return "Tuning station…"

@@ -21,8 +21,9 @@ const usage = `Usage: yakker <command>
   listen [options]  Listen independently of the Omarchy widget
   install           Install the built widget locally
 
-Try: yakker tui --station wbz-fm --volume 60
-     yakker listen --station wbz-fm --volume 60
+Try: yakker tui --volume 60
+     yakker listen --list-stations
+     yakker listen --station ID --volume 60
      yakker listen --help
 `
 

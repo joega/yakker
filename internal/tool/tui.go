@@ -14,7 +14,7 @@ import (
 )
 
 // TUI hosts the same controller as listen, with a separate runtime and no shell
-// IPC or persistent settings. The line-oriented CLI remains available as listen.
+// IPC. Terminal station preferences are separate from desktop shell settings.
 func TUI(ctx context.Context, root string, args []string, input io.Reader, output, logs io.Writer) error {
 	options, err := parsePlaybackOptions(args, output, "tui")
 	if err != nil {
@@ -51,7 +51,7 @@ func runTUI(ctx context.Context, setup *playbackSetup, options listenOptions, in
 			result = errors.Join(result, err)
 		}
 	}()
-	selected := setup.selected["id"].(string)
+	selected, _ := setup.selected["id"].(string)
 	for _, command := range []struct {
 		action string
 		fields map[string]any
@@ -59,13 +59,18 @@ func runTUI(ctx context.Context, setup *playbackSetup, options listenOptions, in
 		{"configure", map[string]any{"stationId": selected}},
 		{"volume", map[string]any{"value": options.volume}},
 		{"mute", map[string]any{"value": options.muted}},
-		{"play", nil},
 	} {
 		if _, err := session.send(command.action, command.fields); err != nil {
 			return err
 		}
 	}
+	if selected != "" {
+		if _, err := session.send("play", nil); err != nil {
+			return err
+		}
+	}
 	model := newTUIModel(setup.stations, selected, options, session.send, session.states)
+	model.remember = setup.remember
 	programOptions := []tea.ProgramOption{tea.WithContext(ctx), tea.WithInput(input), tea.WithOutput(output), tea.WithoutSignalHandler()}
 	programOptions = append(programOptions, extra...)
 	final, err := tea.NewProgram(model, programOptions...).Run()

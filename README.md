@@ -4,9 +4,9 @@ A lightweight sports-radio player for your desktop, with **pause, rewind, and sc
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
 Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
-**98.5 The Sports Hub** (WBZ-FM, Boston) remains the default. No browser required.
-The widget starts playback only when you press Play; the standalone CLI starts
-when you run `yakker listen` or `yakker tui`.
+Choose a station on first launch; Yakker remembers your last choice. A fresh
+install has no preselected station. If a saved station disappears, choose another.
+No browser required. The widget starts playback only when you press Play.
 
 **Pause live radio, rewind a segment, and jump back to live.** Take a call, then
 resume where you left off while audio keeps arriving. Choose **5, 15, or 30
@@ -131,6 +131,8 @@ packaging builds locally and does not publish or install anything.
 ## Listen
 
 Click the radio icon in the bar, select a station, then press the **Play** icon.
+Your last chosen station is restored on later launches. If it is no longer in
+the catalogue, choose another station; Yakker never substitutes a broadcaster.
 The transport row contains **Rewind · Stop · Play/Pause · Forward**. Rewind and
 forward skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
 an active player; **Stop** releases it. Playing a stopped radio starts a fresh
@@ -286,8 +288,15 @@ remain independent and do not start the desktop scheduler.
 Open the Bubble Tea player without changing the installed widget:
 
 ```sh
-./yakker tui --station wbz-fm --volume 60
+./yakker tui
 ```
+
+Run `./yakker tui` to choose a station on first launch, then press Enter to play.
+Later terminal sessions restore your last chosen station.
+An explicit `--station` overrides that choice. Terminal selection is saved
+separately from the desktop widget in `$XDG_CONFIG_HOME/yakker/terminal.json`
+(normally `~/.config/yakker/terminal.json`). Sessions using `--stations` or `--url`
+keep their selections separate and do not change that saved choice.
 
 The player shows the current station, actual playback/connection status, volume,
 mute, and stream metadata when available. It uses a compact layout in smaller
@@ -327,6 +336,8 @@ The built CLI runs independently of the installed Omarchy widget:
 ```
 
 It starts the selected station and prints readable connection/playback status.
+Without `--station`, `listen` uses your last terminal station. If none has been
+chosen, or it was removed, use `--list-stations` and supply a station ID.
 Volume defaults to 60%; `--muted` starts muted. Its private lock/socket directory
 is created and removed automatically. Desktop audio environment variables,
 widget settings, and the installed plugin are not changed.
@@ -364,7 +375,7 @@ This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
 
-In Settings, use **Add custom station** to save a name and HTTP(S) audio stream URL; city, country, and website are optional. Select a saved custom station in the station picker to edit or delete it. Deleting the selected station stops playback and selects the first bundled station. Editing its stream URL reconnects if it was playing. Yakker does not fetch or test a URL until you play it.
+In Settings, use **Add custom station** to save a name and HTTP(S) audio stream URL; city, country, and website are optional. Select a saved custom station in the station picker to edit or delete it. Deleting the selected station stops playback and clears the selection so you can choose another. Editing its stream URL reconnects if it was playing. Yakker does not fetch or test a URL until you play it.
 
 Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
 
@@ -378,8 +389,8 @@ The selected station, favorites, volume, mute and listening buffer length are sa
   "id": "io.github.joega.yakker",
   "volume": 65,
   "muted": false,
-  "stationId": "wbz-fm",
-  "favorites": ["wbz-fm"],
+  "stationId": "",
+  "favorites": [],
   "bufferMinutes": 0,
   "showName": false,
   "mprisPlugin": ""

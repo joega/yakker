@@ -237,7 +237,7 @@ func Install(root string) error {
 			Ready bool `json:"ready"`
 		}
 		if err == nil && json.Unmarshal([]byte(output), &status) == nil && status.Ready {
-			fmt.Println("Yakker is ready. Click its bar icon, then Play live.")
+			fmt.Println("Yakker is ready. Click its bar icon and choose a station, then Play live.")
 			return nil
 		}
 		time.Sleep(50 * time.Millisecond)

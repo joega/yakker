@@ -58,6 +58,7 @@ func TestListenArguments(t *testing.T) {
 
 func stationFixture(t *testing.T) string {
 	t.Helper()
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	root := t.TempDir()
 	data, _ := json.Marshal([]radio.Station{
 		{"id": "first", "name": "First station", "subtitle": "Fixture", "streamUrl": "https://example.test/first"},
@@ -132,7 +133,7 @@ func (p *consolePeer) run(ctx context.Context, cfg radio.Config, input io.Reader
 	if err != nil {
 		return err
 	}
-	state := radio.Status{State: "stopped", Volume: 65, Station: stations[0]}
+	state := radio.Status{State: "stopped", Volume: 65}
 	encoder := json.NewEncoder(output)
 	if err = encoder.Encode(state); err != nil {
 		return err
@@ -150,6 +151,7 @@ func (p *consolePeer) run(ctx context.Context, cfg radio.Config, input io.Reader
 		state.Serial = int64(command["serial"].(float64))
 		switch command["action"] {
 		case "configure":
+			state.Station = nil
 			for _, s := range stations {
 				if s["id"] == command["stationId"] {
 					state.Station = s
@@ -348,7 +350,7 @@ func TestListenEOFAndCancellation(t *testing.T) {
 	for _, mode := range []string{"eof", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
 			peer := &consolePeer{}
-			h := startConsole(t, stationFixture(t), listenOptions{volume: 60}, radio.Config{}, peer.run)
+			h := startConsole(t, stationFixture(t), listenOptions{station: "first", volume: 60}, radio.Config{}, peer.run)
 			h.output.wait(t, 0, "Playing")
 			if mode == "eof" {
 				h.input.Close()
@@ -361,7 +363,7 @@ func TestListenEOFAndCancellation(t *testing.T) {
 }
 func TestListenControllerFailurePropagates(t *testing.T) {
 	failure := errors.New("fixture controller failed")
-	err := listen(context.Background(), stationFixture(t), listenOptions{volume: 60}, radio.Config{}, strings.NewReader(""), io.Discard, io.Discard, func(context.Context, radio.Config, io.Reader, io.Writer, io.Writer) error { return failure })
+	err := listen(context.Background(), stationFixture(t), listenOptions{station: "first", volume: 60}, radio.Config{}, strings.NewReader(""), io.Discard, io.Discard, func(context.Context, radio.Config, io.Reader, io.Writer, io.Writer) error { return failure })
 	if !errors.Is(err, failure) {
 		t.Fatal(err)
 	}
@@ -414,7 +416,7 @@ func TestListenWithRealMPV(t *testing.T) {
 
 func TestListenAcknowledgesUnchangedControls(t *testing.T) {
 	peer := &consolePeer{}
-	h := startConsole(t, stationFixture(t), listenOptions{volume: 60}, radio.Config{}, peer.run)
+	h := startConsole(t, stationFixture(t), listenOptions{station: "first", volume: 60}, radio.Config{}, peer.run)
 	h.output.wait(t, 0, "Playing · Volume 60%")
 	h.send(t, "play", "Playing · Volume 60%")
 	h.send(t, "volume 60", "Playing · Volume 60%")
@@ -465,7 +467,7 @@ func testAudioServer(t *testing.T) (*httptest.Server, *atomic.Int32) {
 
 func TestListenDVRCommandsAndBufferOptOut(t *testing.T) {
 	peer := &consolePeer{}
-	h := startConsole(t, stationFixture(t), listenOptions{volume: 60, bufferMinutes: 30}, radio.Config{}, peer.run)
+	h := startConsole(t, stationFixture(t), listenOptions{station: "first", volume: 60, bufferMinutes: 30}, radio.Config{}, peer.run)
 	h.output.wait(t, 0, "Playing · Volume 60%")
 	for _, line := range []string{"pause", "resume", "back", "forward 12.5", "live", "buffer 0"} {
 		h.send(t, line, "Playing · Volume 60%")
