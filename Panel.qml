@@ -34,12 +34,12 @@ Ui.Panel {
     return false
   }
   function advanceCursor(direction) {
-    let order = [4]
+    let order = [14,4]
     if (settingsOpen) {
       order = order.concat([5,17,10])
       if (radio.station.custom) order = order.concat([11,12])
     }
-    order = order.concat([14,0,13,1])
+    order = order.concat([0,13,1])
     if (radio.wanted) order.push(6)
     if (radio.dvr && radio.playbackKind !== "recording") order = order.concat([7,8,9])
     if (radio.playbackKind === "recording") {
@@ -213,13 +213,26 @@ Ui.Panel {
           width: parent.width
           spacing: Style.space(8)
           Text {
-            width: parent.width - settingsButton.width - parent.spacing
+            width: parent.width - recordingsButton.width - settingsButton.width - parent.spacing * 2
             anchors.verticalCenter: parent.verticalCenter
             text: "YAKKER · " + root.radio.stations.length + " STATIONS"
             textFormat: Text.PlainText
             color: root.barForeground
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
+          }
+          Ui.Button {
+            id: recordingsButton
+            iconText: "󰧔"
+            tooltipText: "Open recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
+            Accessible.role: Accessible.Button
+            Accessible.name: recordingsButton.tooltipText
+            foreground: root.barForeground
+            bordered: true
+            selected: Number(root.radio.recordings.activeCount) > 0
+            hasCursor: root.cursor === 14
+            onHovered: hovered => { if (hovered) root.cursor = 14 }
+            onClicked: root.openRecordings(false)
           }
           Ui.Button {
             id: settingsButton
@@ -399,16 +412,6 @@ Ui.Panel {
             wrapMode: Text.Wrap
           }
           Ui.PanelSeparator { width: parent.width }
-        }
-        Ui.Button {
-          id: recordingsButton
-          width: parent.width
-          text: "Recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
-          foreground: root.barForeground
-          bordered: true
-          hasCursor: root.cursor === 14
-          onHovered: hovered => { if (hovered) root.cursor = 14 }
-          onClicked: root.openRecordings(false)
         }
         Row {
           width: parent.width
