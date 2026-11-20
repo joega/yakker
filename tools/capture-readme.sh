@@ -6,11 +6,43 @@ project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 output_dir=${1:-"$project_dir/docs"}
 mkdir -p -- "$output_dir"
 output_dir=$(cd -- "$output_dir" && pwd)
-shell_dir=${OMARCHY_PATH:-/usr/share/omarchy}/shell
+omarchy_dir=${OMARCHY_PATH:-/usr/share/omarchy}
+shell_dir=$omarchy_dir/shell
 capture_dir=$(mktemp -d /tmp/yakker-readme-XXXXXX)
 trap 'rm -rf -- "$capture_dir"' EXIT
 mkdir -p "$capture_dir/imports/qs" "$capture_dir/plugin" "$capture_dir/runtime" "$capture_dir/config" "$capture_dir/data"
 chmod 700 "$capture_dir/runtime"
+# Reuse the installed renderer, pointing every output and template lookup at
+# this temporary staging tree. Only shell.toml is generated, without applying
+# a theme or touching the user's current/next-theme directories.
+mkdir -p "$capture_dir/templates" "$capture_dir/themes"
+cp "$omarchy_dir/default/themed/shell.toml.tpl" "$capture_dir/templates/"
+awk '
+  /^TEMPLATES_DIR=/ { print "TEMPLATES_DIR=\"$YAKKER_CAPTURE_TEMPLATES\""; next }
+  /^USER_TEMPLATES_DIR=/ { print "USER_TEMPLATES_DIR=\"$YAKKER_CAPTURE_EMPTY_TEMPLATES\""; next }
+  /^NEXT_THEME_DIR=/ { print "NEXT_THEME_DIR=\"$YAKKER_CAPTURE_THEME_DIR\""; next }
+  { print }
+' "$omarchy_dir/bin/omarchy-theme-set-templates" > "$capture_dir/render-theme.sh"
+cp "$project_dir/tools/readme/themes.json" "$capture_dir/themes.json"
+while IFS= read -r theme; do
+  theme_dir=$omarchy_dir/themes/$theme
+  staged_theme=$capture_dir/themes/$theme
+  mkdir -p "$staged_theme"
+  cp "$theme_dir/colors.toml" "$staged_theme/"
+  for override in "$theme_dir"/shell*.toml; do
+    if [[ -f $override ]]; then cp "$override" "$staged_theme/"; fi
+  done
+  env OMARCHY_PATH="$omarchy_dir" XDG_STATE_HOME="$capture_dir/state" \
+    YAKKER_CAPTURE_TEMPLATES="$capture_dir/templates" \
+    YAKKER_CAPTURE_EMPTY_TEMPLATES="$capture_dir/no-user-templates" \
+    YAKKER_CAPTURE_THEME_DIR="$staged_theme" \
+    bash "$capture_dir/render-theme.sh"
+  test -s "$staged_theme/shell.toml"
+  if rg -q '\{\{' "$staged_theme/shell.toml"; then
+    printf 'Unresolved shell template for %s\n' "$theme" >&2
+    exit 1
+  fi
+done < <(jq -r '.[]' "$capture_dir/themes.json")
 cp -r "$shell_dir/Ui" "$capture_dir/imports/qs/Ui"
 cp "$project_dir/tools/readme/KeyboardPanel.qml" "$capture_dir/imports/qs/Ui/KeyboardPanel.qml"
 ln -s "$shell_dir/Commons" "$capture_dir/imports/qs/Commons"
@@ -39,4 +71,4 @@ if ! rg -q 'YAKKER_README_SCREENSHOTS_PASS' "$capture_dir/render.log"; then
   cat "$capture_dir/render.log"
   exit 1
 fi
-printf 'Rendered README screenshots in %s\n' "$output_dir"
+printf 'Rendered eight README screenshots with distinct themes in %s\n' "$output_dir"

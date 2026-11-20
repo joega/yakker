@@ -27,14 +27,15 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
 | [<img src="docs/yakker-popup.png" alt="Live player with favorite station, cassette and settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with a weekday schedule, an active capture, and a saved show ready to play" width="240">](docs/yakker-recordings.png) |
-| Compact playback controls | Catch up at your pace | Record while you listen |
+| **Solitude** | **Nord** | **Jade Horse** |
 
 | Favorites and search | Weekly schedules | Settings and custom stations |
 | :---: | :---: | :---: |
 | [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with weekdays, start and end times, timezone, and next-occurrence preview control" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
-| Find a station by name, city, or country | Set the days, time, and timezone | Make Yakker your own |
+| **Lupine** | **Catppuccin Latte** | **Ristretto** |
 
-_Select any screenshot to enlarge it. Screens show the current native UI with
+_Select any screenshot to enlarge it; Omarchy themes are labeled below each image.
+Screens show the current native UI with
 illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
 
 ## Stations
@@ -231,6 +232,7 @@ ones you want.
 | Saved-show playback | Recording storage |
 | :---: | :---: |
 | [<img src="docs/yakker-recording-player.png" alt="Saved recording playing with the compact transport row, duration-based timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Recording storage settings with an editable folder, library cap, free-space reserve, and concurrency limit" width="300">](docs/yakker-storage.png) |
+| **Tokyo Night** | **Flexoki Light** |
 
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or

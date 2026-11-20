@@ -12,10 +12,28 @@ Pass another destination to review captures before replacing the README assets:
 bash tools/capture-readme.sh /tmp/yakker-readme-preview
 ```
 
-The renderer needs Quickshell, Qt Quick / QtTest, the installed Omarchy `qs.Ui`
-and `qs.Commons` modules, and JetBrainsMono Nerd Font. It uses the current theme
-and a two-times display scale for sharp images. Review every image after a
-capture, especially dropdown placement, text wrapping, and long editor screens.
+The renderer needs jq, Quickshell, Qt Quick / QtTest, the installed Omarchy `qs.Ui`
+and `qs.Commons` modules, and JetBrainsMono Nerd Font. It reads the theme mapping
+from `tools/readme/themes.json` and uses each packaged theme’s `colors.toml`, the
+official stock shell template, and any packaged shell overrides in temporary
+staging. The palette and style are applied in an isolated native QML process;
+font, scale, and layout stay consistent across captures. It does not switch the
+desktop theme or modify desktop configuration. Images use a two-times display
+scale for sharpness. Review every image after a capture, especially dropdown
+placement, text wrapping, and long editor screens.
+
+Each of the eight screenshots uses a different Omarchy theme:
+
+| Screenshot | Theme |
+| --- | --- |
+| `yakker-popup.png` | Solitude |
+| `yakker-dvr.png` | Nord |
+| `yakker-recordings.png` | Jade Horse |
+| `yakker-stations.png` | Lupine |
+| `yakker-schedule.png` | Catppuccin Latte |
+| `yakker-settings.png` | Ristretto |
+| `yakker-recording-player.png` | Tokyo Night |
+| `yakker-storage.png` | Flexoki Light |
 
 The images render the checkout's actual `Panel.qml`, `RecordingsView.qml`, and
 shared native controls. A headless wrapper reproduces the popup card's border,

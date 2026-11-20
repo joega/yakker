@@ -17,6 +17,7 @@ ShellRoot {
     TestCase {
       id: gallery
       when: false
+      property var themes: ({})
       readonly property var radio: panel.radio
       readonly property var schedule: ({id: "afternoon", label: "Afternoon sports", stationId: "wbz-fm", stationName: "98.5 The Sports Hub", weekdays: [1,2,3,4,5], startTime: "14:00", endTime: "14:20", timezone: "America/New_York", enabled: true, nextStart: "2026-11-23T14:00:00-05:00", nextEnd: "2026-11-23T14:20:00-05:00"})
       function snapshot(schedules, recordings, active) {
@@ -24,7 +25,23 @@ ShellRoot {
           settings: {folder: "/home/demo/Music/Yakker", storageCapBytes: 5368709120, freeSpaceReserveBytes: 1073741824, concurrency: 3},
           usedBytes: recordings.reduce(function(total, item) { return total + item.bytes }, 0), schedules: schedules, recordings: recordings, activeCount: active || 0}
       }
+      function readFile(path) {
+        const request = new XMLHttpRequest()
+        request.open("GET", Qt.resolvedUrl(path), false)
+        request.send()
+        verify(request.status === 0 || request.status === 200, "Could not read " + path)
+        verify(request.responseText.length > 0, "Empty file: " + path)
+        return request.responseText
+      }
       function capture(name) {
+        const theme = themes[name]
+        verify(!!theme, "No theme assigned to " + name)
+        // Use stock theme surfaces rather than machine-specific shell overrides.
+        // These functions update only this isolated process's native singletons.
+        Commons.Color.loadUserShell("")
+        Commons.Color.loadColors(readFile("themes/" + theme + "/colors.toml"))
+        Commons.Color.loadShell(readFile("themes/" + theme + "/shell.toml"))
+        Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
         panel.screenshotScroller.contentY = 0
         wait(150)
         window.height = panel.screenshotPanel.contentHeight
@@ -43,10 +60,10 @@ ShellRoot {
           // shared controller. Dates and show labels are illustrative.
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
-          const request = new XMLHttpRequest()
-          request.open("GET", Qt.resolvedUrl("plugin/stations.json"), false)
-          request.send()
-          radio.stations = JSON.parse(request.responseText)
+          themes = JSON.parse(readFile("themes.json"))
+          compare(Object.keys(themes).length, 8)
+          compare(new Set(Object.values(themes)).size, 8)
+          radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
           radio.favoriteIds = ["wbz-fm", "wfan", "tsn-690"]
