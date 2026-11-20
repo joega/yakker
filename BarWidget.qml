@@ -85,6 +85,10 @@ Ui.BarWidget {
         paused: Radio.RadioService.paused, bufferMinutes: Radio.RadioService.bufferMinutes,
         temporaryBuffer: Radio.RadioService.temporaryBuffer, dvr: Radio.RadioService.dvr,
         position: Radio.RadioService.position, bufferStart: Radio.RadioService.bufferStart, bufferEnd: Radio.RadioService.bufferEnd,
+        playbackKind: Radio.RadioService.playbackKind, recordingId: Radio.RadioService.recordingId,
+        recordingTitle: Radio.RadioService.recordingTitle, duration: Radio.RadioService.duration,
+        activeRecordings: Number(Radio.RadioService.recordings.activeCount) || 0,
+        recordingError: Radio.RadioService.recordings.error || "",
         ready: Radio.RadioService.ready, opened: root.opened})
     }
   }
@@ -100,7 +104,9 @@ Ui.BarWidget {
     foreground: Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
       : Radio.RadioService.playbackState === "playing" ? Commons.Color.accent
       : root.bar ? root.bar.barForeground : Commons.Color.foreground
-    tooltipText: Radio.RadioService.station.name + " · " + Radio.RadioService.statusText + "\nClick for controls · Right-click for stations"
+    tooltipText: (Radio.RadioService.playbackKind === "recording" ? Radio.RadioService.recordingTitle : Radio.RadioService.station.name) + " · " + Radio.RadioService.statusText
+      + (Number(Radio.RadioService.recordings.activeCount) > 0 ? "\nRecording " + Radio.RadioService.recordings.activeCount + " stream(s)" : "")
+      + "\nClick for controls · Right-click for stations"
     onPressed: buttonCode => {
       if (buttonCode === Qt.LeftButton) root.toggle()
       else if (buttonCode === Qt.RightButton) root.chooseStation()
@@ -136,8 +142,8 @@ Ui.BarWidget {
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       anchors.margins: Style.space(3)
-      visible: Radio.RadioService.playbackState !== "stopped"
-      color: Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
+      visible: Radio.RadioService.playbackState !== "stopped" || Number(Radio.RadioService.recordings.activeCount) > 0
+      color: Number(Radio.RadioService.recordings.activeCount) > 0 || Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
         : Radio.RadioService.playbackState === "playing" ? Commons.Color.accent : button.foreground
     }
   }

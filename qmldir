@@ -1,2 +1,3 @@
 singleton RadioService 1.0 RadioService.qml
 StationLogo 1.0 StationLogo.qml
+RecordingsView 1.0 RecordingsView.qml

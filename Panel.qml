@@ -13,6 +13,7 @@ Ui.Panel {
   property var hostWidget: null
   property int cursor: 1
   property bool settingsOpen: false
+  property bool recordingsOpen: false
   property bool stationEditorOpen: false
   property int pendingStationSerial: 0
   readonly property bool stationMutationPending: pendingStationSerial !== 0
@@ -20,6 +21,7 @@ Ui.Panel {
   property bool confirmStationDelete: false
   property string editingStationId: ""
   readonly property var radio: Radio.RadioService
+  property var scrollTarget: null
 
   function chooseStation() {
     root.open()
@@ -34,12 +36,16 @@ Ui.Panel {
   function advanceCursor(direction) {
     let order = [4]
     if (settingsOpen) {
-      order = order.concat([5,10])
+      order = order.concat([5,17,10])
       if (radio.station.custom) order = order.concat([11,12])
     }
-    order = order.concat([0,13,1])
+    order = order.concat([14,0,13,1])
     if (radio.wanted) order.push(6)
-    if (radio.dvr) order = order.concat([7,8,9])
+    if (radio.dvr && radio.playbackKind !== "recording") order = order.concat([7,8,9])
+    if (radio.playbackKind === "recording") {
+      if (radio.wanted && radio.duration > 0 && (radio.playbackState === "playing" || radio.paused)) order.push(15)
+      if (radio.wanted || radio.bufferActive) order.push(16)
+    }
     order = order.concat([2,3])
     const index = Math.max(0, order.indexOf(cursor))
     cursor = order[(index + direction + order.length) % order.length]
@@ -48,15 +54,24 @@ Ui.Panel {
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, pauseButton, backButton, forwardButton, liveButton,
-                     addStationButton, editStationButton, deleteStationButton, favoriteButton]
+                     addStationButton, editStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, storageButton]
     ensureItemVisible(targets[cursor])
   }
   function ensureItemVisible(item) {
-    if (!item) return
-    const top = item.mapToItem(panelContent, 0, 0).y
-    if (top < scroller.contentY) scroller.contentY = Math.max(0, top)
-    else if (top + item.height > scroller.contentY + scroller.height)
-      scroller.contentY = Math.min(Math.max(0, scroller.contentHeight - scroller.height), top + item.height - scroller.height)
+    scrollTarget = item
+    if (item) scrollEnsure.restart()
+  }
+  Timer {
+    id: scrollEnsure
+    interval: 16
+    onTriggered: {
+      const item = root.scrollTarget
+      if (!item || !item.visible) return
+      const top = item.mapToItem(panelContent, 0, 0).y
+      if (top < scroller.contentY) scroller.contentY = Math.max(0, top)
+      else if (top + item.height > scroller.contentY + scroller.height)
+        scroller.contentY = Math.min(Math.max(0, scroller.contentHeight - scroller.height), top + item.height - scroller.height)
+    }
   }
   function activate() {
     if (cursor === 0) stationPicker.toggle()
@@ -72,6 +87,14 @@ Ui.Panel {
     else if (cursor === 11 && radio.station.custom) openStationEditor(true)
     else if (cursor === 12 && radio.station.custom) deleteStation()
     else if (cursor === 13) radio.toggleFavorite(radio.stationId)
+    else if (cursor === 14) openRecordings(false)
+    else if (cursor === 16) radio.goLive()
+    else if (cursor === 17 && settingsOpen) openRecordings(true)
+  }
+  function openRecordings(storage) {
+    recordingsOpen = true
+    if (storage) recordingsView.beginStorage()
+    else recordingsView.activate()
   }
   function openStationEditor(edit) {
     if (stationMutationPending) return
@@ -130,21 +153,21 @@ Ui.Panel {
     owner: root.hostWidget || root
     bar: root.bar
     open: root.opened
-    focusTarget: (stationPicker.popupOpen || bufferPicker.popupOpen || stationEditorOpen) ? null : keyCatcher
+    focusTarget: (stationPicker.popupOpen || bufferPicker.popupOpen || stationEditorOpen || recordingsOpen) ? null : keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(panelContent.implicitHeight)
 
     Ui.PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: stationPicker.popupOpen || bufferPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
+      blocked: root.recordingsOpen || stationPicker.popupOpen || bufferPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
       onCloseRequested: root.close()
       onTabRequested: direction => root.advanceCursor(direction)
       onMoveRequested: (dx, dy) => {
         if (dy) root.advanceCursor(dy)
         if (dx) {
-          root.cursor = 2
-          root.radio.commitVolume(root.radio.volume + dx * 5)
+          if (root.cursor === 15 && root.radio.playbackKind === "recording") root.radio.seekRecording(root.radio.position + dx * 30)
+          else { root.cursor = 2; root.radio.commitVolume(root.radio.volume + dx * 5) }
         }
       }
       onActivateRequested: root.activate()
@@ -159,6 +182,8 @@ Ui.Panel {
 
       Flickable {
         id: scroller
+        onHeightChanged: if (root.scrollTarget) scrollEnsure.restart()
+        onContentHeightChanged: if (root.scrollTarget) scrollEnsure.restart()
         anchors.fill: parent
         contentWidth: width
         contentHeight: panelContent.implicitHeight
@@ -170,6 +195,20 @@ Ui.Panel {
         width: parent.width
         spacing: Style.space(14)
 
+        Radio.RecordingsView {
+          id: recordingsView
+          width: parent.width
+          visible: root.recordingsOpen
+          radio: root.radio
+          foreground: root.barForeground
+          bar: root.bar
+          ensureVisible: root.ensureItemVisible
+          onBack: { root.recordingsOpen = false; keyCatcher.forceActiveFocus() }
+        }
+        Column {
+          width: parent.width
+          visible: !root.recordingsOpen
+          spacing: Style.space(14)
         Row {
           width: parent.width
           spacing: Style.space(8)
@@ -220,6 +259,16 @@ Ui.Panel {
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
             wrapMode: Text.WordWrap
+          }
+          Ui.Button {
+            id: storageButton
+            width: parent.width
+            text: "Recording storage settings"
+            foreground: root.barForeground
+            bordered: true
+            hasCursor: root.cursor === 17
+            onHovered: hovered => { if (hovered) root.cursor = 17 }
+            onClicked: root.openRecordings(true)
           }
           Ui.Button {
             id: addStationButton
@@ -351,6 +400,16 @@ Ui.Panel {
           }
           Ui.PanelSeparator { width: parent.width }
         }
+        Ui.Button {
+          id: recordingsButton
+          width: parent.width
+          text: "Recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
+          foreground: root.barForeground
+          bordered: true
+          hasCursor: root.cursor === 14
+          onHovered: hovered => { if (hovered) root.cursor = 14 }
+          onClicked: root.openRecordings(false)
+        }
         Row {
           width: parent.width
           spacing: Style.space(14)
@@ -427,7 +486,7 @@ Ui.Panel {
           }
           Text {
             width: parent.width - Style.space(14)
-            text: root.radio.statusText
+            text: root.radio.playbackKind === "recording" ? (root.radio.paused ? "Paused recording" : root.radio.playbackState === "playing" ? "Playing recording" : root.radio.statusText) : root.radio.statusText
             color: root.barForeground
             font.family: Style.font.family
             font.pixelSize: Style.font.body
@@ -446,9 +505,9 @@ Ui.Panel {
         }
         Text {
           width: parent.width
-          visible: text.length > 0 && root.radio.playbackState === "playing" && (!root.radio.dvr || root.radio.behindLive <= 3)
+          visible: text.length > 0 && (root.radio.playbackKind === "recording" || (root.radio.playbackState === "playing" && (!root.radio.dvr || root.radio.behindLive <= 3)))
           textFormat: Text.PlainText
-          text: root.radio.title
+          text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.title
           color: root.barForeground
           font.family: Style.font.family
           font.pixelSize: Style.font.body
@@ -472,6 +531,48 @@ Ui.Panel {
           width: parent.width
           spacing: Style.space(8)
           visible: root.radio.wanted || root.radio.bufferActive
+          Text {
+            width: parent.width
+            visible: root.radio.playbackKind === "recording"
+            text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration)
+            textFormat: Text.PlainText
+            color: root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+          }
+          Ui.BorderSurface {
+            width: parent.width
+            height: fileTimeline.implicitHeight + Style.space(8)
+            visible: root.radio.playbackKind === "recording"
+            radius: Style.cornerRadius
+            borderSpec: root.cursor === 15 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
+          Ui.PanelSlider {
+            id: fileTimeline
+            anchors.fill: parent
+            anchors.margins: Style.space(4)
+            bar: root.bar
+            minimum: 0
+            maximum: Math.max(1, root.radio.duration)
+            value: root.radio.position
+            step: 1
+            enabled: root.radio.wanted && root.radio.duration > 0 && (root.radio.playbackState === "playing" || root.radio.paused)
+            fillColor: Commons.Color.accent
+            knobColor: root.barForeground
+            trackColor: Style.selectedFillFor(root.barForeground, Commons.Color.accent)
+            onReleased: value => root.radio.seekRecording(value)
+          }
+          }
+          Ui.Button {
+            id: returnLiveButton
+            width: parent.width
+            visible: root.radio.playbackKind === "recording"
+            text: "Return to live"
+            foreground: root.barForeground
+            bordered: true
+            hasCursor: root.cursor === 16
+            onHovered: hovered => { if (hovered) root.cursor = 16 }
+            onClicked: root.radio.goLive()
+          }
           Ui.Button {
             id: pauseButton
             width: parent.width
@@ -486,7 +587,7 @@ Ui.Panel {
           }
           Text {
             width: parent.width
-            visible: root.radio.bufferActive
+            visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
             text: root.radio.bufferText + (root.radio.temporaryBuffer ? " · Temporary 15-minute buffer" : "")
             textFormat: Text.PlainText
             color: root.barForeground
@@ -496,7 +597,7 @@ Ui.Panel {
           }
           Ui.PanelSlider {
             id: timelineSlider
-            visible: root.radio.bufferActive
+            visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
             width: parent.width
             step: 30
             bar: root.bar
@@ -510,7 +611,7 @@ Ui.Panel {
             onReleased: value => root.radio.seek(value)
           }
           Row {
-            visible: root.radio.bufferActive
+            visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
             width: parent.width
             spacing: Style.space(6)
             Ui.Button {
@@ -619,6 +720,7 @@ Ui.Panel {
           font.family: Style.font.family
           font.pixelSize: Style.font.caption
           wrapMode: Text.WordWrap
+        }
         }
       }
       }

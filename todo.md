@@ -10,4 +10,4 @@
 - [x] Pause from Live only using a temporary 15-minute session buffer — `20497b0`. The saved preference stays unchanged; mpv prepares a bounded RAM cache at startup to preserve the connection when pausing.
 - [x] Persistent custom stations with add, edit, delete and default CLI support — `688fc38`.
 - [x] Favorite stations with persistent hearts and favorites-first search results — `55a6b84`.
-- [x] Scope scheduled recordings for discussion — [proposal](docs/recordings-plan.md). Recording implementation remains pending that discussion, as requested in task 3.
+- [x] Scheduled recordings — discussed and implemented: 24 kbit/s mono Opus, default `~/Music/Yakker`, editable folder/cap, independent overlapping captures, native schedule/library controls and retained-file playback. [Design](docs/recordings-plan.md) · [Validation](docs/recordings-validation.md).

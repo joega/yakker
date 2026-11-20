@@ -14,6 +14,7 @@ Item {
   property int latestMuteIntent: 0
   property bool retiring: false
   property bool pendingPlay: false
+  property int helperRestarts: 0
   property bool ready: false
   property string playbackState: "stopped"
   property bool wanted: false
@@ -32,6 +33,17 @@ Item {
       + ((paused || behindLive > 3) ? clock(behindLive) + " behind live · " : "")
       + clock(bufferEnd - bufferStart) + " available"
   property string error: ""
+  property var recordings: ({available: false, error: "", revision: 0, settings: {}, schedules: [], recordings: [], usedBytes: 0, activeCount: 0})
+  property int recordingMutationSerial: 0
+  property bool recordingMutationOK: false
+  property string recordingError: ""
+  property var schedulePreview: ({})
+  property int schedulePreviewSerial: 0
+  property string schedulePreviewError: ""
+  property string playbackKind: "live"
+  property string recordingId: ""
+  property string recordingTitle: ""
+  property real duration: 0
   property string customStationError: ""
   property string customCatalogError: ""
   property int customMutationSerial: 0
@@ -59,13 +71,14 @@ Item {
   property string stationId: "wbz-fm"
   property string mprisPlugin: ""
   property int pendingVolume: -1
-  readonly property string statusText: playbackState === "playing" ? (dvr && behindLive > 3 ? "Delayed · " + clock(behindLive) : "Live")
+  readonly property string statusText: playbackState === "playing" ? (playbackKind === "recording" ? "Playing recording" : (dvr && behindLive > 3 ? "Delayed · " + clock(behindLive) : "Live"))
     : playbackState === "paused" ? "Paused"
     : playbackState === "connecting" ? "Connecting…"
     : playbackState === "retrying" ? "Reconnecting in " + retryDelay + "s · attempt " + retry + "/5"
     : playbackState === "error" ? "Unable to play" : "Stopped"
   signal preferencesChanged(int volume, bool muted, string stationId, int bufferMinutes)
   signal favoritesUpdated()
+  signal statusReceived(int serial)
 
   function normalizeFavorites(value) {
     if (!Array.isArray(value)) return []
@@ -95,6 +108,7 @@ Item {
 
   function acquire(settings) {
     clients++
+    helperRetry.stop()
     retire.stop()
     shutdownGuard.stop()
     if (!initialized) {
@@ -114,7 +128,7 @@ Item {
   function send(command) {
     if (!ready || !helper.running) return 0
     command.serial = ++serial
-    if (["play", "stop", "pause", "seek", "skip", "live"].indexOf(command.action) >= 0) latestIntent = serial
+    if (["play", "stop", "pause", "seek", "skip", "live", "playRecording", "seekRecording"].indexOf(command.action) >= 0) latestIntent = serial
     if (command.action === "configure") latestStationIntent = serial
     if (command.action === "volume") latestVolumeIntent = serial
     if (command.action === "mute") latestMuteIntent = serial
@@ -136,7 +150,7 @@ Item {
     send({action: "configure", stationId: stationId, mprisPlugin: mprisPlugin, bufferMinutes: bufferMinutes})
   }
   function selectStation(id) {
-    if (id === stationId) return
+    if (id === stationId) { if (playbackKind === "recording") goLive(); return }
     for (let i = 0; i < stations.length; i++) {
       if (stations[i].id !== id) continue
       stationId = id
@@ -150,6 +164,8 @@ Item {
     }
   }
   function play() {
+    helperRetry.stop()
+    helperRestarts = 0
     wanted = true
     if (!ready || !helper.running) {
       pendingPlay = true
@@ -161,7 +177,7 @@ Item {
   function stop() { pendingPlay = false; wanted = false; send({action: "stop"}) }
   function togglePlayback() { wanted ? stop() : play() }
   function togglePause() { if (wanted) send({action: paused ? "play" : "pause"}) }
-  function skip(seconds) { if (dvr) send({action: "skip", value: seconds}) }
+  function skip(seconds) { if (dvr || (playbackKind === "recording" && wanted)) send({action: "skip", value: seconds}) }
   function seek(seconds) { if (dvr) send({action: "seek", value: seconds}) }
   function goLive() { send({action: "live"}) }
   function setBufferMinutes(minutes) {
@@ -190,6 +206,14 @@ Item {
     send({action: "mute", value: muted})
     preferencesChanged(volume, muted, stationId, bufferMinutes)
   }
+  function recordingSettings(revision, settings) { return send({action: "recordingSettings", revision: revision, settings: settings}) }
+  function upsertSchedule(revision, schedule, refreshStation) { return send({action: "upsertSchedule", revision: revision, schedule: schedule, refreshStation: refreshStation === true}) }
+  function previewSchedule(schedule) { return send({action: "previewSchedule", schedule: schedule}) }
+  function deleteSchedule(revision, id) { return send({action: "deleteSchedule", revision: revision, id: id}) }
+  function stopRecording(revision, id) { return send({action: "stopRecording", revision: revision, id: id}) }
+  function deleteRecording(revision, id) { return send({action: "deleteRecording", revision: revision, id: id}) }
+  function playRecording(id) { return send({action: "playRecording", id: id}) }
+  function seekRecording(value) { return send({action: "seekRecording", value: value}) }
   function saveCustomStation(station) {
     if (!ready || !helper.running) { customStationError = "Station manager is unavailable. Try again when Yakker reconnects."; return 0 }
     customStationError = ""
@@ -213,6 +237,7 @@ Item {
     id: retire
     interval: 1000
     onTriggered: {
+      helperRetry.stop()
       root.volumeFlushStop()
       root.retiring = true
       root.send({action: "quit"})
@@ -221,8 +246,18 @@ Item {
   }
   function volumeFlushStop() { volumeFlush.stop(); pendingVolume = -1 }
   Timer {
+    id: helperRetry
+    interval: Math.min(8000, 1000 * Math.pow(2, Math.max(0, root.helperRestarts - 1)))
+    onTriggered: if (root.clients > 0 && !helper.running) helper.running = true
+  }
+  Timer {
+    id: helperStable
+    interval: 60000
+    onTriggered: if (root.ready && helper.running) root.helperRestarts = 0
+  }
+  Timer {
     id: shutdownGuard
-    interval: 3000
+    interval: 25000
     onTriggered: if (root.clients === 0) helper.running = false
   }
   Process {
@@ -230,6 +265,7 @@ Item {
     command: [decodeURIComponent(Qt.resolvedUrl("yakker-controller").toString().replace(/^file:\/\//, ""))]
     stdinEnabled: true
     onStarted: {
+      helperStable.restart()
       root.retiring = false
       root.ready = true
       root.customCatalogError = ""
@@ -242,6 +278,17 @@ Item {
       onRead: data => {
         try {
           const next = JSON.parse(data)
+          if (next.recordings && typeof next.recordings === "object") root.recordings = next.recordings
+          if (typeof next.schedulePreviewSerial === "number" && next.schedulePreviewSerial > root.schedulePreviewSerial) {
+            root.schedulePreview = next.schedulePreview || ({})
+            root.schedulePreviewError = next.schedulePreviewError || ""
+            root.schedulePreviewSerial = next.schedulePreviewSerial
+          }
+          if (typeof next.recordingMutationSerial === "number" && next.recordingMutationSerial > root.recordingMutationSerial) {
+            root.recordingMutationOK = next.recordingMutationOK === true
+            root.recordingError = next.recordingError || ""
+            root.recordingMutationSerial = next.recordingMutationSerial
+          }
           if (Array.isArray(next.stations)) root.stations = next.stations
           if (typeof next.customStationError === "string") root.customStationError = next.customStationError
           if (!next.customMutationSerial && typeof next.customStationError === "string") root.customCatalogError = next.customStationError
@@ -255,6 +302,10 @@ Item {
             root.paused = next.paused === true
             root.temporaryBuffer = next.temporaryBuffer === true
             root.dvr = next.dvr === true
+            root.playbackKind = next.playbackKind || "live"
+            root.recordingId = next.recordingId || ""
+            root.recordingTitle = next.recordingTitle || ""
+            root.duration = Number(next.duration) || 0
             root.position = Number(next.position) || 0
             root.bufferStart = Number(next.bufferStart) || 0
             root.bufferEnd = Number(next.bufferEnd) || 0
@@ -271,6 +322,7 @@ Item {
             root.retry = next.retry || 0
             root.retryDelay = next.retryDelay || 0
             root.playerPid = next.playerPid || 0
+            root.statusReceived(Number(next.serial) || 0)
           }
           if ((next.serial || 0) >= root.latestVolumeIntent && typeof next.volume === "number") root.volume = next.volume
           if ((next.serial || 0) >= root.latestMuteIntent && typeof next.muted === "boolean") root.muted = next.muted
@@ -279,16 +331,19 @@ Item {
     }
     stderr: SplitParser { onRead: data => console.warn("Yakker: " + data) }
     onExited: exitCode => {
+      helperStable.stop()
       root.ready = false
       root.wanted = false
       root.paused = false
       root.temporaryBuffer = false
       root.dvr = false
+      root.recordings = Object.assign({}, root.recordings, {available: false, activeCount: 0, error: "Recording manager disconnected."})
       root.playerPid = 0
       root.playbackState = root.clients ? "error" : "stopped"
       if (root.clients && !root.error) root.error = "Yakker controller exited (" + exitCode + "). Press Retry."
       shutdownGuard.stop()
       if (root.retiring && root.clients) Qt.callLater(function() { helper.running = true })
+      else if (root.clients > 0 && root.helperRestarts < 5) { root.helperRestarts++; helperRetry.restart() }
       root.retiring = false
     }
   }

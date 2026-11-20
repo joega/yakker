@@ -17,7 +17,7 @@ and buffered audio stays in RAM without creating recording files.
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
 
-[Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+[Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
 <p>
   <a href="docs/yakker-dvr.png"><img src="docs/yakker-dvr.png" alt="Yakker DVR controls with Pause, a buffered-audio timeline, 30-second rewind and forward, and Go live" width="240" align="top"></a>
@@ -63,6 +63,8 @@ _DVR controls, live playback, and station search. Select a screenshot to view it
 - Go 1.26+ and Make to build from source. Go is only needed at build time.
 - Linux with working audio. The bar widget also needs a desktop session with a private `XDG_RUNTIME_DIR`.
 - Optional: the distribution's `mpv-mpris` package for media keys.
+- Scheduled recordings need `ffmpeg` with the `libopus` encoder and `ffprobe`.
+  Listening and playing retained recordings use mpv.
 
 These are tested versions; older shells must provide the same native UI components.
 The controller uses only Go’s standard library and builds without cgo. The
@@ -200,6 +202,67 @@ The plain CLI accepts `pause`, `play` (resume), `back 30`, `forward 30`, `live`,
 In the terminal UI, **P** pauses/resumes, **[ / ]** skip 30 seconds, **G** goes live,
 and Space retains Play / Stop. Buffer preferences in terminal sessions are
 independent of the desktop widget.
+
+## Scheduled recordings
+
+Open **Recordings → New schedule**, choose a bundled or custom station, select
+weekdays, enter start/end times in 24-hour format, and choose the timezone. Use
+**Preview next time** to check the resolved occurrence before saving. For example,
+WBZ-FM can record Fridays from `14:00` to `14:20` in `America/New_York`. A time
+before the start ends the next day; schedules can last up to 12 hours. Daylight
+saving follows the saved timezone. Schedules start empty; create and enable the
+ones you want.
+
+Up to **three recordings** can run at once, including while you listen to another
+station. Closing the popup, stopping foreground audio, changing stations, or
+playing a saved recording leaves those captures running. The bar dot turns red
+while capturing, and the popup shows the active count. The machine must be awake
+with the plugin loaded in the bar. Disabling/removing the last widget, restarting
+the shell, or shutting down the helper interrupts captures. Recoverable output is
+retained as partial; when the plugin returns during the scheduled interval it can
+capture a linked remainder. Unexpected stream failures can retry twice within
+the remaining interval, retaining separate segments. There is no wake timer or separate recording service.
+
+Recordings use **mono Opus at 24 kbit/s VBR** in `.opus` files: roughly **3.6 MB
+per 20 minutes** or **10.8 MB per hour**, plus container overhead, with sizes
+varying by content. The bitrate is an internal encoder parameter; raising it later
+affects future captures. The library shows complete, partial, missed, error and
+missing-file states with their reasons. **Play** opens a retained file in the
+foreground player, with pause/resume, a duration-based seek bar and **Return to
+live**. Missing files become available again when their retained folder returns.
+Audio quality and exact broadcast boundaries depend on the source; connection
+startup, broadcaster buffering and network interruptions can affect the segment.
+
+Open **Settings → Recording storage**, or the storage controls in Recordings, to
+choose a folder and total library cap. Defaults:
+
+- **Folder:** `~/Music/Yakker`, created when the first capture needs it.
+- **Library cap:** 5 GiB, editable in Settings.
+- **Free-space reserve:** 1 GiB on the destination disk.
+- **Cleanup:** manual deletion; existing recordings are preserved when full.
+
+A folder change applies to future recordings. Older files remain listed at their
+saved locations and count toward the cap. An unavailable/unwritable destination
+produces an explicit failure instead of switching folders. Lowering the cap below
+current usage preserves files and blocks new captures until space is available.
+Metadata, schedules and recording settings live separately in
+`$XDG_DATA_HOME/yakker/recordings.json` (normally
+`~/.local/share/yakker/recordings.json`), outside the replaceable plugin files.
+Uninstalling the plugin preserves this data and the audio files.
+
+Schedule edits and enable/disable/delete actions affect future occurrences; an
+already running capture retains its original settings and has a separate **Stop
+capture** action. Editing a station does not silently change a saved schedule's
+source. Saving that schedule in the editor refreshes its source from the latest
+available catalogue entry; a removed station's saved source is retained. Saved
+recordings survive schedule deletion. Delete requires confirmation, and a capture
+or file that is currently playing must be stopped before deletion.
+
+Changes from another monitor or a background job can make an editor stale. Your
+draft stays visible; **Refresh and keep this draft** lets you review and resubmit
+it. The helper can restart with bounded retries after an interruption, restoring
+schedules without automatically starting foreground listening. Terminal sessions
+remain independent and do not start the desktop scheduler.
 
 ## Terminal player
 
@@ -346,7 +409,7 @@ schedule, fabricated show name, remote artwork fetch, or periodic website reques
 
 ## Lifecycle and reliability
 
-A shared QML singleton owns one compiled Go helper. The helper owns one
+A shared QML singleton owns one compiled Go helper. The helper owns one foreground
 mpv process and a JSON IPC socket under `$XDG_RUNTIME_DIR/io.github.joega.yakker/`.
 A private runtime directory and exclusive lock prevent duplicate players, including
 across monitors or overlapping shell reloads. Stop cancels retry work, terminates
@@ -355,7 +418,9 @@ mpv, waits for it, and removes the socket before another player can start.
 Popup closing and bar visibility do not own playback. Recreating widgets has a
 one-second grace period. With no widgets left (disable/remove), the helper shuts
 down. EOF, SIGTERM, and Linux parent-death protection clean up the player if the
-shell or helper exits. Full shell restarts may stop playback; press Play to reconnect.
+shell or helper exits. Recording workers have independent foreground controls
+and are finalized/reaped on helper shutdown. Full shell restarts may stop
+listening; press Play to reconnect.
 Playback intent is never saved or automatically restored after login.
 
 Failed connections and stalled streams time out and retry at 1, 2, 4, 8, and 16
@@ -373,7 +438,8 @@ omarchy plugin remove io.github.joega.yakker --yes
 ```
 
 Disable removes the bar entry and shuts down radio within a few seconds. Remove
-also deletes the installed copy. This source checkout remains available.
+also deletes the installed copy. Capture finalization may take a few more seconds.
+Recording files, schedules and this source checkout remain available.
 
 ## Troubleshooting
 
@@ -387,6 +453,10 @@ also deletes the installed copy. This source checkout remains available.
 - Missing widget: run `omarchy plugin list --json`, then `omarchy plugin enable
   io.github.joega.yakker`. Inspect logs with `qs log -n -p "$OMARCHY_PATH/shell"
   --tail 100`.
+- Recording encoder unavailable: install your distribution's FFmpeg package with
+  libopus and ffprobe, then disable/re-enable the widget or restart the shell.
+- Recording index unavailable: preserve and repair the reported metadata file;
+  Yakker refuses to overwrite malformed data. Ordinary listening remains available.
 - Source edits: rerun the local installer. Do not modify packaged Omarchy files.
 
 ## Build checks
@@ -397,15 +467,30 @@ YAKKER_TEST_REAL_MPV=1 make check  # Also decode local test audio with mpv
 ```
 
 Checks cover formatting, vet, module checksums, and race-enabled tests. The
-optional mpv checks use local HTTP fixtures and null audio; they do not contact
+recording checks include atomic storage/recovery, timezone/DST rules, cap limits,
+revision fencing and child cleanup. The optional mpv checks use local HTTP
+fixtures and null audio; they do not contact
 broadcasters or change the installed widget. GitHub Actions runs these checks
 and builds Linux amd64 and arm64 archives.
+
+Optional native UI checks (installed Omarchy controls required):
+
+```sh
+python3 tools/test-recordings-ui.py
+```
+
+This uses isolated temporary settings/data and silent local audio. It verifies
+keyboard navigation, scheduling, preview, stale drafts, file playback/seek and
+helper recovery, and writes screenshots under `/tmp/yakker-recordings-ui-qa`.
+Its test container substitutes for the actual layer-shell popup; see
+[recordings validation](docs/recordings-validation.md) for the remaining manual checks.
 
 ## Privacy and licensing
 
 Yakker has no analytics, account system, or background station discovery.
 Playback connects to the selected broadcaster and its stream providers, which
-receive the network request. Artwork and station configuration are bundled
+receive the network request. Enabled recording schedules also connect to their
+saved station sources while due and the plugin is running. Artwork and station configuration are bundled
 locally. The widget saves station, volume, and mute preferences on your device;
 standalone terminal sessions use temporary local state.
 

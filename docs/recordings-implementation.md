@@ -38,7 +38,7 @@ Manager owns exported models with these JSON names:
 
 - `Settings`: `folder` string (absolute), `storageCapBytes` int64, `freeSpaceReserveBytes` int64, `concurrency` int.
 - `Schedule`: `id`, `label`, `stationId`, `stationName`, `streamUrl`, `weekdays` ([]int; 0=Sunday), `startTime`, `endTime` (HH:mm), `timezone` (IANA), `enabled` bool, `nextStart`, `nextEnd` (RFC3339 strings; computed).
-- `Recording`: `id`, `scheduleId`, `label`, `stationId`, `stationName`, `plannedStart`, `plannedEnd`, `startedAt`, `endedAt` (RFC3339 strings), `status`, `reason`, `bytes`, `durationSeconds`, `folder`, `filename`. Status: `recording`, `complete`, `partial`, `missed`, `error`, `missing`. Optional `parentId` for resumed segments.
+- `Recording`: `id`, `scheduleId`, `label`, `stationId`, `stationName`, `plannedStart`, `plannedEnd`, `startedAt`, `endedAt` (RFC3339 strings), `status`, `reason`, `bytes`, `durationSeconds`, `folder`, `filename`. Status: `recording`, `complete`, `partial`, `missed`, `error`, `missing`. Optional `parentId` for resumed segments; computed `playable` indicates currently retained, usable audio.
 - `Snapshot`: `revision` int64, `settings`, `schedules` (array), `recordings` (array newest first), `available` bool, `error` string, `usedBytes` int64, `activeCount` int. Empty collections serialize as arrays.
 - `Config`: `DataDir`, `DefaultFolder`, `FFmpeg`, `FFprobe` strings; `PollInterval`, `StopGrace` durations; `Now func() time.Time` for deterministic tests. Default persistent index under `$XDG_DATA_HOME/yakker`; configured directory used verbatim for isolated tests. Opening a manager must not create the media folder or launch a recorder until needed.
 
@@ -73,12 +73,13 @@ Commands (existing `serial` field retained):
 
 ```text
 recordingSettings { revision, settings }
-upsertSchedule    { revision, schedule }
+upsertSchedule    { revision, schedule, refreshStation? }
 deleteSchedule    { revision, id }
 stopRecording     { revision, id }
 deleteRecording   { revision, id }
 playRecording     { id }
 seekRecording     { value } // finite absolute seconds, clamped to file duration
+previewSchedule   { schedule } // read-only next occurrence, no revision or store write
 ```
 
 For upsertSchedule, UI sends stationId only for station identity. Controller resolves it against the actual merged catalogue and supplies stationName/streamUrl; edits retain the saved station snapshot when identity/URL refresh is not explicitly requested. Unknown stations reject new schedules. Manager snapshots own already-running jobs, unaffected by later station edits/removal.
@@ -88,3 +89,15 @@ For upsertSchedule, UI sends stationId only for station identity. Controller res
 ## UI scope
 
 Use the real native qs.Ui controls and qualified Commons.Color; text stays PlainText. Recordings navigation has Back, a weekly schedule editor (station, label, weekdays, HH:mm start/end, timezone, enabled, next occurrence preview), schedule edit/enable/delete actions, newest-first library with status/size/time/reason, file play/seek/stop/delete actions, and storage folder/cap Settings. User can type an absolute folder path or use a supported native folder chooser. Show unavailable/empty/working/error states and current storage usage. Preserve other settings/favorites and keyboard behavior; inputs must block global radio hotkeys. Explicit delete confirmation and per-panel revision/serial fencing required. Add every new QML component to installer/release lists.
+
+## Delivered validation
+
+The capture, engine, controller and native UI milestones are implemented. The
+editor supports read-only preview before save and explicit draft refresh after a
+stale rejection. Saving an editor refreshes its trusted station source when
+available; running jobs retain their own snapshots. Metadata I/O failures stop
+and reap captures and require reopening after repair; capacity rejection keeps
+history cleanup available.
+
+See [recordings-validation.md](recordings-validation.md) for automated coverage,
+the bounded WBZ and CPU measurements, and outstanding manual acceptance checks.
