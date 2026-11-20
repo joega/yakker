@@ -1,0 +1,757 @@
+package recording
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+)
+
+type fakeCapture struct {
+	once sync.Once
+	done chan CaptureResult
+}
+
+func (c *fakeCapture) Done() <-chan CaptureResult { return c.done }
+func (c *fakeCapture) Stop() {
+	c.once.Do(func() { c.done <- CaptureResult{Bytes: 40, DurationSeconds: 5}; close(c.done) })
+}
+
+func engineFixture(t *testing.T) (*Manager, *time.Time, *int) {
+	t.Helper()
+	now := time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC)
+	base := t.TempDir()
+	count := 0
+	m, err := Open(Config{DataDir: filepath.Join(base, "data"), DefaultFolder: filepath.Join(base, "music"), Now: func() time.Time { return now }, PollInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		count++
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
+	}
+	m.freeBytes = func(string) (int64, error) { return 1 << 40, nil }
+	t.Cleanup(func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	})
+	return m, &now, &count
+}
+func rule(id string) Schedule {
+	return Schedule{ID: id, StationID: "station", StationName: "Station", StreamURL: "https://example.test/live", Weekdays: []int{1}, StartTime: "10:00", EndTime: "11:00", Timezone: "UTC", Enabled: true}
+}
+func saveRule(t *testing.T, m *Manager, s Schedule) {
+	t.Helper()
+	if err := m.UpsertSchedule(m.Snapshot().Revision, s); err != nil {
+		t.Fatal(err)
+	}
+}
+func tick(m *Manager) { m.mu.Lock(); defer m.mu.Unlock(); m.tickLocked() }
+func waitFinished(t *testing.T, m *Manager) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		tick(m)
+		if m.Snapshot().ActiveCount == 0 {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("fake capture did not finalize")
+}
+
+func TestEngineLazyFolderRevisionAndCopies(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	s := m.Snapshot()
+	if _, err := os.Stat(s.Settings.Folder); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("media folder created on Open: %v", err)
+	}
+	if s.Schedules == nil || s.Recordings == nil {
+		t.Fatal("collections must serialize as arrays")
+	}
+	r := rule("weekly")
+	saveRule(t, m, r)
+	s = m.Snapshot()
+	s.Schedules[0].Weekdays[0] = 4
+	if m.Snapshot().Schedules[0].Weekdays[0] != 1 {
+		t.Fatal("snapshot aliases manager")
+	}
+	old := m.Snapshot()
+	settings := old.Settings
+	settings.StorageCapBytes++
+	if err := m.SetSettings(old.Revision-1, settings); err == nil {
+		t.Fatal("stale settings accepted")
+	}
+	if m.Snapshot().Revision != old.Revision {
+		t.Fatal("stale mutation changed revision")
+	}
+	b, _ := json.Marshal(m.Snapshot())
+	if !strings.Contains(string(b), `"recordings":[]`) {
+		t.Fatal(string(b))
+	}
+}
+
+func TestEngineRemainderDuplicateAndSnapshot(t *testing.T) {
+	m, now, count := engineFixture(t)
+	saveRule(t, m, rule("weekly"))
+	*now = now.Add(90 * time.Minute)
+	tick(m)
+	s := m.Snapshot()
+	if *count != 1 || s.ActiveCount != 1 || s.Recordings[0].Reason == "" {
+		t.Fatalf("late remainder: %+v count=%d", s, *count)
+	}
+	r := rule("weekly")
+	r.StationName = "Edited"
+	r.EndTime = "12:00"
+	r.Enabled = false
+	saveRule(t, m, r)
+	s = m.Snapshot()
+	if s.Recordings[0].StationName != "Station" || parseTime(s.Recordings[0].PlannedEnd).Hour() != 11 {
+		t.Fatal("schedule edit altered running job")
+	}
+	*now = now.Add(-time.Hour)
+	tick(m)
+	*now = now.Add(time.Hour)
+	tick(m)
+	if len(m.state.Seen) != 1 || *count > 2 {
+		t.Fatal("clock jump duplicated occurrence identity")
+	}
+	activeID := ""
+	for _, r := range m.Snapshot().Recordings {
+		if r.Status == "recording" {
+			activeID = r.ID
+		}
+	}
+	if err := m.StopRecording(m.Snapshot().Revision, activeID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	if m.Snapshot().Recordings[0].Status != "partial" {
+		t.Fatal("manual stop was not partial")
+	}
+}
+
+func TestEngineMissedAndConcurrency(t *testing.T) {
+	m, now, count := engineFixture(t)
+	for _, id := range []string{"a", "b", "c", "d"} {
+		saveRule(t, m, rule(id))
+	}
+	*now = now.Add(time.Hour)
+	tick(m)
+	s := m.Snapshot()
+	if s.ActiveCount != 3 || *count != 3 || len(s.Recordings) != 4 {
+		t.Fatalf("overlap %+v count=%d", s, *count)
+	}
+	missed := 0
+	for _, r := range s.Recordings {
+		if r.Status == "missed" {
+			missed++
+		}
+	}
+	if missed != 1 {
+		t.Fatal("limit occurrence not missed")
+	}
+	m2, now2, count2 := engineFixture(t)
+	saveRule(t, m2, rule("elapsed"))
+	*now2 = now2.Add(3 * time.Hour)
+	tick(m2)
+	if *count2 != 0 || m2.Snapshot().Recordings[0].Status != "missed" {
+		t.Fatal("elapsed interval launched encoder")
+	}
+}
+
+func TestEngineStorageFolderAndSafeDeletion(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	r := m.Snapshot().Recordings[0]
+	if err := m.DeleteRecording(m.Snapshot().Revision, r.ID); err == nil {
+		t.Fatal("deleted active recording")
+	}
+	settings := m.Snapshot().Settings
+	settings.Folder = filepath.Join(t.TempDir(), "future")
+	if err := m.SetSettings(m.Snapshot().Revision, settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StopRecording(m.Snapshot().Revision, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	retained, path, err := m.RecordingPath(r.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retained.Folder == settings.Folder || m.Snapshot().UsedBytes != 40 {
+		t.Fatal("folder edit moved or lost old media")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/etc/passwd", path); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := m.RecordingPath(r.ID); err == nil {
+		t.Fatal("symlink was accepted")
+	}
+	if err := m.DeleteRecording(m.Snapshot().Revision, r.ID); err == nil {
+		t.Fatal("symlink deletion accepted")
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("safe"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.DeleteRecording(m.Snapshot().Revision, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Snapshot().Recordings) != 0 {
+		t.Fatal("deleted row retained")
+	}
+}
+
+func TestEngineCapReserveAndMonitoring(t *testing.T) {
+	for _, mode := range []string{"cap", "reserve", "statfs"} {
+		t.Run(mode, func(t *testing.T) {
+			m, now, _ := engineFixture(t)
+			saveRule(t, m, rule("a"))
+			*now = now.Add(time.Hour)
+			tick(m)
+			if mode == "cap" {
+				s := m.Snapshot().Settings
+				s.StorageCapBytes = 20
+				if err := m.SetSettings(m.Snapshot().Revision, s); err != nil {
+					t.Fatal(err)
+				}
+			} else if mode == "reserve" {
+				m.freeBytes = func(string) (int64, error) { return 0, nil }
+			} else {
+				m.freeBytes = func(string) (int64, error) { return 0, errors.New("fixture") }
+			}
+			tick(m)
+			waitFinished(t, m)
+			r := m.Snapshot().Recordings[0]
+			if r.Status != "partial" || r.Reason == "" {
+				t.Fatalf("storage stop %+v", r)
+			}
+		})
+	}
+}
+
+func TestEngineFailedWriteNoPublication(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	old := m.Snapshot()
+	dir := filepath.Dir(m.path)
+	if err := os.Rename(dir, dir+".saved"); err != nil {
+		t.Fatal(err)
+	}
+	s := old.Settings
+	s.StorageCapBytes++
+	err := m.SetSettings(old.Revision, s)
+	if err == nil {
+		t.Fatal("write unexpectedly succeeded")
+	}
+	got := m.Snapshot()
+	if got.Revision != old.Revision || got.Settings != old.Settings {
+		t.Fatal("failed write published state")
+	}
+	if err := os.Rename(dir+".saved", dir); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEngineCorruptIndexIsReadOnly(t *testing.T) {
+	base := t.TempDir()
+	path := filepath.Join(base, "recordings.json")
+	bad := []byte(`{"version":1,"schedules":`)
+	if err := os.WriteFile(path, bad, 0600); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Open(Config{DataDir: base, DefaultFolder: filepath.Join(base, "music"), PollInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	s := m.Snapshot()
+	if s.Available || s.Error == "" {
+		t.Fatal("corrupt index accepted")
+	}
+	if err := m.SetSettings(s.Revision, s.Settings); err == nil {
+		t.Fatal("corrupt index allowed writes")
+	}
+	got, _ := os.ReadFile(path)
+	if string(got) != string(bad) {
+		t.Fatal("corrupt data overwritten")
+	}
+}
+
+func TestEngineInputBounds(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	for _, change := range []func(*Schedule){func(s *Schedule) { s.ID = "../bad" }, func(s *Schedule) { s.Weekdays = []int{1, 1} }, func(s *Schedule) { s.EndTime = "10:00" }, func(s *Schedule) { s.EndTime = "23:00" }, func(s *Schedule) { s.Timezone = "Local" }, func(s *Schedule) { s.StreamURL = "file:///etc/passwd" }, func(s *Schedule) { s.Label = strings.Repeat("x", 257) }} {
+		r := rule("a")
+		change(&r)
+		if err := m.UpsertSchedule(m.Snapshot().Revision, r); err == nil {
+			t.Fatalf("invalid rule accepted %+v", r)
+		}
+	}
+	settings := m.Snapshot().Settings
+	settings.Folder = "relative"
+	if err := m.SetSettings(m.Snapshot().Revision, settings); err == nil {
+		t.Fatal("relative path accepted")
+	}
+	m.mu.Lock()
+	for i := 0; i < maxRecordings; i++ {
+		m.state.Recordings = append(m.state.Recordings, entry{})
+	}
+	err := m.startLocked(rule("x"), occurrence{Key: "x:2026-01-05", Start: time.Now(), End: time.Now()}, time.Now(), "")
+	m.state.Recordings = []entry{}
+	m.mu.Unlock()
+	if err == nil {
+		t.Fatal("history bound accepted")
+	}
+}
+
+func TestEngineCloseReapsAndReloadSuppresses(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s := m.Snapshot()
+	if s.ActiveCount != 0 || s.Recordings[0].Status != "partial" {
+		t.Fatalf("Close did not persist partial %+v", s)
+	}
+	m2, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	if len(m2.state.Seen) != 1 {
+		t.Fatal("occurrence ledger lost")
+	}
+	// A partial close retains explicit resume intent; its remainder is linked,
+	// while the original occurrence identity remains exactly one ledger entry.
+	m2.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
+	}
+	m2.freeBytes = m.freeBytes
+	tick(m2)
+	rows := m2.Snapshot().Recordings
+	if len(rows) != 2 || len(m2.state.Seen) != 1 {
+		t.Fatalf("resume rows %+v", rows)
+	}
+	linked := false
+	for _, r := range rows {
+		if r.ParentID == s.Recordings[0].ID {
+			linked = true
+		}
+	}
+	if !linked {
+		t.Fatal("remainder omitted parent link")
+	}
+}
+
+func TestEngineActiveUnlinkStopsAndAccounts(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	r := m.Snapshot().Recordings[0]
+	if err := os.Remove(filepath.Join(r.Folder, r.Filename)); err != nil {
+		t.Fatal(err)
+	}
+	tick(m)
+	waitFinished(t, m)
+	s := m.Snapshot()
+	if s.ActiveCount != 0 || s.Recordings[0].Status != "missing" || s.UsedBytes != 0 {
+		t.Fatalf("unlinked active capture %+v", s)
+	}
+}
+
+func TestEngineFinalizationCannotReplaceExistingFile(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	r := m.Snapshot().Recordings[0]
+	final := filepath.Join(r.Folder, r.ID+".opus")
+	if err := os.WriteFile(final, []byte("existing retained file"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StopRecording(m.Snapshot().Revision, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	b, err := os.ReadFile(final)
+	if err != nil || string(b) != "existing retained file" {
+		t.Fatalf("final audio was replaced: %q %v", b, err)
+	}
+	if m.Snapshot().Recordings[0].Filename != r.Filename {
+		t.Fatal("unfinalized partial was lost")
+	}
+}
+
+func TestEnginePostRenameSyncFailureFailsClosedAtDiskRevision(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	old := m.Snapshot()
+	m.persist = func(path string, s diskState) error {
+		if err := persistState(path, s); err != nil {
+			return err
+		}
+		return committedWriteError{errors.New("fixture directory sync failure")}
+	}
+	settings := old.Settings
+	settings.StorageCapBytes++
+	if err := m.SetSettings(old.Revision, settings); err == nil {
+		t.Fatal("durability failure hidden")
+	}
+	disk, err := loadState(m.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := m.Snapshot()
+	if got.Available || got.Revision != disk.Revision || got.Settings != disk.Settings {
+		t.Fatalf("memory diverged from replaced disk %+v", got)
+	}
+	if err := m.SetSettings(got.Revision, old.Settings); err == nil {
+		t.Fatal("write allowed after uncertain durability")
+	}
+}
+
+func TestEngineMissingOutputRecoveryAndTransactionalResume(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s := m.state.clone()
+	r := &s.Recordings[0]
+	if err := removeManaged(*r); err != nil {
+		t.Fatal(err)
+	}
+	r.Status = "recording"
+	r.Resume = false
+	r.Filename = r.ID + ".partial"
+	if err := persistState(m.path, s); err != nil {
+		t.Fatal(err)
+	}
+	m2, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	if !m2.state.Recordings[0].Resume || m2.state.Recordings[0].Status != "missing" {
+		t.Fatal("missing output lost interrupted intent")
+	}
+	starts := 0
+	m2.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		starts++
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
+	}
+	m2.freeBytes = m.freeBytes
+	m2.persist = func(string, diskState) error { return errors.New("fixture disk failure") }
+	tick(m2)
+	if starts != 0 || len(m2.state.Recordings) != 1 || !m2.state.Recordings[0].Resume {
+		t.Fatal("failed successor commit consumed durable resume intent")
+	}
+	m2.persist = persistState
+	tick(m2)
+	if starts != 1 || len(m2.state.Recordings) != 2 || m2.state.Recordings[0].Resume {
+		t.Fatal("successor was not atomically linked")
+	}
+}
+
+func TestEngineCheckpointsDoNotInvalidateEditorsAndIdleDoesNotWrite(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	calls := 0
+	m.persist = func(path string, s diskState) error { calls++; return persistState(path, s) }
+	*now = now.Add(10 * time.Minute)
+	tick(m)
+	if calls != 0 {
+		t.Fatal("idle engine wrote a checkpoint")
+	}
+	saveRule(t, m, rule("a"))
+	revision := m.Snapshot().Revision
+	*now = now.Add(2 * time.Minute)
+	tick(m)
+	if m.Snapshot().Revision != revision {
+		t.Fatal("housekeeping invalidated an editor")
+	}
+	if calls != 2 {
+		t.Fatalf("mutation and checkpoint writes=%d", calls)
+	}
+}
+
+func TestEngineDisabledIntervalsDoNotBackfill(t *testing.T) {
+	m, now, count := engineFixture(t)
+	s := rule("a")
+	s.Enabled = false
+	saveRule(t, m, s)
+	*now = now.Add(8 * 24 * time.Hour)
+	tick(m)
+	s.Enabled = true
+	saveRule(t, m, s)
+	tick(m)
+	if *count != 0 || len(m.Snapshot().Recordings) != 0 {
+		t.Fatal("disabled intervals were backfilled")
+	}
+}
+
+func TestEngineDependencyUnavailableStillAllowsConfiguration(t *testing.T) {
+	base := t.TempDir()
+	m, err := Open(Config{DataDir: filepath.Join(base, "data"), DefaultFolder: filepath.Join(base, "music"), FFmpeg: filepath.Join(base, "absent"), PollInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	s := m.Snapshot()
+	if s.Available || !strings.Contains(s.Error, "encoder unavailable") {
+		t.Fatalf("missing dependency readiness %+v", s)
+	}
+	settings := s.Settings
+	settings.StorageCapBytes++
+	if err := m.SetSettings(s.Revision, settings); err != nil {
+		t.Fatal("dependency failure blocked configuration", err)
+	}
+}
+
+func TestEngineRecoveryProbesFinalNameAfterInterruptedPublish(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s := m.state.clone()
+	s.Recordings[0].Status = "recording"
+	s.Recordings[0].Resume = false
+	s.Recordings[0].Filename = s.Recordings[0].ID + ".partial"
+	if err := persistState(m.path, s); err != nil {
+		t.Fatal(err)
+	}
+	probe := filepath.Join(t.TempDir(), "probe")
+	script := "#!/bin/sh\nprintf '%s\\n' '{\"streams\":[{\"codec_name\":\"opus\",\"channels\":1}],\"format\":{\"duration\":\"5\",\"format_name\":\"ogg\"}}'\n"
+	if err := os.WriteFile(probe, []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	config := m.config
+	config.FFprobe = probe
+	m2, err := Open(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	r := m2.state.Recordings[0]
+	if r.Status != "partial" || r.DurationSeconds != 5 || r.Filename != r.ID+".opus" || !r.Resume {
+		t.Fatalf("recovered final-name output %+v", r)
+	}
+}
+
+func TestEngineDeletionIntentSurvivesFinalIndexFailure(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("a"))
+	*now = now.Add(time.Hour)
+	tick(m)
+	r := m.Snapshot().Recordings[0]
+	if err := m.StopRecording(m.Snapshot().Revision, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	calls := 0
+	m.persist = func(path string, s diskState) error {
+		calls++
+		if calls == 2 {
+			return errors.New("fixture deletion publication failure")
+		}
+		return persistState(path, s)
+	}
+	if err := m.DeleteRecording(m.Snapshot().Revision, r.ID); err == nil {
+		t.Fatal("final publication failure hidden")
+	}
+	if len(m.state.Recordings) != 1 || !m.state.Recordings[0].Deleting {
+		t.Fatal("durable deletion intent lost")
+	}
+	m.persist = persistState
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	m2, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	if len(m2.Snapshot().Recordings) != 0 {
+		t.Fatal("deletion intent did not reconcile on restart")
+	}
+}
+
+func TestEngineUnwritableFolderAndNewCurrentInterval(t *testing.T) {
+	m, now, count := engineFixture(t)
+	settings := m.Snapshot().Settings
+	if err := os.WriteFile(settings.Folder, []byte("folder is a file"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	*now = now.Add(90 * time.Minute)
+	saveRule(t, m, rule("a"))
+	tick(m)
+	s := m.Snapshot()
+	if *count != 0 || len(s.Recordings) != 1 || s.Recordings[0].Status != "missed" || !strings.Contains(s.Recordings[0].Reason, "folder") {
+		t.Fatalf("bad folder %+v", s)
+	}
+}
+
+func TestEngineBoundedIndexAndCollection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "recordings.json")
+	if err := os.WriteFile(path, []byte(strings.Repeat(" ", maxIndexBytes+1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadState(path); err == nil {
+		t.Fatal("oversized index accepted")
+	}
+	m, _, _ := engineFixture(t)
+	m.mu.Lock()
+	for i := 0; i < maxSchedules; i++ {
+		m.state.Schedules = append(m.state.Schedules, rule("existing"))
+	}
+	m.mu.Unlock()
+	if err := m.UpsertSchedule(m.Snapshot().Revision, rule("overflow")); err == nil {
+		t.Fatal("schedule limit accepted")
+	}
+	m.mu.Lock()
+	m.state.Schedules = []Schedule{}
+	m.mu.Unlock()
+}
+
+func TestEnginePeriodicLoopConcurrentReadersAndClose(t *testing.T) {
+	var clock atomic.Int64
+	clock.Store(time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC).Unix())
+	base := t.TempDir()
+	m, err := Open(Config{DataDir: filepath.Join(base, "data"), DefaultFolder: filepath.Join(base, "music"), PollInterval: 5 * time.Millisecond, Now: func() time.Time { return time.Unix(clock.Load(), 0) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m.Close()
+	m.mu.Lock()
+	m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
+	}
+	m.freeBytes = func(string) (int64, error) { return 1 << 40, nil }
+	m.mu.Unlock()
+	saveRule(t, m, rule("a"))
+	clock.Add(3600)
+	deadline := time.Now().Add(time.Second)
+	for m.Snapshot().ActiveCount != 1 {
+		if time.Now().After(deadline) {
+			t.Fatal("periodic scheduler did not start capture")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for n := 0; n < 20; n++ {
+				s := m.Snapshot()
+				settings := s.Settings
+				_ = m.SetSettings(s.Revision, settings)
+			}
+		}()
+	}
+	wg.Wait()
+	if len(m.updates) > 1 {
+		t.Fatal("updates did not coalesce")
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if m.Snapshot().ActiveCount != 0 {
+		t.Fatal("periodic capture survived Close")
+	}
+}
+
+func TestLedgerCompactionKeepsRecentIdentitiesAndBackwardClockSafe(t *testing.T) {
+	m, now, count := engineFixture(t)
+	saveRule(t, m, rule("weekly"))
+	highWater := now.AddDate(0, 0, 15)
+	m.mu.Lock()
+	m.state.Cursor = timestamp(highWater)
+	for i := 0; i < maxOccurrences; i++ {
+		m.state.Seen[fmt.Sprintf("old%d:2000-01-01", i)] = true
+	}
+	recent := "weekly:" + highWater.AddDate(0, 0, -2).Format("2006-01-02")
+	m.state.Seen[recent] = true
+	revision := m.state.Revision
+	compactErr := m.compactLocked()
+	valid := len(m.state.Seen) == 1 && m.state.Seen[recent] && m.state.Revision == revision
+	m.mu.Unlock()
+	if compactErr != nil {
+		t.Fatal(compactErr)
+	}
+	if !valid {
+		t.Fatal("compaction lost recent dedupe or invalidated an editor")
+	}
+	// The old Monday interval is no longer in Seen. Moving the wall clock
+	// backward still cannot re-record it because the checkpoint never retreats.
+	*now = now.Add(time.Hour)
+	tick(m)
+	if *count != 0 || len(m.Snapshot().Recordings) != 0 {
+		t.Fatal("clock rollback recaptured an expired identity")
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	disk, err := loadState(m.path)
+	if err != nil || parseTime(disk.Cursor).Before(highWater) {
+		t.Fatal("Close moved high-water checkpoint backward", err)
+	}
+}
+
+func TestLongUnavailablePeriodUsesBoundedMissedSummary(t *testing.T) {
+	m, now, count := engineFixture(t)
+	saveRule(t, m, rule("weekly"))
+	*now = now.AddDate(0, 3, 0)
+	tick(m)
+	s := m.Snapshot()
+	if *count != 0 {
+		t.Fatal("started a capture for an old unavailable interval")
+	}
+	summaries := 0
+	for _, r := range s.Recordings {
+		if strings.Contains(r.Reason, "older missed intervals grouped") {
+			summaries++
+		}
+	}
+	if summaries != 1 || len(s.Recordings) > 4 {
+		t.Fatalf("unbounded or missing catch-up summary: %+v", s.Recordings)
+	}
+}

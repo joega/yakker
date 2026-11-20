@@ -99,7 +99,7 @@ func verifyPlayback(t *testing.T, path string, r CaptureResult) {
 	if out, err := exec.CommandContext(ctx, "ffmpeg", "-v", "error", "-i", path, "-f", "null", "-").CombinedOutput(); err != nil {
 		t.Fatalf("decode: %v: %s", err, out)
 	}
-	out, err := exec.CommandContext(ctx, "mpv", "--no-config", "--no-video", "--ao=null", "--start="+fmt.Sprint(r.DurationSeconds/2), "--length=0.2", path).CombinedOutput()
+	out, err := exec.CommandContext(ctx, "mpv", "--no-config", "--load-scripts=no", "--no-video", "--ao=null", "--start="+fmt.Sprint(r.DurationSeconds/2), "--length=0.2", path).CombinedOutput()
 	if err != nil {
 		t.Fatalf("mid-file playback: %v: %s", err, out)
 	}
