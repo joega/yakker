@@ -1,6 +1,6 @@
 # Yakker
 
-A lightweight sports-radio player for your desktop.
+A lightweight sports-radio player for your desktop, with optional **DVR-style controls**.
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
 Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
@@ -8,15 +8,24 @@ Twenty-four stations across the US, Canada, UK and Ireland, streamed through hea
 The widget starts playback only when you press Play; the standalone CLI starts
 when you run `yakker listen` or `yakker tui`.
 
+**Pause live radio, rewind a segment, and jump back to live.** Take a call, then
+resume where you left off while audio keeps arriving. Choose **5, 15, or 30
+minutes of history** in Settings; use the timeline, skip back or forward
+30 seconds, or select **Go live** to catch up. **Live only** remains the default,
+and buffered audio stays in RAM without creating recording files.
+
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
 
-[Install](#install-locally) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+[Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
 <p>
-  <img src="docs/yakker-popup.png" alt="Yakker playback controls" width="320">
-  <img src="docs/yakker-stations.png" alt="Yakker station picker with city search and live playback" width="320">
+  <a href="docs/yakker-dvr.png"><img src="docs/yakker-dvr.png" alt="Yakker DVR controls with Pause, a buffered-audio timeline, 30-second rewind and forward, and Go live" width="240" align="top"></a>
+  <a href="docs/yakker-popup.png"><img src="docs/yakker-popup.png" alt="Yakker live playback controls" width="240" align="top"></a>
+  <a href="docs/yakker-stations.png"><img src="docs/yakker-stations.png" alt="Yakker station picker with city search and live playback" width="240" align="top"></a>
 </p>
+
+_DVR controls, live playback, and station search. Select a screenshot to view it full size._
 
 ## Stations
 
@@ -115,15 +124,16 @@ Right-click the bar icon to open the station list directly.
 The popup includes a searchable station selector, volume, mute, connection status, and Retry after errors.
 Search by station, city or country—for example, `690`, `Seattle`, `UK` or `Ireland`.
 Changing stations while playing makes a fresh live connection; while stopped it
-selects the next station without starting playback. The last station, volume and
-mute setting are remembered across shell restarts.
+selects the next station without starting playback. The last station, volume,
+mute setting and listening buffer length are remembered across shell restarts.
 The bar shows a neutral radio icon until playback is live, then switches to the
 playing station's bundled logo. Stop restores the neutral icon; connecting,
 reconnecting and errors also use it. The popup keeps the selected station's logo.
 The bar status dot uses accent
 color while playing and the urgent theme color for errors. Hover it for station and status.
 
-Keyboard inside the popup: Tab or Up/Down selects Station, Play, Volume, or Mute;
+Keyboard inside the popup: Tab or Up/Down moves between controls, including
+Settings and the DVR controls when available;
 Space/Enter activates the selection. Inside the station selector, type to search,
 Down browses the matches, Enter selects, and Escape cancels and clears the search. Left/Right adjusts volume by 5%; M toggles
 mute; R retries a stopped stream; Escape dismisses the popup. Right-clicking the
@@ -145,7 +155,8 @@ omarchy-shell shell hide io.github.joega.yakker
 
 ## Pause and rewind
 
-Open **Settings** in the radio popup and choose a **Listening buffer**:
+The optional DVR-style buffer lets you pause a live station and listen from that
+point later. Open **Settings** in the radio popup and choose a **Listening buffer**:
 
 - **Live only** (default): the existing short network buffer, with no replay history.
 - **5 minutes**, **15 minutes**, or **30 minutes**: enable pause and rewind for the selected station.

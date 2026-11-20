@@ -27,7 +27,7 @@ var installFiles = []string{
 	"assets/talksport.png", "assets/talksport-2.png", "assets/bbc-radio-5-live.png",
 	"assets/off-the-ball.png", "assets/README.md", "yakker-controller",
 	"stations.json", "README.md", "LICENSE",
-	"docs/yakker-popup.png", "docs/yakker-stations.png",
+	"docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
 }
 
 type installMarker struct {
