@@ -55,15 +55,66 @@ func (r *controller) currentPosition() float64 {
 	}
 	return math.Float64frombits(r.player.position.Load())
 }
-func (r *controller) setPaused(paused bool) error {
-	if paused && r.cfg.DVRWindow == 0 {
-		return errors.New("Enable a buffer before pausing")
+
+const temporaryWindow = 15 * time.Minute
+
+func (r *controller) effectiveWindow() time.Duration {
+	if r.state.TemporaryBuffer {
+		return temporaryWindow
 	}
+	return r.cfg.DVRWindow
+}
+
+func (r *controller) effectiveBytes() int64 {
+	if r.state.TemporaryBuffer {
+		return dvrByteLimit(temporaryWindow)
+	}
+	return r.cfg.DVRBytes
+}
+
+// The demuxer cache limits are fixed when mpv opens a stream, so the live
+// player reserves capacity at startup. Only audio from this point is exposed.
+func (r *controller) enableTemporaryBuffer() error {
+	if r.effectiveWindow() > 0 {
+		return nil
+	}
+	if r.player != nil {
+		r.player.temporaryStart = r.currentPosition()
+		if r.player.conn != nil {
+			if err := r.ipc([]any{"observe_property", 7, "demuxer-cache-state"}); err != nil {
+				return err
+			}
+			if r.dvrTicker == nil {
+				r.dvrTicker = time.NewTicker(r.cfg.DVRPollInterval)
+			}
+		}
+	}
+	r.state.TemporaryBuffer = true
+	return nil
+}
+
+func (r *controller) retainedStart(cache cacheWindow) float64 {
+	start := math.Max(cache.start, cache.end-r.effectiveWindow().Seconds())
+	if r.state.TemporaryBuffer && r.player != nil {
+		start = math.Max(start, r.player.temporaryStart)
+	}
+	return math.Min(start, cache.end)
+}
+
+func (r *controller) setPaused(paused bool) error {
 	if !r.state.Wanted || r.player == nil {
 		return errors.New("Start playback before pausing or resuming")
 	}
 	if paused == r.state.Paused {
 		return nil
+	}
+	if paused {
+		if err := r.enableTemporaryBuffer(); err != nil {
+			return err
+		}
+	}
+	if r.player.conn != nil {
+		r.player.pendingPause = &paused
 	}
 	if err := r.ipc([]any{"set_property", "pause", paused}); err != nil {
 		return err
@@ -97,7 +148,7 @@ func (r *controller) seekDVR(target float64) error {
 	if !cache.valid {
 		return errors.New("No continuous buffered range is available")
 	}
-	r.state.BufferStart = math.Max(cache.start, cache.end-r.cfg.DVRWindow.Seconds())
+	r.state.BufferStart = r.retainedStart(cache)
 	r.state.BufferEnd = cache.end
 	end := math.Max(r.state.BufferStart, r.state.BufferEnd-.25)
 	target = math.Max(r.state.BufferStart, math.Min(end, target))
@@ -121,7 +172,7 @@ func (r *controller) updateDVR() {
 	first := !r.state.DVR
 	r.state.DVR = true
 	r.state.BufferEnd = cache.end
-	r.state.BufferStart = math.Max(cache.start, cache.end-r.cfg.DVRWindow.Seconds())
+	r.state.BufferStart = r.retainedStart(cache)
 	position := r.currentPosition()
 	// Advance an expired paused bookmark while staying paused. The extra forward
 	// read-ahead lets intake continue beyond the visible retention window. If a
@@ -132,7 +183,7 @@ func (r *controller) updateDVR() {
 		return
 	}
 	expired := position < r.state.BufferStart
-	capacity := r.state.Paused && cache.idle && cache.forwardBytes >= float64(r.cfg.DVRBytes)*.9 && cache.end-position > 5
+	capacity := r.state.Paused && cache.idle && cache.forwardBytes >= float64(r.effectiveBytes())*.9 && cache.end-position > 5
 	if expired || capacity {
 		target := r.state.BufferStart
 		if capacity {

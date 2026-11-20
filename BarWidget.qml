@@ -78,7 +78,8 @@ Ui.BarWidget {
         error: Radio.RadioService.error, playerPid: Radio.RadioService.playerPid,
         title: Radio.RadioService.title, stationId: Radio.RadioService.stationId,
         station: Radio.RadioService.station, stations: Radio.RadioService.stations,
-        paused: Radio.RadioService.paused, bufferMinutes: Radio.RadioService.bufferMinutes, dvr: Radio.RadioService.dvr,
+        paused: Radio.RadioService.paused, bufferMinutes: Radio.RadioService.bufferMinutes,
+        temporaryBuffer: Radio.RadioService.temporaryBuffer, dvr: Radio.RadioService.dvr,
         position: Radio.RadioService.position, bufferStart: Radio.RadioService.bufferStart, bufferEnd: Radio.RadioService.bufferEnd,
         ready: Radio.RadioService.ready, opened: root.opened})
     }

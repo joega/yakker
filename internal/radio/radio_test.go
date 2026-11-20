@@ -537,17 +537,22 @@ func TestMissingMPVNoRetryStorm(t *testing.T) {
 		t.Fatal(s)
 	}
 }
-func TestPauseAndEndStopDoNotReconnect(t *testing.T) {
-	for _, mode := range []string{"pause", "end-stop"} {
-		t.Run(mode, func(t *testing.T) {
-			h := newHarness(t, Config{MPVArgs: []string{"--fixture-mode=" + mode}, RetryDelays: []time.Duration{20 * time.Millisecond}}, false)
-			h.send("play")
-			h.wait(func(s Status) bool { return s.State == "stopped" && !s.Wanted && s.PlayerPID == 0 })
-			time.Sleep(50 * time.Millisecond)
-			if s := h.barrier(); s.State != "stopped" || s.Wanted || s.PlayerPID != 0 {
-				t.Fatal(s)
-			}
-		})
+func TestExternalPauseEnablesTemporaryBuffer(t *testing.T) {
+	h := newHarness(t, Config{MPVArgs: []string{"--fixture-mode=pause"}}, false)
+	h.send("play")
+	s := h.wait(func(s Status) bool { return s.Paused && s.TemporaryBuffer })
+	if !s.Wanted || s.PlayerPID == 0 || s.BufferMinutes != 0 {
+		t.Fatal(s)
+	}
+	h.stop()
+}
+func TestEndStopDoesNotReconnect(t *testing.T) {
+	h := newHarness(t, Config{MPVArgs: []string{"--fixture-mode=end-stop"}, RetryDelays: []time.Duration{20 * time.Millisecond}}, false)
+	h.send("play")
+	h.wait(func(s Status) bool { return s.State == "stopped" && !s.Wanted && s.PlayerPID == 0 })
+	time.Sleep(50 * time.Millisecond)
+	if s := h.barrier(); s.State != "stopped" || s.Wanted || s.PlayerPID != 0 {
+		t.Fatal(s)
 	}
 }
 func TestMetadataAndBuffering(t *testing.T) {

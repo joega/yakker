@@ -151,11 +151,8 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			m.tune()
 		case "p":
-			if m.status.BufferMinutes == 0 {
-				break
-			}
 			if !m.wanted {
-				m.setWanted(true)
+				break
 			} else if serial, ok := m.command(map[bool]string{true: "play", false: "pause"}[m.paused], nil); ok {
 				m.paused = !m.paused
 				m.pauseSerial = serial

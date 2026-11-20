@@ -3,6 +3,7 @@ package radio
 import (
 	"encoding/binary"
 	"encoding/json"
+	"io"
 	"math"
 	"net"
 	"net/http"
@@ -34,7 +35,7 @@ func TestDVRDefaultsAndInputValidation(t *testing.T) {
 		}
 	}
 	if err := r.setPaused(true); err == nil {
-		t.Fatal("Live only allowed a pause")
+		t.Fatal("stopped playback allowed a pause")
 	}
 }
 func TestDVRPreferenceChangesDoNotAutoplay(t *testing.T) {
@@ -96,6 +97,36 @@ func TestDVRCacheBoundsAndPausedWatchdog(t *testing.T) {
 	r := &controller{player: p, cfg: Config{StallTimeout: 30 * time.Second}, state: Status{State: "paused", Paused: true}}
 	if r.watchdogRemaining() < 29*time.Second {
 		t.Fatal("fresh intake did not keep paused stream alive")
+	}
+}
+
+func TestTemporaryBufferReconnectAndStationSwitch(t *testing.T) {
+	path := filepath.Join(tempDir(t), "stations.json")
+	data, _ := json.Marshal([]Station{
+		{"id": "one", "name": "One", "subtitle": "Test", "streamUrl": "http://localhost/one"},
+		{"id": "two", "name": "Two", "subtitle": "Test", "streamUrl": "http://localhost/two"},
+	})
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, Config{StationFile: path, RetryDelays: []time.Duration{20 * time.Millisecond}}, false)
+	first := h.play()
+	h.send("pause")
+	paused := h.wait(func(s Status) bool { return s.Paused && s.TemporaryBuffer })
+	if paused.PlayerPID != first.PlayerPID || paused.BufferMinutes != 0 {
+		t.Fatal(paused)
+	}
+	if err := syscall.Kill(paused.PlayerPID, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	retry := h.wait(func(s Status) bool { return s.State == "paused" && s.PlayerPID != 0 && s.PlayerPID != first.PlayerPID })
+	if !retry.TemporaryBuffer || retry.BufferMinutes != 0 || retry.DVR || retry.BufferStart != 0 {
+		t.Fatal("reconnect did not start a fresh temporary cache", retry)
+	}
+	serial := h.send("configure", "stationId", "two", "bufferMinutes", 0)
+	switched := h.wait(func(s Status) bool { return s.Serial == serial && s.Station["id"] == "two" && s.State == "playing" })
+	if switched.TemporaryBuffer || switched.Paused || switched.DVR || switched.BufferMinutes != 0 {
+		t.Fatal("station switch retained temporary cache", switched)
 	}
 }
 
@@ -194,4 +225,70 @@ func TestRealMPVDVRPauseSeekLiveExpireAndOptOut(t *testing.T) {
 		t.Fatal("old buffered player survived opt out")
 	}
 	h.stop()
+
+	// Starting from Live only must activate the provisioned cache without reconnecting.
+	requests.Store(0)
+	h2 := newHarness(t, Config{StationFile: path, MPV: mpv, MPVArgs: []string{"--ao=null"}, DVRPollInterval: 100 * time.Millisecond}, false)
+	liveFirst := h2.play()
+	time.Sleep(2 * time.Second)
+	h2.send("pause")
+	temporary := h2.wait(func(s Status) bool { return s.Paused && s.TemporaryBuffer && s.DVR })
+	grown := h2.wait(func(s Status) bool { return s.Paused && s.BufferEnd > temporary.BufferEnd+5 })
+	if grown.BufferMinutes != 0 || grown.PlayerPID != liveFirst.PlayerPID || requests.Load() != 1 || math.Abs(grown.Position-temporary.Position) > .3 {
+		t.Fatal("temporary pause did not preserve the live connection and position", temporary, grown, requests.Load())
+	}
+	h2.send("play")
+	resumedTemp := h2.wait(func(s Status) bool { return !s.Paused && s.TemporaryBuffer && s.Position > grown.Position+.2 })
+	if resumedTemp.PlayerPID != liveFirst.PlayerPID || requests.Load() != 1 {
+		t.Fatal("temporary resume reconnected", resumedTemp)
+	}
+	stopped := h2.stop()
+	if stopped.TemporaryBuffer || stopped.DVR || stopped.BufferMinutes != 0 {
+		t.Fatal("temporary buffer survived stop", stopped)
+	}
+}
+
+func TestPauseIgnoresStaleObservationsAndAllowsExternalControl(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	go func() { _, _ = io.Copy(io.Discard, server) }()
+	r := &controller{
+		state:  Status{State: "playing", Wanted: true},
+		cfg:    Config{DVRWindow: 15 * time.Minute, StallTimeout: time.Second},
+		player: &player{conn: client, started: time.Now()},
+		output: json.NewEncoder(io.Discard),
+	}
+	defer r.clearTimer()
+	prop := func(v bool) { r.event(mpvEvent{Event: "property-change", Name: "pause", Data: v}) }
+	if err := r.setPaused(true); err != nil {
+		t.Fatal(err)
+	}
+	prop(false)
+	if !r.state.Paused || r.player.pendingPause == nil {
+		t.Fatal("stale unpause undid pause", r.state)
+	}
+	// Rapid toggles must fence old observations against the latest intent.
+	if err := r.setPaused(false); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.setPaused(true); err != nil {
+		t.Fatal(err)
+	}
+	prop(false)
+	if !r.state.Paused {
+		t.Fatal("stale event undid latest toggle", r.state)
+	}
+	prop(true)
+	if r.player.pendingPause != nil {
+		t.Fatal("latest observation did not acknowledge pause")
+	}
+	prop(false)
+	if r.state.Paused {
+		t.Fatal("external resume was ignored", r.state)
+	}
+	prop(true)
+	if !r.state.Paused {
+		t.Fatal("external pause was ignored", r.state)
+	}
 }

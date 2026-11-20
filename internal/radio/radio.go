@@ -27,25 +27,26 @@ import (
 type Station map[string]any
 
 type Status struct {
-	State         string  `json:"state"`
-	Wanted        bool    `json:"wanted"`
-	Error         string  `json:"error"`
-	Volume        int     `json:"volume"`
-	Muted         bool    `json:"muted"`
-	Title         string  `json:"title"`
-	Station       Station `json:"station"`
-	Retry         int     `json:"retry"`
-	RetryDelay    float64 `json:"retryDelay"`
-	PlayerPID     int     `json:"playerPid"`
-	MPRIS         bool    `json:"mpris"`
-	Serial        int64   `json:"serial"`
-	Paused        bool    `json:"paused"`
-	BufferMinutes int     `json:"bufferMinutes"`
-	DVR           bool    `json:"dvr"`
-	Position      float64 `json:"position"`
-	BufferStart   float64 `json:"bufferStart"`
-	BufferEnd     float64 `json:"bufferEnd"`
-	BufferExpired bool    `json:"bufferExpired"`
+	State           string  `json:"state"`
+	Wanted          bool    `json:"wanted"`
+	Error           string  `json:"error"`
+	Volume          int     `json:"volume"`
+	Muted           bool    `json:"muted"`
+	Title           string  `json:"title"`
+	Station         Station `json:"station"`
+	Retry           int     `json:"retry"`
+	RetryDelay      float64 `json:"retryDelay"`
+	PlayerPID       int     `json:"playerPid"`
+	MPRIS           bool    `json:"mpris"`
+	Serial          int64   `json:"serial"`
+	Paused          bool    `json:"paused"`
+	BufferMinutes   int     `json:"bufferMinutes"`
+	TemporaryBuffer bool    `json:"temporaryBuffer"`
+	DVR             bool    `json:"dvr"`
+	Position        float64 `json:"position"`
+	BufferStart     float64 `json:"bufferStart"`
+	BufferEnd       float64 `json:"bufferEnd"`
+	BufferExpired   bool    `json:"bufferExpired"`
 }
 
 // Config overrides are used by the standalone CLI and tests; normal plugin
@@ -136,11 +137,13 @@ type player struct {
 	// Suppress older observed values until the latest control reaches mpv.
 	pendingVolume  *int
 	pendingMute    *bool
+	pendingPause   *bool
 	lastProgress   atomic.Int64
 	lastIntake     atomic.Int64
 	position       atomic.Uint64
 	cacheMu        sync.Mutex
 	cache          cacheWindow
+	temporaryStart float64
 	playbackSince  time.Duration
 	cmd            *exec.Cmd
 	conn           net.Conn
@@ -407,7 +410,7 @@ func (r *controller) command(raw []byte) (bool, error) {
 		r.mpris = plugin
 		r.state.MPRIS = plugin != ""
 		if changed {
-			wanted, paused := r.state.Wanted, r.state.Paused && !bufferChanged
+			wanted, paused := r.state.Wanted, r.state.Paused && !bufferChanged && !r.state.TemporaryBuffer
 			r.stop()
 			if wanted {
 				r.state.Paused = paused
@@ -493,6 +496,7 @@ func (r *controller) play() {
 func (r *controller) stop() {
 	r.state.Wanted = false
 	r.state.Paused = false
+	r.state.TemporaryBuffer = false
 	r.clearTimer()
 	r.cleanup()
 	r.state.State = "stopped"
@@ -534,14 +538,18 @@ func (r *controller) start() {
 	r.state.Title = ""
 	_ = os.Remove(r.socket) // The exclusive owner lock is held.
 	args := append([]string{}, r.cfg.MPVArgs...)
-	cacheSeconds := 3.0
-	backBytes := int64(0)
-	if r.cfg.DVRWindow > 0 {
-		cacheSeconds = r.cfg.DVRWindow.Seconds() + 10
-		backBytes = r.cfg.DVRBytes
+	// mpv fixes demuxer limits when opening the stream. Reserve enough RAM
+	// for pause in live-only mode without exposing prior audio as DVR history.
+	window := r.effectiveWindow()
+	bytes := r.effectiveBytes()
+	if window == 0 {
+		window = temporaryWindow
+		bytes = dvrByteLimit(window)
 	}
+	cacheSeconds := window.Seconds() + 10
+	backBytes := bytes
 	args = append(args, "--no-config", "--load-scripts=no", "--no-video", "--no-audio-display", "--idle=no", "--terminal=no", "--input-terminal=no", "--keep-open=no",
-		"--cache=yes", fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", r.cfg.DVRBytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",
+		"--cache=yes", fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", bytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",
 		"--input-ipc-server="+r.socket, fmt.Sprintf("--volume=%d", r.state.Volume), "--mute="+map[bool]string{true: "yes", false: "no"}[r.state.Muted], "--force-media-title="+r.state.Station["name"].(string))
 	if r.mpris != "" {
 		args = append(args, "--script="+r.mpris)
@@ -581,6 +589,8 @@ func (r *controller) connect() {
 		return
 	}
 	p.conn = conn
+	pause := r.state.Paused
+	p.pendingPause = &pause
 	// Controls may change while waiting for mpv to open the socket. Apply the
 	// latest preferences before observing initial player values.
 	for _, command := range [][]any{{"set_property", "volume", r.state.Volume}, {"set_property", "mute", r.state.Muted}, {"set_property", "pause", r.state.Paused}} {
@@ -590,7 +600,7 @@ func (r *controller) connect() {
 		}
 	}
 	observed := []string{"volume", "mute", "metadata", "core-idle", "pause", "time-pos"}
-	if r.cfg.DVRWindow > 0 {
+	if r.effectiveWindow() > 0 {
 		observed = append(observed, "demuxer-cache-state")
 	}
 	for i, name := range observed {
@@ -600,7 +610,7 @@ func (r *controller) connect() {
 		}
 	}
 	r.after("deadline", r.cfg.ConnectTimeout)
-	if r.cfg.DVRWindow > 0 {
+	if r.effectiveWindow() > 0 {
 		r.dvrTicker = time.NewTicker(r.cfg.DVRPollInterval)
 	}
 	go func() {
@@ -653,6 +663,7 @@ func (r *controller) fail(message string) {
 	if r.state.Retry >= len(r.cfg.RetryDelays) {
 		r.state.Wanted = false
 		r.state.Paused = false
+		r.state.TemporaryBuffer = false
 		r.state.State = "error"
 		r.state.RetryDelay = 0
 	} else {
@@ -771,10 +782,17 @@ func (r *controller) event(event mpvEvent) {
 			}
 		case "pause":
 			if paused, ok := value.(bool); ok && r.state.Wanted {
-				if paused && r.cfg.DVRWindow == 0 {
-					r.stop()
-					_ = r.publish()
-					return
+				if r.player != nil && r.player.pendingPause != nil {
+					if paused != *r.player.pendingPause {
+						break
+					}
+					r.player.pendingPause = nil
+				}
+				if paused && r.effectiveWindow() == 0 {
+					if err := r.enableTemporaryBuffer(); err != nil {
+						r.fail(err.Error())
+						return
+					}
 				}
 				if paused == r.state.Paused {
 					break

@@ -504,3 +504,29 @@ func TestTUIDVRPauseIntentAndLiveControls(t *testing.T) {
 		t.Fatal("Go live did not resume")
 	}
 }
+
+func TestTUILiveOnlyPauseAndStoppedShortcut(t *testing.T) {
+	m, c := modelFixture()
+	if m.status.BufferMinutes != 0 {
+		t.Fatal("fixture must start in Live only")
+	}
+	m = updateModel(m, key('p'))
+	serial := c.serial
+	if !m.paused || c.commands[len(c.commands)-1]["action"] != "pause" {
+		t.Fatal("Live only P did not request temporary pause", c.commands)
+	}
+	m = updateModel(m, statusMessage(m.stations[0], serial-1, 60, false, true))
+	if !m.paused {
+		t.Fatal("stale live status undid pause intent")
+	}
+	m = updateModel(m, key('p'))
+	if m.paused || c.commands[len(c.commands)-1]["action"] != "play" {
+		t.Fatal("second P did not resume", c.commands)
+	}
+	m = updateModel(m, key('s'))
+	count := len(c.commands)
+	m = updateModel(m, key('p'))
+	if len(c.commands) != count || m.wanted {
+		t.Fatal("Pause while stopped started playback")
+	}
+}

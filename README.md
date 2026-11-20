@@ -158,18 +158,30 @@ omarchy-shell shell hide io.github.joega.yakker
 The optional DVR-style buffer lets you pause a live station and listen from that
 point later. Open **Settings** in the radio popup and choose a **Listening buffer**:
 
-- **Live only** (default): the existing short network buffer, with no replay history.
+- **Live only** (default): no replay history is exposed until you pause.
 - **5 minutes**, **15 minutes**, or **30 minutes**: enable pause and rewind for the selected station.
 
-With a buffer enabled, use **Pause / Resume**, the timeline, **−30s / +30s**, or
-**Go live**. Audio continues arriving while paused. History begins when buffering
+Press **Pause** or **P** during Live only playback to start a temporary **15-minute**
+RAM buffer without reconnecting the stream. **Resume** continues from the paused
+position, and the timeline, **−30s / +30s**, and **Go live** become available.
+The saved Live only setting stays unchanged. This temporary buffer ends when you
+Stop, change stations, explicitly change the buffer setting, or close the player.
+A stream reconnection retains temporary mode but clears the old connection's
+audio, so the original paused position is lost.
+
+With a configured buffer, use the same **Pause / Resume**, timeline,
+**−30s / +30s**, and **Go live** controls. Audio continues arriving while paused. History begins when buffering
 is enabled; programmes from before that connection are unavailable. Changing
 stations or buffer length, pressing Stop, or closing the player clears history.
 The widget remembers the selected buffer length without starting playback at login.
 
 Buffered audio stays in RAM; no audio files are recorded. The forward and backward
 packet caches together are capped at 32 MiB for 5 minutes, 64 MiB for 15 minutes,
-and 128 MiB for 30 minutes, in addition to normal player/decoder memory. Actual use
+and 128 MiB for 30 minutes, in addition to normal player/decoder memory.
+Temporary pause buffering uses the 15-minute / 64 MiB cap. To make immediate
+pause possible without reconnecting, Live only also prepares this bounded
+packet cache at startup. RAM use can therefore grow before you pause; earlier
+audio is not exposed as replay history. This is a cap, not a fixed allocation. Actual use
 grows with received audio. The byte cap can shorten the available window on
 high-bitrate streams. When a paused position expires, playback moves to the oldest
 available audio and remains paused. Reconnecting after a stream failure also clears
@@ -204,7 +216,7 @@ terminals and adapts its colors to the terminal background and color support.
 | Key | Action |
 | --- | --- |
 | Space | Play / Stop |
-| `p` | Pause / Resume with a buffer enabled |
+| `p` | Pause / Resume; starts a temporary buffer in Live only |
 | `[` / `]` | Rewind / forward 30 seconds |
 | `g` | Go live |
 | Left / Right or `-` / `+` | Change volume by 5% |
@@ -315,8 +327,8 @@ No plugin or global keybinding is installed automatically. All other mpv user
 configuration and scripts are disabled for predictable playback.
 
 MPRIS exists while the player is running and exposes the station title, state,
-volume, and media controls. Pause retains buffered audio when a listening buffer is enabled. In Live only
-mode, Pause is treated as Stop. After Stop, use the radio widget to start again: no idle MPRIS player is
+volume, and media controls. Pause retains buffered audio; in Live only mode it starts the same temporary
+15-minute buffer as the widget and terminal controls. After Stop, use the radio widget to start again: no idle MPRIS player is
 kept alive. Your desktop chooses which application's MPRIS session media keys
 control. Native widget controls work with MPRIS disabled.
 
@@ -342,8 +354,8 @@ Playback intent is never saved or automatically restored after login.
 Failed connections and stalled streams time out and retry at 1, 2, 4, 8, and 16
 seconds, then stop with Retry available. A minute of successful playback resets
 the failure budget. Network buffering is reported as Connecting. State comes
-from mpv events rather than an optimistic Play button. Live only mode targets three
-seconds with a small capped demuxer cache; end-to-end delay also depends on the
+from mpv events rather than an optimistic Play button. Live only starts playback as audio arrives and prepares a bounded in-memory
+packet cache for immediate pause; end-to-end delay also depends on the
 broadcaster, output device, and network.
 
 ## Disable and remove

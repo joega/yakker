@@ -19,6 +19,8 @@ Item {
   property bool wanted: false
   property bool paused: false
   property int bufferMinutes: 0
+  property bool temporaryBuffer: false
+  readonly property bool bufferActive: bufferMinutes > 0 || temporaryBuffer
   property bool dvr: false
   property real position: 0
   property real bufferStart: 0
@@ -123,7 +125,7 @@ Item {
   }
   function stop() { pendingPlay = false; wanted = false; send({action: "stop"}) }
   function togglePlayback() { wanted ? stop() : play() }
-  function togglePause() { if (bufferMinutes > 0 && wanted) send({action: paused ? "play" : "pause"}) }
+  function togglePause() { if (wanted) send({action: paused ? "play" : "pause"}) }
   function skip(seconds) { if (dvr) send({action: "skip", value: seconds}) }
   function seek(seconds) { if (dvr) send({action: "seek", value: seconds}) }
   function goLive() { send({action: "live"}) }
@@ -210,6 +212,7 @@ Item {
             root.playbackState = next.state || "error"
             root.wanted = next.wanted === true
             root.paused = next.paused === true
+            root.temporaryBuffer = next.temporaryBuffer === true
             root.dvr = next.dvr === true
             root.position = Number(next.position) || 0
             root.bufferStart = Number(next.bufferStart) || 0
@@ -236,6 +239,7 @@ Item {
       root.ready = false
       root.wanted = false
       root.paused = false
+      root.temporaryBuffer = false
       root.dvr = false
       root.playerPid = 0
       root.playbackState = root.clients ? "error" : "stopped"

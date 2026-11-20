@@ -453,7 +453,7 @@ func playbackClock(seconds float64) string {
 }
 func formatDVRStatus(s radio.Status) string {
 	if !s.DVR {
-		if s.BufferMinutes == 0 {
+		if s.BufferMinutes == 0 && !s.TemporaryBuffer {
 			return "Live only"
 		}
 		return "Building buffer…"
@@ -467,6 +467,9 @@ func formatDVRStatus(s radio.Status) string {
 		label = "Paused · " + playbackClock(lag) + " behind live"
 	}
 	label += " · " + playbackClock(s.BufferEnd-s.BufferStart) + " available"
+	if s.TemporaryBuffer {
+		label += " · Temporary 15-minute buffer"
+	}
 	if s.BufferExpired {
 		label += " · Older audio expired"
 	}

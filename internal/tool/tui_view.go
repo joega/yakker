@@ -82,7 +82,7 @@ func (m tuiModel) controls(styles radioStyles) string {
 		mute = "Muted"
 	}
 	pause := ""
-	if m.status.BufferMinutes > 0 {
+	if m.wanted {
 		label := "Pause"
 		if m.paused {
 			label = "Resume"

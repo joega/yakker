@@ -28,7 +28,8 @@ Ui.Panel {
     let order = [4]
     if (settingsOpen) order.push(5)
     order = order.concat([0,1])
-    if (radio.dvr) order = order.concat([6,7,8,9])
+    if (radio.wanted) order.push(6)
+    if (radio.dvr) order = order.concat([7,8,9])
     order = order.concat([2,3])
     const index = Math.max(0, order.indexOf(cursor))
     cursor = order[(index + direction + order.length) % order.length]
@@ -50,7 +51,7 @@ Ui.Panel {
     else if (cursor === 3) radio.toggleMute()
     else if (cursor === 4) settingsOpen = !settingsOpen
     else if (cursor === 5 && settingsOpen) bufferPicker.toggle()
-    else if (cursor === 6 && radio.dvr) radio.togglePause()
+    else if (cursor === 6 && radio.wanted) radio.togglePause()
     else if (cursor === 7) radio.skip(-30)
     else if (cursor === 8) radio.skip(30)
     else if (cursor === 9 && radio.dvr) radio.goLive()
@@ -151,7 +152,7 @@ Ui.Panel {
           }
           Text {
             width: parent.width
-            text: "Enable a buffer to pause and rewind. Audio stays in memory; no files are recorded. Changing this setting clears history and returns to live."
+            text: "Pause in Live only starts a temporary 15-minute buffer for this session. Audio stays in memory; no files are recorded. Changing this setting clears history and returns to live."
             textFormat: Text.PlainText
             color: root.barForeground
             opacity: 0.7
@@ -261,7 +262,7 @@ Ui.Panel {
         Column {
           width: parent.width
           spacing: Style.space(8)
-          visible: root.radio.bufferMinutes > 0
+          visible: root.radio.wanted || root.radio.bufferActive
           Ui.Button {
             id: pauseButton
             width: parent.width
@@ -269,14 +270,15 @@ Ui.Panel {
             iconText: root.radio.paused ? "󰐊" : "󰏤"
             foreground: root.barForeground
             bordered: true
-            enabled: root.radio.wanted && root.radio.dvr
+            enabled: root.radio.wanted && (root.radio.paused || root.radio.playbackState === "playing")
             hasCursor: root.cursor === 6
             onHovered: hovered => { if (hovered) root.cursor = 6 }
             onClicked: root.radio.togglePause()
           }
           Text {
             width: parent.width
-            text: root.radio.bufferText
+            visible: root.radio.bufferActive
+            text: root.radio.bufferText + (root.radio.temporaryBuffer ? " · Temporary 15-minute buffer" : "")
             textFormat: Text.PlainText
             color: root.barForeground
             font.family: Style.font.family
@@ -285,6 +287,7 @@ Ui.Panel {
           }
           Ui.PanelSlider {
             id: timelineSlider
+            visible: root.radio.bufferActive
             width: parent.width
             step: 30
             bar: root.bar
@@ -298,6 +301,7 @@ Ui.Panel {
             onReleased: value => root.radio.seek(value)
           }
           Row {
+            visible: root.radio.bufferActive
             width: parent.width
             spacing: Style.space(6)
             Ui.Button {
