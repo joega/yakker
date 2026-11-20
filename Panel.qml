@@ -39,13 +39,16 @@ Ui.Panel {
       order = order.concat([5,17,10])
       if (radio.station.custom) order = order.concat([11,12])
     }
-    order = order.concat([0,13,1])
-    if (radio.wanted) order.push(6)
-    if (radio.dvr && radio.playbackKind !== "recording") order = order.concat([7,8,9])
+    order = order.concat([0,13])
+    if (backButton.enabled) order.push(7)
+    if (stopButton.enabled) order.push(6)
+    if (playButton.enabled) order.push(1)
+    if (forwardButton.enabled) order.push(8)
     if (radio.playbackKind === "recording") {
       if (radio.wanted && radio.duration > 0 && (radio.playbackState === "playing" || radio.paused)) order.push(15)
       if (radio.wanted || radio.bufferActive) order.push(16)
     }
+    if (liveButton.visible && liveButton.enabled) order.push(9)
     order = order.concat([2,3])
     const index = Math.max(0, order.indexOf(cursor))
     cursor = order[(index + direction + order.length) % order.length]
@@ -53,7 +56,7 @@ Ui.Panel {
   }
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
-                     bufferPicker, pauseButton, backButton, forwardButton, liveButton,
+                     bufferPicker, stopButton, backButton, forwardButton, liveButton,
                      addStationButton, editStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, storageButton]
     ensureItemVisible(targets[cursor])
   }
@@ -75,13 +78,13 @@ Ui.Panel {
   }
   function activate() {
     if (cursor === 0) stationPicker.toggle()
-    else if (cursor === 1) radio.togglePlayback()
+    else if (cursor === 1 && playButton.enabled) playButton.clicked()
     else if (cursor === 3) radio.toggleMute()
     else if (cursor === 4) settingsOpen = !settingsOpen
     else if (cursor === 5 && settingsOpen) bufferPicker.toggle()
-    else if (cursor === 6 && radio.wanted) radio.togglePause()
-    else if (cursor === 7) radio.skip(-30)
-    else if (cursor === 8) radio.skip(30)
+    else if (cursor === 6 && stopButton.enabled) radio.stop()
+    else if (cursor === 7 && backButton.enabled) radio.skip(-30)
+    else if (cursor === 8 && forwardButton.enabled) radio.skip(30)
     else if (cursor === 9 && radio.dvr) radio.goLive()
     else if (cursor === 10) openStationEditor(false)
     else if (cursor === 11 && radio.station.custom) openStationEditor(true)
@@ -518,17 +521,73 @@ Ui.Panel {
           maximumLineCount: 3
           elide: Text.ElideRight
         }
-        Ui.Button {
-          id: playButton
+        Row {
           width: parent.width
-          text: root.radio.wanted ? "Stop" : root.radio.playbackState === "error" ? "Retry" : "Play live"
-          iconText: root.radio.wanted ? "󰓛" : "󰐊"
-          foreground: root.barForeground
-          selected: true
-          bordered: true
-          hasCursor: root.cursor === 1
-          onHovered: hovered => { if (hovered) root.cursor = 1 }
-          onClicked: root.radio.togglePlayback()
+          spacing: Style.space(8)
+          readonly property real buttonWidth: (width - spacing * 3) / 4
+          readonly property bool seekable: root.radio.wanted && (root.radio.playbackState === "playing" || root.radio.paused)
+            && (root.radio.playbackKind === "recording" ? root.radio.duration > 0 : root.radio.dvr)
+          Ui.Button {
+            id: backButton
+            width: parent.buttonWidth
+            iconText: "󰑟"
+            tooltipText: "Rewind 30 seconds"
+            Accessible.role: Accessible.Button
+            Accessible.name: tooltipText
+            foreground: root.barForeground
+            bordered: true
+            enabled: parent.seekable && root.radio.position > (root.radio.playbackKind === "recording" ? 0 : root.radio.bufferStart) + 0.5
+            opacity: enabled ? 1 : 0.35
+            hasCursor: root.cursor === 7
+            onHovered: hovered => { if (hovered) root.cursor = 7 }
+            onClicked: root.radio.skip(-30)
+          }
+          Ui.Button {
+            id: stopButton
+            width: parent.buttonWidth
+            iconText: "󰓛"
+            tooltipText: "Stop"
+            Accessible.role: Accessible.Button
+            Accessible.name: tooltipText
+            foreground: root.barForeground
+            bordered: true
+            enabled: root.radio.wanted
+            opacity: enabled ? 1 : 0.35
+            hasCursor: root.cursor === 6
+            onHovered: hovered => { if (hovered) root.cursor = 6 }
+            onClicked: root.radio.stop()
+          }
+          Ui.Button {
+            id: playButton
+            width: parent.buttonWidth
+            iconText: root.radio.wanted && !root.radio.paused ? "󰏤" : "󰐊"
+            tooltipText: root.radio.wanted ? (root.radio.paused ? "Resume" : "Pause") : root.radio.playbackState === "error" ? "Retry" : "Play"
+            Accessible.role: Accessible.Button
+            Accessible.name: tooltipText
+            foreground: root.barForeground
+            selected: true
+            bordered: true
+            enabled: !root.radio.wanted || root.radio.paused || root.radio.playbackState === "playing"
+            opacity: enabled ? 1 : 0.35
+            hasCursor: root.cursor === 1
+            onHovered: hovered => { if (hovered) root.cursor = 1 }
+            onClicked: root.radio.wanted ? root.radio.togglePause() : root.radio.play()
+          }
+          Ui.Button {
+            id: forwardButton
+            width: parent.buttonWidth
+            iconText: "󰈑"
+            tooltipText: "Forward 30 seconds"
+            Accessible.role: Accessible.Button
+            Accessible.name: tooltipText
+            foreground: root.barForeground
+            bordered: true
+            enabled: parent.seekable && (root.radio.playbackKind === "recording" ? root.radio.duration - root.radio.position > 0.5 : root.radio.behindLive > 3)
+            opacity: enabled ? 1 : 0.35
+            hasCursor: root.cursor === 8
+            onHovered: hovered => { if (hovered) root.cursor = 8 }
+            onClicked: root.radio.skip(30)
+          }
         }
         Column {
           width: parent.width
@@ -576,27 +635,31 @@ Ui.Panel {
             onHovered: hovered => { if (hovered) root.cursor = 16 }
             onClicked: root.radio.goLive()
           }
-          Ui.Button {
-            id: pauseButton
-            width: parent.width
-            text: root.radio.paused ? "Resume" : "Pause"
-            iconText: root.radio.paused ? "󰐊" : "󰏤"
-            foreground: root.barForeground
-            bordered: true
-            enabled: root.radio.wanted && (root.radio.paused || root.radio.playbackState === "playing")
-            hasCursor: root.cursor === 6
-            onHovered: hovered => { if (hovered) root.cursor = 6 }
-            onClicked: root.radio.togglePause()
-          }
-          Text {
+          Row {
             width: parent.width
             visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
-            text: root.radio.bufferText + (root.radio.temporaryBuffer ? " · Temporary 15-minute buffer" : "")
-            textFormat: Text.PlainText
-            color: root.barForeground
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-            wrapMode: Text.WordWrap
+            spacing: Style.space(8)
+            Text {
+              width: parent.width - liveButton.width - parent.spacing
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.radio.bufferText + (root.radio.temporaryBuffer ? " · Temporary 15-minute buffer" : "")
+              textFormat: Text.PlainText
+              color: root.barForeground
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+              wrapMode: Text.WordWrap
+            }
+            Ui.Button {
+              id: liveButton
+              text: "Go live"
+              foreground: root.barForeground
+              bordered: true
+              enabled: root.radio.dvr
+              opacity: enabled ? 1 : 0.35
+              hasCursor: root.cursor === 9
+              onHovered: hovered => { if (hovered) root.cursor = 9 }
+              onClicked: root.radio.goLive()
+            }
           }
           Ui.PanelSlider {
             id: timelineSlider
@@ -612,44 +675,6 @@ Ui.Panel {
             knobColor: root.barForeground
             trackColor: Style.selectedFillFor(root.barForeground, Commons.Color.accent)
             onReleased: value => root.radio.seek(value)
-          }
-          Row {
-            visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
-            width: parent.width
-            spacing: Style.space(6)
-            Ui.Button {
-              id: backButton
-              width: (parent.width - parent.spacing * 2) / 3
-              text: "−30s"
-              foreground: root.barForeground
-              bordered: true
-              enabled: root.radio.dvr
-              hasCursor: root.cursor === 7
-              onHovered: hovered => { if (hovered) root.cursor = 7 }
-              onClicked: root.radio.skip(-30)
-            }
-            Ui.Button {
-              id: forwardButton
-              width: (parent.width - parent.spacing * 2) / 3
-              text: "+30s"
-              foreground: root.barForeground
-              bordered: true
-              enabled: root.radio.dvr
-              hasCursor: root.cursor === 8
-              onHovered: hovered => { if (hovered) root.cursor = 8 }
-              onClicked: root.radio.skip(30)
-            }
-            Ui.Button {
-              id: liveButton
-              width: (parent.width - parent.spacing * 2) / 3
-              text: "Go live"
-              foreground: root.barForeground
-              bordered: true
-              enabled: root.radio.dvr
-              hasCursor: root.cursor === 9
-              onHovered: hovered => { if (hovered) root.cursor = 9 }
-              onClicked: root.radio.goLive()
-            }
           }
           Text {
             width: parent.width

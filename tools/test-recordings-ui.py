@@ -51,6 +51,10 @@ def main():
   property alias testCatcher: keyCatcher
   property alias testRecordingsButton: recordingsButton
   property alias testStorageButton: storageButton
+  property alias testPlayButton: playButton
+  property alias testStopButton: stopButton
+  property alias testBackButton: backButton
+  property alias testForwardButton: forwardButton
   property alias testName: stationName
   property var anchorItem: null''', 1))
         view = plugin / "RecordingsView.qml"
