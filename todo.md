@@ -4,3 +4,10 @@
 4. In the settings section we also probably want to allow the ability to add a new channel if we have not previously included it in our stock list. This should save on the user side and persist so they can use their own channels if they have them.
 5. Add the ability to heart/pin favorite stations to the top of the station search list. This will be useful for navigation as our available stations list grows
 
+## Delivery status
+
+- [x] Icon-only Settings control with an active indicator — `70c0724`.
+- [x] Pause from Live only using a temporary 15-minute session buffer — `20497b0`. The saved preference stays unchanged; mpv prepares a bounded RAM cache at startup to preserve the connection when pausing.
+- [x] Persistent custom stations with add, edit, delete and default CLI support — `688fc38`.
+- [x] Favorite stations with persistent hearts and favorites-first search results — `55a6b84`.
+- [x] Scope scheduled recordings for discussion — [proposal](docs/recordings-plan.md). Recording implementation remains pending that discussion, as requested in task 3.
