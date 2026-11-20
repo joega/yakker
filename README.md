@@ -1,6 +1,6 @@
 # Yakker
 
-A lightweight sports-radio player for your desktop, with optional **DVR-style controls**.
+A lightweight sports-radio player for your desktop, with **pause, rewind, and scheduled recordings**.
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
 Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
@@ -14,18 +14,28 @@ minutes of history** in Settings; use the timeline, skip back or forward
 30 seconds, or select **Go live** to catch up. **Live only** remains the default,
 and buffered audio stays in RAM without creating recording files.
 
+**Save a show for later.** Schedule recordings by weekday and timezone, keep
+compact Opus files in `~/Music/Yakker`, and play them inside Yakker. Choose your
+recording folder and storage cap. Favorite stations stay at the top of search,
+and you can add your own stream URLs.
+
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
 
 [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
-<p>
-  <a href="docs/yakker-dvr.png"><img src="docs/yakker-dvr.png" alt="Yakker DVR controls with Pause, a buffered-audio timeline, 30-second rewind and forward, and Go live" width="240" align="top"></a>
-  <a href="docs/yakker-popup.png"><img src="docs/yakker-popup.png" alt="Yakker live playback controls" width="240" align="top"></a>
-  <a href="docs/yakker-stations.png"><img src="docs/yakker-stations.png" alt="Yakker station picker with city search and live playback" width="240" align="top"></a>
-</p>
+| Live radio | Pause and rewind | Recording library |
+| :---: | :---: | :---: |
+| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, cassette and settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with a weekday schedule, an active capture, and a saved show ready to play" width="240">](docs/yakker-recordings.png) |
+| Compact playback controls | Catch up at your pace | Record while you listen |
 
-_DVR controls, live playback, and station search. Select a screenshot to view it full size._
+| Favorites and search | Weekly schedules | Settings and custom stations |
+| :---: | :---: | :---: |
+| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with weekdays, start and end times, timezone, and next-occurrence preview control" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
+| Find a station by name, city, or country | Set the days, time, and timezone | Make Yakker your own |
+
+_Select any screenshot to enlarge it. Screens show the current native UI with
+illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
 
 ## Stations
 
@@ -120,8 +130,11 @@ packaging builds locally and does not publish or install anything.
 
 ## Listen
 
-Click the radio icon in the bar, select a station, then **Play live**. **Stop** releases the player;
-Play always connects to a fresh live stream. Closing the popup leaves audio playing.
+Click the radio icon in the bar, select a station, then press the **Play** icon.
+The transport row contains **Rewind · Stop · Play/Pause · Forward**. Rewind and
+forward skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
+an active player; **Stop** releases it. Playing a stopped radio starts a fresh
+live stream. Closing the popup leaves audio playing.
 Right-click the bar icon to open the station list directly.
 The popup includes a searchable station selector, volume, mute, connection status, and Retry after errors.
 Search by station, city or country—for example, `690`, `Seattle`, `UK` or `Ireland`.
@@ -165,14 +178,14 @@ point later. Open **Settings** in the radio popup and choose a **Listening buffe
 
 Press **Pause** or **P** during Live only playback to start a temporary **15-minute**
 RAM buffer without reconnecting the stream. **Resume** continues from the paused
-position, and the timeline, **−30s / +30s**, and **Go live** become available.
+position, and the timeline, **Rewind / Forward**, and **Go live** become available.
 The saved Live only setting stays unchanged. This temporary buffer ends when you
 Stop, change stations, explicitly change the buffer setting, or close the player.
 A stream reconnection retains temporary mode but clears the old connection's
 audio, so the original paused position is lost.
 
 With a configured buffer, use the same **Pause / Resume**, timeline,
-**−30s / +30s**, and **Go live** controls. Audio continues arriving while paused. History begins when buffering
+**Rewind / Forward**, and **Go live** controls. Audio continues arriving while paused. History begins when buffering
 is enabled; programmes from before that connection are unavailable. Changing
 stations or buffer length, pressing Stop, or closing the player clears history.
 The widget remembers the selected buffer length without starting playback at login.
@@ -205,7 +218,7 @@ independent of the desktop widget.
 
 ## Scheduled recordings
 
-Open **Recordings → New schedule**, choose a bundled or custom station, select
+Open the **cassette icon → New schedule**, choose a bundled or custom station, select
 weekdays, enter start/end times in 24-hour format, and choose the timezone. Use
 **Preview next time** to check the resolved occurrence before saving. For example,
 WBZ-FM can record Fridays from `14:00` to `14:20` in `America/New_York`. A time
@@ -213,10 +226,14 @@ before the start ends the next day; schedules can last up to 12 hours. Daylight
 saving follows the saved timezone. Schedules start empty; create and enable the
 ones you want.
 
+| Saved-show playback | Recording storage |
+| :---: | :---: |
+| [<img src="docs/yakker-recording-player.png" alt="Saved recording playing with the compact transport row, duration-based timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Recording storage settings with an editable folder, library cap, free-space reserve, and concurrency limit" width="300">](docs/yakker-storage.png) |
+
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
 playing a saved recording leaves those captures running. The bar dot turns red
-while capturing, and the popup shows the active count. The machine must be awake
+while capturing; the cassette button highlights and its tooltip shows the active count. The machine must be awake
 with the plugin loaded in the bar. Disabling/removing the last widget, restarting
 the shell, or shutting down the helper interrupts captures. Recoverable output is
 retained as partial; when the plugin returns during the scheduled interval it can
