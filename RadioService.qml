@@ -39,11 +39,18 @@ Item {
   property string title: ""
   property var station: ({id: "wbz-fm", name: "98.5 The Sports Hub", subtitle: "WBZ-FM · Boston", icon: "󰐹", artwork: "assets/sports-hub.png"})
   property var stations: []
+  property var favoriteIds: []
   readonly property var countryNames: ({US: "United States (US)", CA: "Canada (CA)", GB: "United Kingdom (UK)", IE: "Ireland (IE)"})
-  readonly property var stationOptions: stations.map(function(item) {
-    return {value: item.id, label: (item.city ? item.city + " · " : "") + item.name,
-      description: (root.countryNames[item.country] || item.country || "") + (item.subtitle ? " · " + item.subtitle : "")}
-  })
+  readonly property var stationOptions: {
+    const favorites = [], others = []
+    for (const item of stations) {
+      const favorite = root.favoriteIds.indexOf(item.id) !== -1
+      const option = {value: item.id, label: (favorite ? "♥ " : "") + (item.city ? item.city + " · " : "") + item.name,
+        description: (root.countryNames[item.country] || item.country || "") + (item.subtitle ? " · " + item.subtitle : "")}
+      if (favorite) favorites.push(option); else others.push(option)
+    }
+    return favorites.concat(others)
+  }
   property int volume: 65
   property bool muted: false
   property int retry: 0
@@ -58,6 +65,28 @@ Item {
     : playbackState === "retrying" ? "Reconnecting in " + retryDelay + "s · attempt " + retry + "/5"
     : playbackState === "error" ? "Unable to play" : "Stopped"
   signal preferencesChanged(int volume, bool muted, string stationId, int bufferMinutes)
+  signal favoritesUpdated()
+
+  function normalizeFavorites(value) {
+    if (!Array.isArray(value)) return []
+    const result = []
+    for (const id of value) {
+      if (typeof id === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(id) && result.indexOf(id) === -1) result.push(id)
+      if (result.length >= 1000) break
+    }
+    return result
+  }
+  function toggleFavorite(id) {
+    if (!stations.some(function(station) { return station.id === id })) return
+    const next = favoriteIds.slice()
+    const index = next.indexOf(id)
+    if (index < 0) {
+      if (next.length >= 1000) return
+      next.push(id)
+    } else next.splice(index, 1)
+    favoriteIds = next
+    favoritesUpdated()
+  }
 
   function clock(seconds) {
     const value = Math.max(0, Math.floor(seconds))
@@ -93,6 +122,7 @@ Item {
     return command.serial
   }
   function configureSettings(settings) {
+    favoriteIds = normalizeFavorites(settings.favorites)
     const selected = String(settings.stationId || "wbz-fm")
     const mpris = String(settings.mprisPlugin || "")
     const minutes = [0,5,15,30].indexOf(Number(settings.bufferMinutes)) >= 0 ? Number(settings.bufferMinutes) : 0

@@ -37,7 +37,7 @@ Ui.Panel {
       order = order.concat([5,10])
       if (radio.station.custom) order = order.concat([11,12])
     }
-    order = order.concat([0,1])
+    order = order.concat([0,13,1])
     if (radio.wanted) order.push(6)
     if (radio.dvr) order = order.concat([7,8,9])
     order = order.concat([2,3])
@@ -48,7 +48,7 @@ Ui.Panel {
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, pauseButton, backButton, forwardButton, liveButton,
-                     addStationButton, editStationButton, deleteStationButton]
+                     addStationButton, editStationButton, deleteStationButton, favoriteButton]
     ensureItemVisible(targets[cursor])
   }
   function ensureItemVisible(item) {
@@ -71,6 +71,7 @@ Ui.Panel {
     else if (cursor === 10) openStationEditor(false)
     else if (cursor === 11 && radio.station.custom) openStationEditor(true)
     else if (cursor === 12 && radio.station.custom) deleteStation()
+    else if (cursor === 13) radio.toggleFavorite(radio.stationId)
   }
   function openStationEditor(edit) {
     if (stationMutationPending) return
@@ -363,20 +364,40 @@ Ui.Panel {
           Column {
             width: parent.width - Style.space(70)
             spacing: Style.space(4)
-            Ui.SearchableDropdown {
-              id: stationPicker
+            Row {
               width: parent.width
-              showLabel: false
-              placeholderText: "Station, city or country"
-              emptyText: "No matching stations"
-              value: root.radio.stationId
-              options: root.radio.stationOptions
-              foreground: root.barForeground
-              hasCursor: root.cursor === 0
-              onHovered: hovered => { if (hovered) root.cursor = 0 }
-              onChanged: value => {
-                root.radio.selectStation(value)
-                Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+              spacing: Style.space(6)
+              Ui.SearchableDropdown {
+                id: stationPicker
+                width: parent.width - favoriteButton.width - parent.spacing
+                showLabel: false
+                placeholderText: "Station, city or country"
+                emptyText: "No matching stations"
+                value: root.radio.stationId
+                options: root.radio.stationOptions
+                foreground: root.barForeground
+                hasCursor: root.cursor === 0
+                onHovered: hovered => { if (hovered) root.cursor = 0 }
+                onChanged: value => {
+                  root.radio.selectStation(value)
+                  Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+                }
+              }
+              Ui.Button {
+                id: favoriteButton
+                height: stationPicker.height
+                iconText: root.radio.favoriteIds.indexOf(root.radio.stationId) !== -1 ? "♥" : "♡"
+                selected: root.radio.favoriteIds.indexOf(root.radio.stationId) !== -1
+                tooltipText: selected ? "Remove from favorites" : "Add to favorites"
+                Accessible.role: Accessible.Button
+                Accessible.name: favoriteButton.tooltipText
+                Accessible.checkable: true
+                Accessible.checked: favoriteButton.selected
+                foreground: root.barForeground
+                bordered: true
+                hasCursor: root.cursor === 13
+                onHovered: hovered => { if (hovered) root.cursor = 13 }
+                onClicked: root.radio.toggleFavorite(root.radio.stationId)
               }
             }
             Text {

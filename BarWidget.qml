@@ -31,11 +31,13 @@ Ui.BarWidget {
     if (!root.bar || !root.bar.shell) return
     const entry = {id: root.moduleName}
     for (let key in root.settings) if (key !== "id") entry[key] = root.settings[key]
-    if (entry.volume === volume && entry.muted === muted && entry.stationId === stationId && entry.bufferMinutes === bufferMinutes) return
+    const favorites = Radio.RadioService.favoriteIds
+    if (entry.volume === volume && entry.muted === muted && entry.stationId === stationId && entry.bufferMinutes === bufferMinutes && JSON.stringify(entry.favorites || []) === JSON.stringify(favorites)) return
     entry.volume = volume
     entry.muted = muted
     entry.stationId = stationId
     entry.bufferMinutes = bufferMinutes
+    entry.favorites = favorites.slice()
     root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 
@@ -52,6 +54,7 @@ Ui.BarWidget {
   Connections {
     target: Radio.RadioService
     function onPreferencesChanged(volume, muted, stationId, bufferMinutes) { root.savePreferences(volume, muted, stationId, bufferMinutes) }
+    function onFavoritesUpdated() { root.savePreferences(Radio.RadioService.volume, Radio.RadioService.muted, Radio.RadioService.stationId, Radio.RadioService.bufferMinutes) }
   }
   Loader {
     id: panelLoader
