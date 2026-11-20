@@ -122,10 +122,13 @@ Ui.Panel {
           }
           Ui.Button {
             id: settingsButton
-            text: "Settings"
             iconText: "󰒓"
+            tooltipText: root.settingsOpen ? "Close settings" : "Open settings"
+            Accessible.role: Accessible.Button
+            Accessible.name: settingsButton.tooltipText
             foreground: root.barForeground
             bordered: true
+            selected: root.settingsOpen
             hasCursor: root.cursor === 4
             onHovered: hovered => { if (hovered) root.cursor = 4 }
             onClicked: root.settingsOpen = !root.settingsOpen
