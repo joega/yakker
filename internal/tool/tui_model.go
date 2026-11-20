@@ -18,6 +18,8 @@ type tuiModel struct {
 	status                                                radio.Status
 	volume                                                int
 	muted, wanted                                         bool
+	paused                                                bool
+	pauseSerial                                           int64
 	volumeSerial, muteSerial, intentSerial, stationSerial int64
 	width, height                                         int
 	dark, help, ready                                     bool
@@ -66,6 +68,10 @@ func (m *tuiModel) setWanted(wanted bool) {
 	if serial, ok := m.command(action, nil); ok {
 		m.intentSerial = serial
 		m.wanted = wanted
+		if !wanted {
+			m.paused = false
+			m.pauseSerial = serial
+		}
 	}
 }
 func (m *tuiModel) setVolume(volume int) {
@@ -120,6 +126,9 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			if s.Serial >= m.muteSerial {
 				m.muted = s.Muted
 			}
+			if s.Serial >= m.pauseSerial {
+				m.paused = s.Paused
+			}
 			if s.Serial >= m.intentSerial {
 				m.wanted = s.Wanted
 			}
@@ -141,7 +150,28 @@ func (m tuiModel) Update(message tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = len(m.stations) - 1
 		case "enter":
 			m.tune()
-		case "space", "p":
+		case "p":
+			if m.status.BufferMinutes == 0 {
+				break
+			}
+			if !m.wanted {
+				m.setWanted(true)
+			} else if serial, ok := m.command(map[bool]string{true: "play", false: "pause"}[m.paused], nil); ok {
+				m.paused = !m.paused
+				m.pauseSerial = serial
+			}
+		case "[", "]":
+			seconds := -30.0
+			if msg.String() == "]" {
+				seconds = 30
+			}
+			m.command("skip", map[string]any{"value": seconds})
+		case "g":
+			if serial, ok := m.command("live", nil); ok {
+				m.pauseSerial = serial
+				m.paused = false
+			}
+		case "space":
 			m.setWanted(!m.wanted)
 		case "s":
 			m.setWanted(false)
@@ -177,9 +207,17 @@ func (m tuiModel) badge() (string, string) {
 	if m.pendingStation() {
 		return "◌ CONNECTING", "pending"
 	}
+	if m.paused {
+		return "Ⅱ PAUSED", "pending"
+	}
 	switch m.status.State {
 	case "playing":
+		if m.status.DVR && m.status.BufferEnd-m.status.Position > 3 {
+			return "● DELAYED", "pending"
+		}
 		return "● LIVE", "live"
+	case "paused":
+		return "Ⅱ PAUSED", "pending"
 	case "connecting":
 		return "◌ CONNECTING", "pending"
 	case "retrying":
@@ -206,6 +244,9 @@ func (m tuiModel) playbackDetail() string {
 	}
 	if m.status.Error != "" {
 		return terminalText(m.status.Error)
+	}
+	if m.status.DVR {
+		return formatDVRStatus(m.status)
 	}
 	if m.status.Title != "" {
 		return terminalText(m.status.Title)

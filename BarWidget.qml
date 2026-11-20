@@ -26,14 +26,15 @@ Ui.BarWidget {
     panelLoader.item.anchorItem = button
     panelLoader.item.hostWidget = root
   }
-  function savePreferences(volume, muted, stationId) {
+  function savePreferences(volume, muted, stationId, bufferMinutes) {
     if (!root.bar || !root.bar.shell) return
     const entry = {id: root.moduleName}
     for (let key in root.settings) if (key !== "id") entry[key] = root.settings[key]
-    if (entry.volume === volume && entry.muted === muted && entry.stationId === stationId) return
+    if (entry.volume === volume && entry.muted === muted && entry.stationId === stationId && entry.bufferMinutes === bufferMinutes) return
     entry.volume = volume
     entry.muted = muted
     entry.stationId = stationId
+    entry.bufferMinutes = bufferMinutes
     root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 
@@ -49,7 +50,7 @@ Ui.BarWidget {
 
   Connections {
     target: Radio.RadioService
-    function onPreferencesChanged(volume, muted, stationId) { root.savePreferences(volume, muted, stationId) }
+    function onPreferencesChanged(volume, muted, stationId, bufferMinutes) { root.savePreferences(volume, muted, stationId, bufferMinutes) }
   }
   Loader {
     id: panelLoader
@@ -62,6 +63,11 @@ Ui.BarWidget {
     target: root.moduleName
     function play(): void { Radio.RadioService.play() }
     function stop(): void { Radio.RadioService.stop() }
+    function pause(): void { if (!Radio.RadioService.paused) Radio.RadioService.togglePause() }
+    function resume(): void { Radio.RadioService.play() }
+    function skip(seconds: int): void { Radio.RadioService.skip(seconds) }
+    function goLive(): void { Radio.RadioService.goLive() }
+    function setBufferMinutes(minutes: int): void { Radio.RadioService.setBufferMinutes(minutes) }
     function setVolume(value: int): void { Radio.RadioService.commitVolume(value) }
     function toggleMute(): void { Radio.RadioService.toggleMute() }
     function setStation(stationId: string): void { Radio.RadioService.selectStation(stationId) }
@@ -72,6 +78,8 @@ Ui.BarWidget {
         error: Radio.RadioService.error, playerPid: Radio.RadioService.playerPid,
         title: Radio.RadioService.title, stationId: Radio.RadioService.stationId,
         station: Radio.RadioService.station, stations: Radio.RadioService.stations,
+        paused: Radio.RadioService.paused, bufferMinutes: Radio.RadioService.bufferMinutes, dvr: Radio.RadioService.dvr,
+        position: Radio.RadioService.position, bufferStart: Radio.RadioService.bufferStart, bufferEnd: Radio.RadioService.bufferEnd,
         ready: Radio.RadioService.ready, opened: root.opened})
     }
   }

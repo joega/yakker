@@ -143,6 +143,41 @@ omarchy-shell io.github.joega.yakker status
 omarchy-shell shell hide io.github.joega.yakker
 ```
 
+## Pause and rewind
+
+Open **Settings** in the radio popup and choose a **Listening buffer**:
+
+- **Live only** (default): the existing short network buffer, with no replay history.
+- **5 minutes**, **15 minutes**, or **30 minutes**: enable pause and rewind for the selected station.
+
+With a buffer enabled, use **Pause / Resume**, the timeline, **−30s / +30s**, or
+**Go live**. Audio continues arriving while paused. History begins when buffering
+is enabled; programmes from before that connection are unavailable. Changing
+stations or buffer length, pressing Stop, or closing the player clears history.
+The widget remembers the selected buffer length without starting playback at login.
+
+Buffered audio stays in RAM; no audio files are recorded. The forward and backward
+packet caches together are capped at 32 MiB for 5 minutes, 64 MiB for 15 minutes,
+and 128 MiB for 30 minutes, in addition to normal player/decoder memory. Actual use
+grows with received audio. The byte cap can shorten the available window on
+high-bitrate streams. When a paused position expires, playback moves to the oldest
+available audio and remains paused. Reconnecting after a stream failure also clears
+that connection's buffer. “Live” is relative to the newest audio received from the
+station, which may already have a broadcaster delay.
+
+Popup shortcuts: **P** pauses/resumes, **[ / ]** skip 30 seconds, and **G** goes live.
+The plain CLI accepts `pause`, `play` (resume), `back 30`, `forward 30`, `live`, and
+`buffer 0`, `buffer 5`, `buffer 15`, or `buffer 30`. Terminal modes use `--buffer`:
+
+```sh
+./yakker tui --buffer 30
+./yakker listen --buffer 15
+```
+
+In the terminal UI, **P** pauses/resumes, **[ / ]** skip 30 seconds, **G** goes live,
+and Space retains Play / Stop. Buffer preferences in terminal sessions are
+independent of the desktop widget.
+
 ## Terminal player
 
 Open the Bubble Tea player without changing the installed widget:
@@ -157,7 +192,10 @@ terminals and adapts its colors to the terminal background and color support.
 
 | Key | Action |
 | --- | --- |
-| Space or `p` | Play / Stop |
+| Space | Play / Stop |
+| `p` | Pause / Resume with a buffer enabled |
+| `[` / `]` | Rewind / forward 30 seconds |
+| `g` | Go live |
 | Left / Right or `-` / `+` | Change volume by 5% |
 | `m` | Toggle mute |
 | Up / Down or `k` / `j` | Browse configured stations |
@@ -223,7 +261,7 @@ This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
 
-The selected station, volume and mute are saved through Quattro's inline entry persistence in
+The selected station, volume, mute and listening buffer length are saved through Quattro's inline entry persistence in
 `~/.config/omarchy/shell.json`. The widget entry also accepts:
 
 ```json
@@ -232,6 +270,7 @@ The selected station, volume and mute are saved through Quattro's inline entry p
   "volume": 65,
   "muted": false,
   "stationId": "wbz-fm",
+  "bufferMinutes": 0,
   "showName": false,
   "mprisPlugin": ""
 }
@@ -265,8 +304,8 @@ No plugin or global keybinding is installed automatically. All other mpv user
 configuration and scripts are disabled for predictable playback.
 
 MPRIS exists while the player is running and exposes the station title, state,
-volume, and media controls. Pause is treated as Stop to avoid resuming buffered
-radio. After Stop, use the radio widget to start again: no idle MPRIS player is
+volume, and media controls. Pause retains buffered audio when a listening buffer is enabled. In Live only
+mode, Pause is treated as Stop. After Stop, use the radio widget to start again: no idle MPRIS player is
 kept alive. Your desktop chooses which application's MPRIS session media keys
 control. Native widget controls work with MPRIS disabled.
 
@@ -292,7 +331,7 @@ Playback intent is never saved or automatically restored after login.
 Failed connections and stalled streams time out and retry at 1, 2, 4, 8, and 16
 seconds, then stop with Retry available. A minute of successful playback resets
 the failure budget. Network buffering is reported as Connecting. State comes
-from mpv events rather than an optimistic Play button. Buffering targets three
+from mpv events rather than an optimistic Play button. Live only mode targets three
 seconds with a small capped demuxer cache; end-to-end delay also depends on the
 broadcaster, output device, and network.
 

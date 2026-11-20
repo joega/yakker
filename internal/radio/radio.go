@@ -27,31 +27,41 @@ import (
 type Station map[string]any
 
 type Status struct {
-	State      string  `json:"state"`
-	Wanted     bool    `json:"wanted"`
-	Error      string  `json:"error"`
-	Volume     int     `json:"volume"`
-	Muted      bool    `json:"muted"`
-	Title      string  `json:"title"`
-	Station    Station `json:"station"`
-	Retry      int     `json:"retry"`
-	RetryDelay float64 `json:"retryDelay"`
-	PlayerPID  int     `json:"playerPid"`
-	MPRIS      bool    `json:"mpris"`
-	Serial     int64   `json:"serial"`
+	State         string  `json:"state"`
+	Wanted        bool    `json:"wanted"`
+	Error         string  `json:"error"`
+	Volume        int     `json:"volume"`
+	Muted         bool    `json:"muted"`
+	Title         string  `json:"title"`
+	Station       Station `json:"station"`
+	Retry         int     `json:"retry"`
+	RetryDelay    float64 `json:"retryDelay"`
+	PlayerPID     int     `json:"playerPid"`
+	MPRIS         bool    `json:"mpris"`
+	Serial        int64   `json:"serial"`
+	Paused        bool    `json:"paused"`
+	BufferMinutes int     `json:"bufferMinutes"`
+	DVR           bool    `json:"dvr"`
+	Position      float64 `json:"position"`
+	BufferStart   float64 `json:"bufferStart"`
+	BufferEnd     float64 `json:"bufferEnd"`
+	BufferExpired bool    `json:"bufferExpired"`
 }
 
 // Config overrides are used by the standalone CLI and tests; normal plugin
 // startup uses the executable's adjacent stations.json and the real mpv.
 type Config struct {
-	RuntimeBase    string
-	StationFile    string
-	MPV            string
-	MPVArgs        []string
-	ConnectTimeout time.Duration
-	StallTimeout   time.Duration
-	RetryDelays    []time.Duration
-	ResetAfter     time.Duration
+	RuntimeBase     string
+	StationFile     string
+	MPV             string
+	MPVArgs         []string
+	ConnectTimeout  time.Duration
+	StallTimeout    time.Duration
+	RetryDelays     []time.Duration
+	ResetAfter      time.Duration
+	DVRWindow       time.Duration
+	DVRPollInterval time.Duration
+	DVRBytes        int64
 }
 
 func LoadStations(path string) ([]Station, error) {
@@ -107,6 +117,15 @@ func (c *Config) defaults() error {
 	if c.ResetAfter == 0 {
 		c.ResetAfter = time.Minute
 	}
+	if c.DVRWindow < 0 || c.DVRWindow > 30*time.Minute {
+		return errors.New("Buffer window must be between zero and 30 minutes")
+	}
+	if c.DVRPollInterval <= 0 {
+		c.DVRPollInterval = time.Second
+	}
+	if c.DVRBytes <= 0 {
+		c.DVRBytes = dvrByteLimit(c.DVRWindow)
+	}
 	if c.RetryDelays == nil {
 		c.RetryDelays = []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second}
 	}
@@ -114,7 +133,14 @@ func (c *Config) defaults() error {
 }
 
 type player struct {
+	// Suppress older observed values until the latest control reaches mpv.
+	pendingVolume  *int
+	pendingMute    *bool
 	lastProgress   atomic.Int64
+	lastIntake     atomic.Int64
+	position       atomic.Uint64
+	cacheMu        sync.Mutex
+	cache          cacheWindow
 	playbackSince  time.Duration
 	cmd            *exec.Cmd
 	conn           net.Conn
@@ -185,6 +211,7 @@ type controller struct {
 	output    *json.Encoder
 	logs      io.Writer
 	writeErr  error
+	dvrTicker *time.Ticker
 }
 
 func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Writer) error {
@@ -203,7 +230,7 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 	}
 	defer lock.Close()
 	r := &controller{cfg: cfg, stations: stations, socket: filepath.Join(dir, "mpv.sock"), events: make(chan playerEvent, 64), output: json.NewEncoder(output), logs: logs,
-		state: Status{State: "stopped", Volume: 65, Station: stations[0]}}
+		state: Status{State: "stopped", Volume: 65, Station: stations[0], BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
 	defer r.cleanup()
 	defer r.clearTimer()
 	lines := make(chan inputLine)
@@ -237,6 +264,10 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 		if r.timer != nil {
 			timer = r.timer.C
 		}
+		var dvrTick <-chan time.Time
+		if r.dvrTicker != nil {
+			dvrTick = r.dvrTicker.C
+		}
 		var exited <-chan struct{}
 		if r.player != nil && r.player.conn == nil {
 			// Once connected, consume socket events in order, including end-file stop
@@ -260,6 +291,8 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 			if quit {
 				return nil
 			}
+		case <-dvrTick:
+			r.updateDVR()
 		case <-exited:
 			r.fail(r.player.logs.message("The player disconnected"))
 		case event := <-r.events:
@@ -334,6 +367,14 @@ func (r *controller) command(raw []byte) (bool, error) {
 	_ = json.Unmarshal(data["action"], &action)
 	switch action {
 	case "configure":
+		window := r.cfg.DVRWindow
+		if raw, ok := data["bufferMinutes"]; ok {
+			var minutes int
+			if string(raw) == "null" || json.Unmarshal(raw, &minutes) != nil || (minutes != 0 && minutes != 5 && minutes != 15 && minutes != 30) {
+				return false, errors.New("Buffer must be 0, 5, 15 or 30 minutes")
+			}
+			window = time.Duration(minutes) * time.Minute
+		}
 		var id, plugin string
 		_ = json.Unmarshal(data["stationId"], &id)
 		if raw, ok := data["mprisPlugin"]; ok {
@@ -355,19 +396,55 @@ func (r *controller) command(raw []byte) (bool, error) {
 			}
 		}
 		// Station IDs are unique and records are immutable after startup.
-		changed := station["id"] != r.state.Station["id"] || plugin != r.mpris
+		bufferChanged := window != r.cfg.DVRWindow
+		changed := station["id"] != r.state.Station["id"] || plugin != r.mpris || bufferChanged
+		r.cfg.DVRWindow = window
+		if bufferChanged {
+			r.cfg.DVRBytes = dvrByteLimit(window)
+		}
+		r.state.BufferMinutes = int(window / time.Minute)
 		r.state.Station = station
 		r.mpris = plugin
 		r.state.MPRIS = plugin != ""
 		if changed {
-			wanted := r.state.Wanted
+			wanted, paused := r.state.Wanted, r.state.Paused && !bufferChanged
 			r.stop()
 			if wanted {
+				r.state.Paused = paused
 				r.play()
 			}
 		}
 	case "play":
+		if r.state.Wanted {
+			return false, r.setPaused(false)
+		}
 		r.play()
+	case "pause":
+		return false, r.setPaused(true)
+	case "seek", "skip":
+		var value float64
+		raw := data["value"]
+		if len(raw) == 0 || string(raw) == "null" || json.Unmarshal(raw, &value) != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+			return false, errors.New("Seek must be a finite number of seconds")
+		}
+		if action == "skip" {
+			value += r.currentPosition()
+		}
+		return false, r.seekDVR(value)
+	case "live":
+		if !r.state.Wanted {
+			r.play()
+			return false, nil
+		}
+		if r.state.DVR && r.player != nil {
+			r.player.cacheMu.Lock()
+			liveEnd := r.player.cache.end
+			r.player.cacheMu.Unlock()
+			if err := r.seekDVR(liveEnd - 1); err != nil {
+				return false, err
+			}
+		}
+		return false, r.setPaused(false)
 	case "stop":
 		r.stop()
 	case "volume":
@@ -376,6 +453,10 @@ func (r *controller) command(raw []byte) (bool, error) {
 			return false, errors.New("Volume must be a finite number")
 		}
 		r.state.Volume = int(math.Max(0, math.Min(100, math.RoundToEven(value))))
+		if r.player != nil && r.player.conn != nil {
+			volume := r.state.Volume
+			r.player.pendingVolume = &volume
+		}
 		return false, r.ipc([]any{"set_property", "volume", r.state.Volume})
 	case "mute":
 		var value bool
@@ -383,6 +464,9 @@ func (r *controller) command(raw []byte) (bool, error) {
 			return false, errors.New("Mute must be a boolean")
 		}
 		r.state.Muted = value
+		if r.player != nil && r.player.conn != nil {
+			r.player.pendingMute = &value
+		}
 		return false, r.ipc([]any{"set_property", "mute", value})
 	case "quit":
 		r.stop()
@@ -396,6 +480,7 @@ func (r *controller) command(raw []byte) (bool, error) {
 
 func (r *controller) play() {
 	if r.state.Wanted {
+		_ = r.setPaused(false)
 		return
 	}
 	r.state.Wanted = true
@@ -407,6 +492,7 @@ func (r *controller) play() {
 }
 func (r *controller) stop() {
 	r.state.Wanted = false
+	r.state.Paused = false
 	r.clearTimer()
 	r.cleanup()
 	r.state.State = "stopped"
@@ -416,6 +502,13 @@ func (r *controller) stop() {
 	r.state.RetryDelay = 0
 }
 func (r *controller) cleanup() {
+	if r.dvrTicker != nil {
+		r.dvrTicker.Stop()
+		r.dvrTicker = nil
+	}
+	r.state.DVR = false
+	r.state.Position, r.state.BufferStart, r.state.BufferEnd = 0, 0, 0
+	r.state.BufferExpired = false
 	p := r.player
 	if p == nil {
 		return
@@ -441,8 +534,14 @@ func (r *controller) start() {
 	r.state.Title = ""
 	_ = os.Remove(r.socket) // The exclusive owner lock is held.
 	args := append([]string{}, r.cfg.MPVArgs...)
+	cacheSeconds := 3.0
+	backBytes := int64(0)
+	if r.cfg.DVRWindow > 0 {
+		cacheSeconds = r.cfg.DVRWindow.Seconds() + 10
+		backBytes = r.cfg.DVRBytes
+	}
 	args = append(args, "--no-config", "--load-scripts=no", "--no-video", "--no-audio-display", "--idle=no", "--terminal=no", "--input-terminal=no", "--keep-open=no",
-		"--cache=yes", "--cache-secs=3", "--demuxer-max-bytes=2MiB", "--demuxer-max-back-bytes=0", "--network-timeout=15", "--msg-level=all=warn",
+		"--cache=yes", fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", r.cfg.DVRBytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",
 		"--input-ipc-server="+r.socket, fmt.Sprintf("--volume=%d", r.state.Volume), "--mute="+map[bool]string{true: "yes", false: "no"}[r.state.Muted], "--force-media-title="+r.state.Station["name"].(string))
 	if r.mpris != "" {
 		args = append(args, "--script="+r.mpris)
@@ -484,19 +583,26 @@ func (r *controller) connect() {
 	p.conn = conn
 	// Controls may change while waiting for mpv to open the socket. Apply the
 	// latest preferences before observing initial player values.
-	for _, command := range [][]any{{"set_property", "volume", r.state.Volume}, {"set_property", "mute", r.state.Muted}} {
+	for _, command := range [][]any{{"set_property", "volume", r.state.Volume}, {"set_property", "mute", r.state.Muted}, {"set_property", "pause", r.state.Paused}} {
 		if err := r.ipc(command); err != nil {
 			r.fail(err.Error())
 			return
 		}
 	}
-	for i, name := range []string{"volume", "mute", "metadata", "core-idle", "pause", "time-pos"} {
+	observed := []string{"volume", "mute", "metadata", "core-idle", "pause", "time-pos"}
+	if r.cfg.DVRWindow > 0 {
+		observed = append(observed, "demuxer-cache-state")
+	}
+	for i, name := range observed {
 		if err := r.ipc([]any{"observe_property", i + 1, name}); err != nil {
 			r.fail(err.Error())
 			return
 		}
 	}
 	r.after("deadline", r.cfg.ConnectTimeout)
+	if r.cfg.DVRWindow > 0 {
+		r.dvrTicker = time.NewTicker(r.cfg.DVRPollInterval)
+	}
 	go func() {
 		scanner := bufio.NewScanner(conn)
 		scanner.Buffer(make([]byte, 4096), 1024*1024)
@@ -514,7 +620,7 @@ func (r *controller) connect() {
 				deliver(playerEvent{source: p, err: err})
 				return
 			}
-			if p.consumeProgress(event) {
+			if p.consumeProgress(event) || p.consumeCache(event) {
 				continue
 			}
 			if !deliver(playerEvent{source: p, value: event}) {
@@ -535,7 +641,7 @@ func (r *controller) ipc(command []any) error {
 	return json.NewEncoder(conn).Encode(map[string]any{"command": command})
 }
 func (r *controller) fail(message string) {
-	if r.player != nil && time.Since(r.player.started) > r.cfg.ResetAfter && r.state.State == "playing" {
+	if r.player != nil && time.Since(r.player.started) > r.cfg.ResetAfter && (r.state.State == "playing" || r.state.State == "paused") {
 		r.state.Retry = 0
 	}
 	r.cleanup()
@@ -546,6 +652,7 @@ func (r *controller) fail(message string) {
 	r.state.Error = head(message, 240)
 	if r.state.Retry >= len(r.cfg.RetryDelays) {
 		r.state.Wanted = false
+		r.state.Paused = false
 		r.state.State = "error"
 		r.state.RetryDelay = 0
 	} else {
@@ -566,7 +673,8 @@ func (p *player) consumeProgress(event mpvEvent) bool {
 	if event.Event != "property-change" || event.Name != "time-pos" {
 		return false
 	}
-	if _, ok := event.Data.(float64); ok {
+	if value, ok := event.Data.(float64); ok && !math.IsNaN(value) && !math.IsInf(value, 0) {
+		p.position.Store(math.Float64bits(value))
 		p.lastProgress.Store(time.Since(p.started).Nanoseconds())
 	}
 	return true
@@ -574,10 +682,13 @@ func (p *player) consumeProgress(event mpvEvent) bool {
 
 func (r *controller) watchdogRemaining() time.Duration {
 	p := r.player
-	if p == nil || r.state.State != "playing" {
+	if p == nil || (r.state.State != "playing" && r.state.State != "paused") {
 		return 0
 	}
 	last := max(time.Duration(p.lastProgress.Load()), p.playbackSince)
+	if r.state.Paused {
+		last = max(time.Duration(p.lastIntake.Load()), p.playbackSince)
+	}
 	return r.cfg.StallTimeout - (time.Since(p.started) - last)
 }
 
@@ -620,6 +731,9 @@ func (r *controller) event(event mpvEvent) {
 	}
 	if kind == "playback-restart" || (kind == "property-change" && name == "core-idle" && value == false) {
 		r.state.State = "playing"
+		if r.state.Paused {
+			r.state.State = "paused"
+		}
 		r.state.Error = ""
 		r.state.RetryDelay = 0
 		if r.player != nil {
@@ -630,23 +744,52 @@ func (r *controller) event(event mpvEvent) {
 	if kind == "property-change" {
 		switch name {
 		case "core-idle":
-			if value == true && r.state.State == "playing" {
+			if value == true && r.state.State == "playing" && !r.state.Paused {
 				r.state.State = "connecting"
 				r.after("deadline", r.cfg.StallTimeout)
 			}
 		case "volume":
 			if v, ok := value.(float64); ok {
-				r.state.Volume = int(math.Max(0, math.Min(100, math.RoundToEven(v))))
+				volume := int(math.Max(0, math.Min(100, math.RoundToEven(v))))
+				if r.player != nil && r.player.pendingVolume != nil {
+					if volume != *r.player.pendingVolume {
+						break
+					}
+					r.player.pendingVolume = nil
+				}
+				r.state.Volume = volume
 			}
 		case "mute":
 			if v, ok := value.(bool); ok {
+				if r.player != nil && r.player.pendingMute != nil {
+					if v != *r.player.pendingMute {
+						break
+					}
+					r.player.pendingMute = nil
+				}
 				r.state.Muted = v
 			}
 		case "pause":
-			if value == true {
-				r.stop()
+			if paused, ok := value.(bool); ok && r.state.Wanted {
+				if paused && r.cfg.DVRWindow == 0 {
+					r.stop()
+					_ = r.publish()
+					return
+				}
+				if paused == r.state.Paused {
+					break
+				}
+				r.state.Paused = paused
+				if paused {
+					r.state.State = "paused"
+				} else if r.state.State == "paused" {
+					r.state.State = "playing"
+				}
+				if r.player != nil {
+					r.player.playbackSince = time.Since(r.player.started)
+				}
+				r.after("deadline", r.cfg.StallTimeout)
 				_ = r.publish()
-				return
 			}
 		case "metadata":
 			if metadata, ok := value.(map[string]any); ok {

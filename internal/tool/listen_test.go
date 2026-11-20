@@ -28,7 +28,9 @@ func TestListenArguments(t *testing.T) {
 		args  []string
 		valid bool
 	}{
-		{"defaults", nil, true}, {"station", []string{"--station", "wbz-fm", "--volume", "60", "--muted"}, true},
+		{"defaults", nil, true},
+		{"buffer-off", []string{"--buffer", "0"}, true}, {"buffer-5", []string{"--buffer", "5"}, true}, {"buffer-15", []string{"--buffer", "15"}, true}, {"buffer-30", []string{"--buffer", "30"}, true},
+		{"buffer-invalid", []string{"--buffer", "1"}, false}, {"buffer-negative", []string{"--buffer", "-5"}, false}, {"buffer-fraction", []string{"--buffer", "5.5"}, false}, {"station", []string{"--station", "wbz-fm", "--volume", "60", "--muted"}, true},
 		{"url", []string{"--url", "https://example.test/live.aac"}, true}, {"list", []string{"--list-stations"}, true},
 		{"low", []string{"--volume", "-1"}, false}, {"high", []string{"--volume", "101"}, false}, {"fraction", []string{"--volume", "1.5"}, false},
 		{"conflict", []string{"--station", "wbz-fm", "--url", "https://example.test/live"}, false},
@@ -409,4 +411,32 @@ func testAudioServer(t *testing.T) (*httptest.Server, *atomic.Int32) {
 		}
 	}))
 	return server, &connections
+}
+
+func TestListenDVRCommandsAndBufferOptOut(t *testing.T) {
+	peer := &consolePeer{}
+	h := startConsole(t, stationFixture(t), listenOptions{volume: 60, bufferMinutes: 30}, radio.Config{}, peer.run)
+	h.output.wait(t, 0, "Playing · Volume 60%")
+	for _, line := range []string{"pause", "resume", "back", "forward 12.5", "live", "buffer 0"} {
+		h.send(t, line, "Playing · Volume 60%")
+	}
+	for _, line := range []string{"back NaN", "forward Inf", "back -2"} {
+		h.send(t, line, "Seek seconds must be a positive finite number")
+	}
+	h.send(t, "buffer 60", "Buffer must be 0, 5, 15 or 30 minutes")
+	h.send(t, "quit", "")
+	h.finish(t)
+	if peer.cfg.DVRWindow != 30*time.Minute {
+		t.Fatal("buffer flag did not configure controller", peer.cfg.DVRWindow)
+	}
+	var got []string
+	for _, command := range peer.commands[4:] {
+		got = append(got, command["action"].(string))
+	}
+	if fmt.Sprint(got) != "[pause play skip skip live configure]" {
+		t.Fatal("incorrect DVR commands or invalid values accepted", got)
+	}
+	if peer.commands[6]["value"] != -30.0 || peer.commands[7]["value"] != 12.5 || peer.commands[9]["bufferMinutes"] != 0.0 {
+		t.Fatal("DVR command values", peer.commands)
+	}
 }

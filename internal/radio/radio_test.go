@@ -51,7 +51,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	controllerBinary = filepath.Join(dir, "yakker-controller")
-	cmd := exec.Command("go", "build", "-o", controllerBinary, "./cmd/yakker-controller")
+	cmd := exec.Command("go", "build", "-buildvcs=false", "-o", controllerBinary, "./cmd/yakker-controller")
 	cmd.Dir = root
 	if output, err := cmd.CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "build test controller: %v\n%s", err, output)
@@ -761,5 +761,26 @@ func TestVolumeMuteWhileConnecting(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if s := h.barrier(); s.Volume != 37 || !s.Muted {
 		t.Fatal(s)
+	}
+}
+
+func TestOldPlayerObservationsCannotUndoLatestControls(t *testing.T) {
+	volume, muted := 37, true
+	r := &controller{state: Status{State: "playing", Wanted: true, Volume: volume, Muted: muted}, player: &player{pendingVolume: &volume, pendingMute: &muted}, output: json.NewEncoder(io.Discard)}
+	prop := func(name string, value any) { r.event(mpvEvent{Event: "property-change", Name: name, Data: value}) }
+	prop("volume", 65.0)
+	prop("mute", false)
+	if r.state.Volume != 37 || !r.state.Muted {
+		t.Fatal("stale observation undid latest controls", r.state)
+	}
+	prop("volume", 37.0)
+	prop("mute", true)
+	if r.player.pendingVolume != nil || r.player.pendingMute != nil {
+		t.Fatal("latest player echoes did not acknowledge controls")
+	}
+	prop("volume", 42.0)
+	prop("mute", false)
+	if r.state.Volume != 42 || r.state.Muted {
+		t.Fatal("native media controls stopped working", r.state)
 	}
 }

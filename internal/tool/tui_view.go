@@ -81,7 +81,15 @@ func (m tuiModel) controls(styles radioStyles) string {
 	if m.muted {
 		mute = "Muted"
 	}
-	return styles.ink.Bold(true).Render(play) + styles.dim.Render("  [space]        ") + styles.ink.Render(mute) + styles.dim.Render("  [m]")
+	pause := ""
+	if m.status.BufferMinutes > 0 {
+		label := "Pause"
+		if m.paused {
+			label = "Resume"
+		}
+		pause = styles.dim.Render("   ") + styles.ink.Render(label) + styles.dim.Render(" [p]")
+	}
+	return styles.ink.Bold(true).Render(play) + styles.dim.Render(" [space]") + pause + styles.dim.Render("   ") + styles.ink.Render(mute) + styles.dim.Render(" [m]")
 }
 func (m tuiModel) stationRow(index, width int, styles radioStyles) string {
 	station := m.stations[index]
@@ -126,18 +134,18 @@ func (m tuiModel) cardView(styles radioStyles) string {
 	}
 	rows := []string{header, "", styles.ink.Bold(true).Render(tuiClip(stationString(station, "name"), inner)), styles.dim.Render(tuiClip(stationString(station, "subtitle"), inner)), "", strings.Join(details, "\n"), "", m.controls(styles), m.volumeBar(styles, inner), "", styles.dim.Render("STATIONS") + styles.dim.Render(fmt.Sprintf("  %d / %d", m.cursor+1, len(m.stations)))}
 	footer := []string{
-		styles.dim.Render("space play/stop   ←/→ volume   m mute   q quit"),
-		styles.dim.Render("↑/↓ select station   enter tune   r retry   ? help"),
+		styles.dim.Render("space play/stop   p pause/resume   q quit"),
+		styles.dim.Render("[ / ] rewind/forward   g live   ? help"),
 	}
 	if inner < 50 {
-		footer = []string{styles.dim.Render("space play/stop  ←/→ vol  m mute"), styles.dim.Render("↑/↓ select  enter tune  q quit")}
+		footer = []string{styles.dim.Render("space play/stop  p pause  ←/→ vol"), styles.dim.Render("↑/↓ select  enter tune  q quit")}
 	}
 	if m.help {
 		footer = []string{
-			styles.dim.Render("space / p  Play or stop"),
+			styles.dim.Render("space  Play/stop   p  Pause/resume"),
 			styles.dim.Render("←/→ / ±    Volume by 5%   m  Mute"),
 			styles.dim.Render("↑/↓ / j/k  Select   enter  Tune"),
-			styles.dim.Render("r  Retry   ?  Close help   q / esc  Quit"),
+			styles.dim.Render("[ / ] Seek 30s   g Live   r Retry   q Quit"),
 		}
 	}
 	available := max(1, min(5, m.height-(16+len(details)+len(footer))))
@@ -166,11 +174,11 @@ func (m tuiModel) compactView(styles radioStyles) string {
 		styles.dim.Render(tuiClip(stationString(station, "subtitle"), inner)), "",
 		m.volumeBar(styles, inner), styles.dim.Render(tuiClip(m.playbackDetail(), inner)), "",
 		m.stationRow(m.cursor, inner, styles),
-		styles.dim.Render("space play/stop  ←/→ vol  m mute"),
+		styles.dim.Render("space play/stop  p pause  ←/→ vol"),
 		styles.dim.Render("↑/↓ select  enter tune  q quit"),
 	}
 	if m.help {
-		rows = []string{rows[0], "", rows[2], m.volumeBar(styles, inner), "", styles.dim.Render("space / p  Play or stop"), styles.dim.Render("←/→ / ±  Volume   m  Mute"), styles.dim.Render("↑/↓ select   enter tune"), styles.dim.Render("r retry  ? close help  q quit")}
+		rows = []string{rows[0], "", rows[2], m.volumeBar(styles, inner), "", styles.dim.Render("space  Play/stop   p  Pause/resume"), styles.dim.Render("←/→ / ±  Volume   m  Mute"), styles.dim.Render("↑/↓ select   enter tune"), styles.dim.Render("r retry  ? close help  q quit")}
 	}
 	box := styles.border.Width(cardWidth).Padding(0, 1).Render(fitTUIRows(rows, inner))
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
@@ -188,11 +196,11 @@ func (m tuiModel) tinyView(styles radioStyles) string {
 		styles.ink.Render(fmt.Sprintf("Volume %d%%%s", m.volume, muted)),
 		styles.dim.Render(tuiClip(m.playbackDetail(), m.width)),
 		styles.accent.Render("› " + tuiClip(stationString(m.stations[m.cursor], "name"), m.width-2)),
-		styles.dim.Render("space play/stop · ←/→ vol"),
+		styles.dim.Render("space stop · p pause · ←/→ vol"),
 		styles.dim.Render("↑/↓ select · enter tune"),
 	}
 	if m.help {
-		rows = append(rows[:3], styles.dim.Render("space play/stop · m mute"), styles.dim.Render("↑/↓ select · enter tune"), styles.dim.Render("←/→ vol · r retry · ? help"))
+		rows = append(rows[:3], styles.dim.Render("space stop · p pause · m mute"), styles.dim.Render("↑/↓ select · enter tune"), styles.dim.Render("←/→ vol · r retry · ? help"))
 	}
 	limit := max(0, m.height-1)
 	if len(rows) > limit {

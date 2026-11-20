@@ -474,3 +474,33 @@ func TestBundledCatalogueNavigationAndCityLabels(t *testing.T) {
 		t.Fatal("Home did not return to existing default", model.target)
 	}
 }
+
+func TestTUIDVRPauseIntentAndLiveControls(t *testing.T) {
+	m, c := modelFixture()
+	m.status.BufferMinutes = 30
+	m.status.DVR = true
+	m.status.BufferStart = 10
+	m.status.BufferEnd = 100
+	m.status.Position = 80
+	m = updateModel(m, key('p'))
+	serial := c.serial
+	if !m.paused || c.commands[len(c.commands)-1]["action"] != "pause" {
+		t.Fatal("P did not pause", c.commands)
+	}
+	m = updateModel(m, statusMessage(m.stations[0], serial-1, 60, false, true))
+	if !m.paused {
+		t.Fatal("stale status undid Pause")
+	}
+	badge, _ := m.badge()
+	if !strings.Contains(badge, "PAUSED") {
+		t.Fatal(badge)
+	}
+	m = updateModel(m, key(']'))
+	if c.commands[len(c.commands)-1]["action"] != "skip" || c.commands[len(c.commands)-1]["value"] != 30.0 {
+		t.Fatal(c.commands)
+	}
+	m = updateModel(m, key('g'))
+	if c.commands[len(c.commands)-1]["action"] != "live" || m.paused {
+		t.Fatal("Go live did not resume")
+	}
+}

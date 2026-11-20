@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import qs.Commons
 import qs.Ui as Ui
 import "." as Radio
@@ -10,6 +11,7 @@ Ui.Panel {
   property var anchorItem: null
   property var hostWidget: null
   property int cursor: 1
+  property bool settingsOpen: false
   readonly property var radio: Radio.RadioService
 
   function chooseStation() {
@@ -22,15 +24,42 @@ Ui.Panel {
       return root.bar.switchPanelFrom(root.hostWidget || root, direction)
     return false
   }
+  function advanceCursor(direction) {
+    let order = [4]
+    if (settingsOpen) order.push(5)
+    order = order.concat([0,1])
+    if (radio.dvr) order = order.concat([6,7,8,9])
+    order = order.concat([2,3])
+    const index = Math.max(0, order.indexOf(cursor))
+    cursor = order[(index + direction + order.length) % order.length]
+    Qt.callLater(ensureCursorVisible)
+  }
+  function ensureCursorVisible() {
+    const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
+                     bufferPicker, pauseButton, backButton, forwardButton, liveButton]
+    const item = targets[cursor]
+    if (!item) return
+    const top = item.mapToItem(panelContent, 0, 0).y
+    if (top < scroller.contentY) scroller.contentY = top
+    else if (top + item.height > scroller.contentY + scroller.height)
+      scroller.contentY = Math.min(Math.max(0, scroller.contentHeight - scroller.height), top + item.height - scroller.height)
+  }
   function activate() {
     if (cursor === 0) stationPicker.toggle()
     else if (cursor === 1) radio.togglePlayback()
     else if (cursor === 3) radio.toggleMute()
+    else if (cursor === 4) settingsOpen = !settingsOpen
+    else if (cursor === 5 && settingsOpen) bufferPicker.toggle()
+    else if (cursor === 6 && radio.dvr) radio.togglePause()
+    else if (cursor === 7) radio.skip(-30)
+    else if (cursor === 8) radio.skip(30)
+    else if (cursor === 9 && radio.dvr) radio.goLive()
   }
-  onOpenedChanged: if (!opened) stationPicker.close()
+  onOpenedChanged: if (!opened) { stationPicker.close(); bufferPicker.close() }
   Connections {
     target: root.radio
     function onStationIdChanged() { stationPicker.value = root.radio.stationId }
+    function onBufferMinutesChanged() { bufferPicker.value = String(root.radio.bufferMinutes) }
   }
 
   Ui.KeyboardPanel {
@@ -39,18 +68,18 @@ Ui.Panel {
     owner: root.hostWidget || root
     bar: root.bar
     open: root.opened
-    focusTarget: stationPicker.popupOpen ? null : keyCatcher
+    focusTarget: (stationPicker.popupOpen || bufferPicker.popupOpen) ? null : keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(panelContent.implicitHeight)
 
     Ui.PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: stationPicker.popupOpen
+      blocked: stationPicker.popupOpen || bufferPicker.popupOpen
       onCloseRequested: root.close()
-      onTabRequested: direction => { root.cursor = (root.cursor + direction + 4) % 4 }
+      onTabRequested: direction => root.advanceCursor(direction)
       onMoveRequested: (dx, dy) => {
-        if (dy) root.cursor = (root.cursor + dy + 4) % 4
+        if (dy) root.advanceCursor(dy)
         if (dx) {
           root.cursor = 2
           root.radio.commitVolume(root.radio.volume + dx * 5)
@@ -58,16 +87,77 @@ Ui.Panel {
       }
       onActivateRequested: root.activate()
       onTextKey: text => {
+        if (text.toLowerCase() === "p") root.radio.togglePause()
+        if (text === "[") root.radio.skip(-30)
+        if (text === "]") root.radio.skip(30)
+        if (text.toLowerCase() === "g") root.radio.goLive()
         if (text.toLowerCase() === "m") root.radio.toggleMute()
         if (text.toLowerCase() === "r" && !root.radio.wanted) root.radio.play()
       }
 
+      Flickable {
+        id: scroller
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: panelContent.implicitHeight
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+        QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
       Column {
         id: panelContent
         width: parent.width
         spacing: Style.space(14)
 
-        Ui.PanelSectionHeader { text: "YAKKER · " + root.radio.stations.length + (root.radio.stations.length === 1 ? " STATION" : " STATIONS"); foreground: root.barForeground }
+        Row {
+          width: parent.width
+          spacing: Style.space(8)
+          Text {
+            width: parent.width - settingsButton.width - parent.spacing
+            anchors.verticalCenter: parent.verticalCenter
+            text: "YAKKER · " + root.radio.stations.length + " STATIONS"
+            textFormat: Text.PlainText
+            color: root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+          }
+          Ui.Button {
+            id: settingsButton
+            text: "Settings"
+            iconText: "󰒓"
+            foreground: root.barForeground
+            bordered: true
+            hasCursor: root.cursor === 4
+            onHovered: hovered => { if (hovered) root.cursor = 4 }
+            onClicked: root.settingsOpen = !root.settingsOpen
+          }
+        }
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.settingsOpen
+          Ui.Dropdown {
+            id: bufferPicker
+            width: parent.width
+            label: "Listening buffer"
+            options: [{value:"0",label:"Live only"}, {value:"5",label:"5 minutes"}, {value:"15",label:"15 minutes"}, {value:"30",label:"30 minutes"}]
+            value: String(root.radio.bufferMinutes)
+            foreground: root.barForeground
+            hasCursor: root.cursor === 5
+            onHovered: hovered => { if (hovered) root.cursor = 5 }
+            onChanged: value => { root.radio.setBufferMinutes(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
+          }
+          Text {
+            width: parent.width
+            text: "Enable a buffer to pause and rewind. Audio stays in memory; no files are recorded. Changing this setting clears history and returns to live."
+            textFormat: Text.PlainText
+            color: root.barForeground
+            opacity: 0.7
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+          Ui.PanelSeparator { width: parent.width }
+        }
         Row {
           width: parent.width
           spacing: Style.space(14)
@@ -143,7 +233,7 @@ Ui.Panel {
         }
         Text {
           width: parent.width
-          visible: text.length > 0 && root.radio.playbackState === "playing"
+          visible: text.length > 0 && root.radio.playbackState === "playing" && (!root.radio.dvr || root.radio.behindLive <= 3)
           textFormat: Text.PlainText
           text: root.radio.title
           color: root.barForeground
@@ -154,6 +244,7 @@ Ui.Panel {
           elide: Text.ElideRight
         }
         Ui.Button {
+          id: playButton
           width: parent.width
           text: root.radio.wanted ? "Stop" : root.radio.playbackState === "error" ? "Retry" : "Play live"
           iconText: root.radio.wanted ? "󰓛" : "󰐊"
@@ -163,6 +254,93 @@ Ui.Panel {
           hasCursor: root.cursor === 1
           onHovered: hovered => { if (hovered) root.cursor = 1 }
           onClicked: root.radio.togglePlayback()
+        }
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.radio.bufferMinutes > 0
+          Ui.Button {
+            id: pauseButton
+            width: parent.width
+            text: root.radio.paused ? "Resume" : "Pause"
+            iconText: root.radio.paused ? "󰐊" : "󰏤"
+            foreground: root.barForeground
+            bordered: true
+            enabled: root.radio.wanted && root.radio.dvr
+            hasCursor: root.cursor === 6
+            onHovered: hovered => { if (hovered) root.cursor = 6 }
+            onClicked: root.radio.togglePause()
+          }
+          Text {
+            width: parent.width
+            text: root.radio.bufferText
+            textFormat: Text.PlainText
+            color: root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
+          Ui.PanelSlider {
+            id: timelineSlider
+            width: parent.width
+            step: 30
+            bar: root.bar
+            minimum: root.radio.bufferStart
+            maximum: Math.max(minimum + 1, root.radio.bufferEnd)
+            value: root.radio.position
+            enabled: root.radio.dvr
+            fillColor: Color.accent
+            knobColor: root.barForeground
+            trackColor: Style.selectedFillFor(root.barForeground, Color.accent)
+            onReleased: value => root.radio.seek(value)
+          }
+          Row {
+            width: parent.width
+            spacing: Style.space(6)
+            Ui.Button {
+              id: backButton
+              width: (parent.width - parent.spacing * 2) / 3
+              text: "−30s"
+              foreground: root.barForeground
+              bordered: true
+              enabled: root.radio.dvr
+              hasCursor: root.cursor === 7
+              onHovered: hovered => { if (hovered) root.cursor = 7 }
+              onClicked: root.radio.skip(-30)
+            }
+            Ui.Button {
+              id: forwardButton
+              width: (parent.width - parent.spacing * 2) / 3
+              text: "+30s"
+              foreground: root.barForeground
+              bordered: true
+              enabled: root.radio.dvr
+              hasCursor: root.cursor === 8
+              onHovered: hovered => { if (hovered) root.cursor = 8 }
+              onClicked: root.radio.skip(30)
+            }
+            Ui.Button {
+              id: liveButton
+              width: (parent.width - parent.spacing * 2) / 3
+              text: "Go live"
+              foreground: root.barForeground
+              bordered: true
+              enabled: root.radio.dvr
+              hasCursor: root.cursor === 9
+              onHovered: hovered => { if (hovered) root.cursor = 9 }
+              onClicked: root.radio.goLive()
+            }
+          }
+          Text {
+            width: parent.width
+            visible: root.radio.bufferExpired
+            text: "Older audio expired. Playback moved to the available buffer."
+            textFormat: Text.PlainText
+            color: root.barForeground
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+            wrapMode: Text.WordWrap
+          }
         }
         Row {
           width: parent.width
@@ -207,6 +385,7 @@ Ui.Panel {
           }
         }
         Ui.Button {
+          id: muteButton
           width: parent.width
           text: root.radio.muted ? "Unmute" : "Mute"
           iconText: root.radio.muted ? "󰝟" : "󰕾"
@@ -218,13 +397,14 @@ Ui.Panel {
         }
         Text {
           width: parent.width
-          text: "Tab  Select control    ← →  Volume    M  Mute"
+          text: "Tab  Controls    ← →  Volume    P  Pause    [ ]  Seek    G  Live"
           color: root.barForeground
           opacity: 0.6
           font.family: Style.font.family
           font.pixelSize: Style.font.caption
           wrapMode: Text.WordWrap
         }
+      }
       }
     }
   }

@@ -8,11 +8,13 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/joega/yakker/internal/radio"
 )
@@ -20,10 +22,11 @@ import (
 type listenOptions struct {
 	station, streamURL, stationFile string
 	volume                          int
+	bufferMinutes                   int
 	muted, list                     bool
 }
 
-const listenCommands = "Commands: play, stop, volume 0–100, mute (toggle), unmute, status, help, quit.\n"
+const listenCommands = "Commands: play/resume, pause, stop, back [seconds], forward [seconds], live, buffer 0|5|15|30, volume 0–100, mute (toggle), unmute, status, help, quit.\n"
 
 func parseListenOptions(args []string, output io.Writer) (listenOptions, error) {
 	return parsePlaybackOptions(args, output, "listen")
@@ -36,16 +39,17 @@ func parsePlaybackOptions(args []string, output io.Writer, mode string) (listenO
 	flags.StringVar(&options.station, "station", "", "station ID from stations.json (default: first station)")
 	flags.StringVar(&options.streamURL, "url", "", "HTTP(S) stream URL instead of a configured station")
 	flags.StringVar(&options.stationFile, "stations", "", "alternate stations.json file")
+	flags.IntVar(&options.bufferMinutes, "buffer", 0, "DVR buffer in minutes: 0 (live only), 5, 15 or 30")
 	flags.IntVar(&options.volume, "volume", 60, "initial volume, 0–100")
 	flags.BoolVar(&options.muted, "muted", false, "start muted")
 	flags.BoolVar(&options.list, "list-stations", false, "list configured station IDs and exit")
 	flags.Usage = func() {
-		fmt.Fprintf(output, "Usage: yakker %s [--station ID | --url URL] [--volume 60] [--muted]\n", mode)
+		fmt.Fprintf(output, "Usage: yakker %s [--station ID | --url URL] [--volume 60] [--muted] [--buffer 0|5|15|30]\n", mode)
 		flags.SetOutput(output)
 		flags.PrintDefaults()
 		flags.SetOutput(io.Discard)
 		if mode == "tui" {
-			fmt.Fprintln(output, "\nKeys: space play/stop, left/right volume, up/down select, enter tune, m mute, r retry, ? help, q quit.")
+			fmt.Fprintln(output, "\nKeys: space play/stop, p pause/resume, [ / ] rewind/forward 30s, g live, left/right volume, up/down select, enter tune, m mute, r retry, ? help, q quit.")
 		} else {
 			fmt.Fprint(output, "\n"+listenCommands+"Each command is followed by Enter. Ctrl+C or EOF also exits.\n")
 		}
@@ -55,6 +59,9 @@ func parsePlaybackOptions(args []string, output io.Writer, mode string) (listenO
 	}
 	if flags.NArg() != 0 {
 		return options, fmt.Errorf("unexpected argument %q; use --station or --url", flags.Arg(0))
+	}
+	if options.bufferMinutes != 0 && options.bufferMinutes != 5 && options.bufferMinutes != 15 && options.bufferMinutes != 30 {
+		return options, errors.New("buffer must be 0, 5, 15 or 30 minutes")
 	}
 	if options.volume < 0 || options.volume > 100 {
 		return options, errors.New("volume must be an integer from 0 to 100")
@@ -171,6 +178,7 @@ func preparePlayback(root string, options listenOptions, cfg radio.Config) (*pla
 			return nil, err
 		}
 	}
+	cfg.DVRWindow = time.Duration(options.bufferMinutes) * time.Minute
 	cfg.RuntimeBase = base
 	cfg.StationFile = stationFile
 	ready = true
@@ -310,7 +318,11 @@ func listenSession(parent context.Context, cfg radio.Config, stationID string, o
 			force := replies[state.Serial]
 			delete(replies, state.Serial)
 			if text != lastStatus || force {
-				fmt.Fprintf(output, "\n%s\nyakker> ", text)
+				display := text
+				if force && state.DVR {
+					display += "\n" + formatDVRStatus(state)
+				}
+				fmt.Fprintf(output, "\n%s\nyakker> ", display)
 				lastStatus = text
 			}
 		case line := <-lines:
@@ -333,8 +345,34 @@ func listenSession(parent context.Context, cfg radio.Config, stationID string, o
 			var action string
 			var values map[string]any
 			switch {
-			case (command == "play" || command == "stop" || command == "status") && len(fields) == 1:
+			case (command == "play" || command == "stop" || command == "status" || command == "pause" || command == "live" || command == "resume") && len(fields) == 1:
 				action = command
+				if action == "resume" {
+					action = "play"
+				}
+			case (command == "back" || command == "forward") && len(fields) <= 2:
+				seconds := 30.0
+				var err error
+				if len(fields) == 2 {
+					seconds, err = strconv.ParseFloat(fields[1], 64)
+				}
+				if err != nil || seconds <= 0 || math.IsNaN(seconds) || math.IsInf(seconds, 0) {
+					fmt.Fprint(output, "Seek seconds must be a positive finite number.\nyakker> ")
+					continue
+				}
+				if command == "back" {
+					seconds = -seconds
+				}
+				action = "skip"
+				values = map[string]any{"value": seconds}
+			case command == "buffer" && len(fields) == 2:
+				minutes, err := strconv.Atoi(fields[1])
+				if err != nil || (minutes != 0 && minutes != 5 && minutes != 15 && minutes != 30) {
+					fmt.Fprint(output, "Buffer must be 0, 5, 15 or 30 minutes.\nyakker> ")
+					continue
+				}
+				action = "configure"
+				values = map[string]any{"stationId": stationID, "bufferMinutes": minutes}
 			case command == "volume" && len(fields) == 2:
 				volume, err := strconv.Atoi(fields[1])
 				if err != nil || volume < 0 || volume > 100 {
@@ -372,6 +410,11 @@ func formatListenStatus(s radio.Status) string {
 	switch state {
 	case "playing":
 		state = "Playing"
+		if s.DVR && s.BufferEnd-s.Position > 3 {
+			state += " (behind live)"
+		}
+	case "paused":
+		state = "Paused"
 	case "connecting":
 		state = "Connecting"
 	case "stopped":
@@ -385,7 +428,7 @@ func formatListenStatus(s radio.Status) string {
 	if s.Muted {
 		text += " · Muted"
 	}
-	if s.Title != "" {
+	if s.Title != "" && (!s.DVR || (!s.Paused && s.BufferEnd-s.Position <= 3)) {
 		text += " · " + terminalText(s.Title)
 	}
 	if s.Error != "" {
@@ -402,4 +445,30 @@ func terminalText(text string) string {
 		}
 		return r
 	}, text)
+}
+
+func playbackClock(seconds float64) string {
+	value := int(math.Max(0, seconds))
+	return fmt.Sprintf("%d:%02d", value/60, value%60)
+}
+func formatDVRStatus(s radio.Status) string {
+	if !s.DVR {
+		if s.BufferMinutes == 0 {
+			return "Live only"
+		}
+		return "Building buffer…"
+	}
+	lag := math.Max(0, s.BufferEnd-s.Position)
+	label := "Live"
+	if lag > 3 {
+		label = playbackClock(lag) + " behind live"
+	}
+	if s.Paused {
+		label = "Paused · " + playbackClock(lag) + " behind live"
+	}
+	label += " · " + playbackClock(s.BufferEnd-s.BufferStart) + " available"
+	if s.BufferExpired {
+		label += " · Older audio expired"
+	}
+	return label
 }

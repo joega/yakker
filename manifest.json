@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.joega.yakker",
   "name": "Yakker",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "author": "Yakker contributors",
   "license": "MIT",
   "description": "Sports radio from the US, Canada, UK and Ireland, with searchable stations and local artwork.",

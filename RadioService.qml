@@ -17,6 +17,18 @@ Item {
   property bool ready: false
   property string playbackState: "stopped"
   property bool wanted: false
+  property bool paused: false
+  property int bufferMinutes: 0
+  property bool dvr: false
+  property real position: 0
+  property real bufferStart: 0
+  property real bufferEnd: 0
+  property bool bufferExpired: false
+  readonly property real behindLive: Math.max(0, bufferEnd - position)
+  readonly property string bufferText: !wanted ? "Buffer starts when you play" : !dvr ? "Building buffer…"
+    : (paused ? "Paused · " : behindLive > 3 ? "" : "Live · ")
+      + ((paused || behindLive > 3) ? clock(behindLive) + " behind live · " : "")
+      + clock(bufferEnd - bufferStart) + " available"
   property string error: ""
   property string title: ""
   property var station: ({id: "wbz-fm", name: "98.5 The Sports Hub", subtitle: "WBZ-FM · Boston", icon: "󰐹", artwork: "assets/sports-hub.png"})
@@ -34,11 +46,17 @@ Item {
   property string stationId: "wbz-fm"
   property string mprisPlugin: ""
   property int pendingVolume: -1
-  readonly property string statusText: playbackState === "playing" ? "Live"
+  readonly property string statusText: playbackState === "playing" ? (dvr && behindLive > 3 ? "Delayed · " + clock(behindLive) : "Live")
+    : playbackState === "paused" ? "Paused"
     : playbackState === "connecting" ? "Connecting…"
     : playbackState === "retrying" ? "Reconnecting in " + retryDelay + "s · attempt " + retry + "/5"
     : playbackState === "error" ? "Unable to play" : "Stopped"
-  signal preferencesChanged(int volume, bool muted, string stationId)
+  signal preferencesChanged(int volume, bool muted, string stationId, int bufferMinutes)
+
+  function clock(seconds) {
+    const value = Math.max(0, Math.floor(seconds))
+    return Math.floor(value / 60) + ":" + (value % 60 < 10 ? "0" : "") + (value % 60)
+  }
 
   function acquire(settings) {
     clients++
@@ -61,7 +79,7 @@ Item {
   function send(command) {
     if (!ready || !helper.running) return
     command.serial = ++serial
-    if (command.action === "play" || command.action === "stop") latestIntent = serial
+    if (["play", "stop", "pause", "seek", "skip", "live"].indexOf(command.action) >= 0) latestIntent = serial
     if (command.action === "configure") latestStationIntent = serial
     if (command.action === "volume") latestVolumeIntent = serial
     if (command.action === "mute") latestMuteIntent = serial
@@ -70,13 +88,15 @@ Item {
   function configureSettings(settings) {
     const selected = String(settings.stationId || "wbz-fm")
     const mpris = String(settings.mprisPlugin || "")
-    if (stationId === selected && mprisPlugin === mpris) return
+    const minutes = [0,5,15,30].indexOf(Number(settings.bufferMinutes)) >= 0 ? Number(settings.bufferMinutes) : 0
+    if (stationId === selected && mprisPlugin === mpris && bufferMinutes === minutes) return
     stationId = selected
     mprisPlugin = mpris
+    bufferMinutes = minutes
     configure()
   }
   function configure() {
-    send({action: "configure", stationId: stationId, mprisPlugin: mprisPlugin})
+    send({action: "configure", stationId: stationId, mprisPlugin: mprisPlugin, bufferMinutes: bufferMinutes})
   }
   function selectStation(id) {
     if (id === stationId) return
@@ -88,7 +108,7 @@ Item {
       error = ""
       playbackState = wanted ? "connecting" : "stopped"
       configure()
-      preferencesChanged(volume, muted, stationId)
+      preferencesChanged(volume, muted, stationId, bufferMinutes)
       return
     }
   }
@@ -103,6 +123,20 @@ Item {
   }
   function stop() { pendingPlay = false; wanted = false; send({action: "stop"}) }
   function togglePlayback() { wanted ? stop() : play() }
+  function togglePause() { if (bufferMinutes > 0 && wanted) send({action: paused ? "play" : "pause"}) }
+  function skip(seconds) { if (dvr) send({action: "skip", value: seconds}) }
+  function seek(seconds) { if (dvr) send({action: "seek", value: seconds}) }
+  function goLive() { send({action: "live"}) }
+  function setBufferMinutes(minutes) {
+    if ([0,5,15,30].indexOf(minutes) < 0 || minutes === bufferMinutes) return
+    bufferMinutes = minutes
+    dvr = false
+    paused = false
+    position = 0; bufferStart = 0; bufferEnd = 0; bufferExpired = false
+    playbackState = wanted ? "connecting" : "stopped"
+    configure()
+    preferencesChanged(volume, muted, stationId, bufferMinutes)
+  }
   function setVolume(value) {
     pendingVolume = Math.max(0, Math.min(100, Math.round(value)))
     volumeFlush.restart()
@@ -112,12 +146,12 @@ Item {
     pendingVolume = -1
     volume = Math.max(0, Math.min(100, Math.round(value)))
     send({action: "volume", value: volume})
-    preferencesChanged(volume, muted, stationId)
+    preferencesChanged(volume, muted, stationId, bufferMinutes)
   }
   function toggleMute() {
     muted = !muted
     send({action: "mute", value: muted})
-    preferencesChanged(volume, muted, stationId)
+    preferencesChanged(volume, muted, stationId, bufferMinutes)
   }
 
   FileView {
@@ -175,6 +209,13 @@ Item {
           if ((next.serial || 0) >= Math.max(root.latestIntent, root.latestStationIntent)) {
             root.playbackState = next.state || "error"
             root.wanted = next.wanted === true
+            root.paused = next.paused === true
+            root.dvr = next.dvr === true
+            root.position = Number(next.position) || 0
+            root.bufferStart = Number(next.bufferStart) || 0
+            root.bufferEnd = Number(next.bufferEnd) || 0
+            root.bufferExpired = next.bufferExpired === true
+            if ([0,5,15,30].indexOf(next.bufferMinutes) >= 0) root.bufferMinutes = next.bufferMinutes
             root.error = next.error || ""
             root.title = next.title || ""
             if (next.station) {
@@ -194,6 +235,8 @@ Item {
     onExited: exitCode => {
       root.ready = false
       root.wanted = false
+      root.paused = false
+      root.dvr = false
       root.playerPid = 0
       root.playbackState = root.clients ? "error" : "stopped"
       if (root.clients && !root.error) root.error = "Yakker controller exited (" + exitCode + "). Press Retry."
