@@ -3,7 +3,7 @@
 A lightweight sports-radio player for your desktop.
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
-Nineteen stations across the US, Canada, UK and Ireland, streamed through headless mpv.
+Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
 **98.5 The Sports Hub** (WBZ-FM, Boston) remains the default. No browser required.
 The widget starts playback only when you press Play; the standalone CLI starts
 when you run `yakker listen` or `yakker tui`.
@@ -207,10 +207,14 @@ The bundled catalogue includes:
 
 | Country | City | Station | CLI station ID |
 | --- | --- | --- | --- |
+| US | Atlanta | 92.9 The Game | `wzgc-fm` |
 | US | Boston | 98.5 The Sports Hub | `wbz-fm` |
 | US | Boston | WEEI 93.7 | `weei-fm` |
 | US | Chicago | 104.3 The Score | `wscr` |
+| US | Cleveland | 92.3 The Fan | `wkrk-fm` |
+| US | Columbus | 97.1 The Fan | `wbns-fm` |
 | US | Dallas–Fort Worth | 105.3 The Fan | `krld-fm` |
+| US | Denver | 104.3 The Fan | `kkfn-fm` |
 | US | Detroit | 97.1 The Ticket | `wxyt-fm` |
 | US | Los Angeles | AM 570 LA Sports | `klac` |
 | US | Minneapolis | KFAN 100.3 | `kfan` |
@@ -218,6 +222,7 @@ The bundled catalogue includes:
 | US | New York | WFAN 101.9 / 660 | `wfan` |
 | US | Philadelphia | SportsRadio 94WIP | `wip-fm` |
 | US | Pittsburgh | 93.7 The Fan | `kdka-fm` |
+| US | San Diego | 97.3 The Fan | `kwfn-fm` |
 | US | Seattle | Seattle Sports 710 | `kiro-am` |
 | Canada | Montreal | TSN 690 | `tsn-690` |
 | Canada | Toronto | Sportsnet 590 The FAN | `sportsnet-590` |

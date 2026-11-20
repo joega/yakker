@@ -51,3 +51,17 @@ terms above apply to these logos as well.
 | `talksport-2.png` | [talkSPORT 2](https://talksport.com/play/) | [Original image](https://assets.wireless.radio/images/uwp/seo-logos/talksport2.png) |
 | `bbc-radio-5-live.png` | [BBC Radio 5 Live](https://www.bbc.co.uk/sounds/play/live/bbc_radio_five_live) | [Original image](https://sounds.files.bbci.co.uk/3.12.0/networks/bbc_radio_five_live/colour_450.png) |
 | `off-the-ball.png` | [Off The Ball](https://www.offtheball.com/) | [Original image](https://media.goloudnow.com/uploads/1691526793/StreamLogo-Off_The_Ball.png) |
+
+## Additional US markets
+
+Downloaded on 2026-11-20 from official station websites and their linked players.
+The ownership and identification-only terms above apply to these logos.
+Transparent Audacy logos use a dark backing to keep their white lettering visible.
+
+| File | Station / official player | Artwork source |
+| --- | --- | --- |
+| `wbns-fm.png` | [97.1 The Fan](https://www.971thefan.com/) | [Original image](https://dehayf5mhw1h7.cloudfront.net/wp-content/uploads/sites/2091/2020/10/12160146/station.png) |
+| `wkrk-fm.webp` | [92.3 The Fan](https://www.audacy.com/923thefan) | [Original image](https://assets.rbl.ms/64017230/origin.webp) |
+| `kwfn-fm.webp` | [97.3 The Fan](https://www.audacy.com/973thefansd) | [Original image](https://assets.rbl.ms/65204913/origin.webp) |
+| `wzgc-fm.webp` | [92.9 The Game](https://www.audacy.com/929thegame) | [Original image](https://assets.rbl.ms/65204528/origin.webp) |
+| `kkfn-fm.webp` | [104.3 The Fan](https://denversports.com/) | [Original image](https://cdn.bonneville.cloud/i/KKFN-FM/square.webp) |

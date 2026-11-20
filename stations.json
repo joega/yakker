@@ -11,6 +11,18 @@
     "country": "US"
   },
   {
+    "id": "wzgc-fm",
+    "name": "92.9 The Game",
+    "subtitle": "WZGC-FM · Atlanta",
+    "city": "Atlanta",
+    "country": "US",
+    "streamUrl": "https://live.amperwave.net/manifest/audacy-wzgcfmaac-imc",
+    "websiteUrl": "https://www.audacy.com/929thegame",
+    "icon": "󰐹",
+    "artwork": "assets/wzgc-fm.webp",
+    "artworkBackground": "#171b23"
+  },
+  {
     "id": "weei-fm",
     "name": "WEEI 93.7",
     "subtitle": "WEEI-FM · Boston",
@@ -35,6 +47,29 @@
     "country": "US"
   },
   {
+    "id": "wkrk-fm",
+    "name": "92.3 The Fan",
+    "subtitle": "WKRK-FM · Cleveland",
+    "city": "Cleveland",
+    "country": "US",
+    "streamUrl": "https://live.amperwave.net/manifest/audacy-wkrkfmaac-imc",
+    "websiteUrl": "https://www.audacy.com/923thefan",
+    "icon": "󰐹",
+    "artwork": "assets/wkrk-fm.webp",
+    "artworkBackground": "#171b23"
+  },
+  {
+    "id": "wbns-fm",
+    "name": "97.1 The Fan",
+    "subtitle": "WBNS-FM · Columbus",
+    "city": "Columbus",
+    "country": "US",
+    "streamUrl": "https://radiohio.streamguys1.com/cols/wbnsfm-linktree.mp3",
+    "websiteUrl": "https://www.971thefan.com/",
+    "icon": "󰐹",
+    "artwork": "assets/wbns-fm.png"
+  },
+  {
     "id": "krld-fm",
     "name": "105.3 The Fan",
     "city": "Dallas–Fort Worth",
@@ -45,6 +80,17 @@
     "icon": "󰐹",
     "artwork": "assets/krld-fm.webp",
     "artworkBackground": "#171b23"
+  },
+  {
+    "id": "kkfn-fm",
+    "name": "104.3 The Fan",
+    "subtitle": "KKFN-FM · Denver",
+    "city": "Denver",
+    "country": "US",
+    "streamUrl": "https://bonneville.cdnstream1.com/2612_48.aac",
+    "websiteUrl": "https://denversports.com/",
+    "icon": "󰐹",
+    "artwork": "assets/kkfn-fm.webp"
   },
   {
     "id": "wxyt-fm",
@@ -129,6 +175,18 @@
     "artwork": "assets/kdka-fm.png",
     "artworkBackground": "#171b23",
     "country": "US"
+  },
+  {
+    "id": "kwfn-fm",
+    "name": "97.3 The Fan",
+    "subtitle": "KWFN-FM · San Diego",
+    "city": "San Diego",
+    "country": "US",
+    "streamUrl": "https://live.amperwave.net/manifest/audacy-kwfnfmaac-imc",
+    "websiteUrl": "https://www.audacy.com/973thefansd",
+    "icon": "󰐹",
+    "artwork": "assets/kwfn-fm.webp",
+    "artworkBackground": "#171b23"
   },
   {
     "id": "kiro-am",

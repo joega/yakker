@@ -16,6 +16,7 @@ func TestBundledStationCatalogue(t *testing.T) {
 		"wbz-fm": true, "weei-fm": true, "wscr": true, "wxyt-fm": true, "espn-new-york": true,
 		"wfan": true, "wip-fm": true, "kdka-fm": true, "tsn-1050": true, "klac": true,
 		"krld-fm": true, "kfan": true, "kiro-am": true, "sportsnet-590": true, "tsn-690": true,
+		"wbns-fm": true, "wkrk-fm": true, "kwfn-fm": true, "wzgc-fm": true, "kkfn-fm": true,
 		"talksport": true, "talksport-2": true, "bbc-radio-5-live": true, "off-the-ball": true,
 	}
 	if len(stations) != len(want) || stations[0]["id"] != "wbz-fm" {
