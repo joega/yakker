@@ -134,10 +134,32 @@ Column {
     const old = snapshot.settings || {}
     submit(radio.recordingSettings(storageRevision, {folder: folderField.text.trim(), storageCapBytes: Math.round(Number(capField.text) * 1073741824), freeSpaceReserveBytes: old.freeSpaceReserveBytes, concurrency: old.concurrency}), "settings")
   }
-  function dateText(value) {
+  function timeText(hours, minutes) {
+    const locale = Qt.locale(Commons.I18n.formatLocale)
+    return String(hours % 12 || 12).padStart(2, "0") + ":" + String(minutes).padStart(2, "0")
+      + (hours < 12 ? locale.amText : locale.pmText).toUpperCase()
+  }
+  function scheduleTimeText(value) {
+    const parts = /^(\d{2}):(\d{2})$/.exec(String(value || ""))
+    return parts ? timeText(Number(parts[1]), Number(parts[2])) : String(value || "")
+  }
+  function dateText(value, sourceTime) {
     if (!value) return ""
-    const d = new Date(value)
-    return isNaN(d.getTime()) ? String(value) : d.toLocaleString(Qt.locale(Commons.I18n.formatLocale), Locale.ShortFormat)
+    let d = new Date(value)
+    if (isNaN(d.getTime())) return String(value)
+    // Schedule occurrences already carry their saved timezone's UTC offset.
+    // Read their wall-clock fields in UTC to avoid converting them to the
+    // machine timezone (or applying the machine's different DST rules).
+    if (sourceTime) d = new Date(String(value).replace(/(?:Z|[+-]\d{2}:\d{2})$/, "Z"))
+    const day = sourceTime ? d.getUTCDay() : d.getDay()
+    const month = sourceTime ? d.getUTCMonth() : d.getMonth()
+    const date = sourceTime ? d.getUTCDate() : d.getDate()
+    const year = sourceTime ? d.getUTCFullYear() : d.getFullYear()
+    const hours = sourceTime ? d.getUTCHours() : d.getHours()
+    const minutes = sourceTime ? d.getUTCMinutes() : d.getMinutes()
+    const locale = Qt.locale(Commons.I18n.formatLocale)
+    return locale.dayName(day, Locale.ShortFormat) + " " + locale.monthName(month, Locale.ShortFormat)
+      + " " + date + " " + year + " " + timeText(hours, minutes)
   }
   function sizeText(n) {
     const bytes = Math.max(0, Number(n) || 0)
@@ -152,7 +174,7 @@ Column {
       if (!root.previewSerial || root.radio.schedulePreviewSerial !== root.previewSerial || root.previewKey !== root.formKey) return
       root.previewSerial = 0
       const p = root.radio.schedulePreview || {}
-      root.previewText = root.radio.schedulePreviewError || (p.nextStart ? "Next: " + p.nextStart.replace("T", " ") + " – " + p.nextEnd.replace("T", " ") + " · " + p.timezone : "This schedule is disabled.")
+      root.previewText = root.radio.schedulePreviewError || (p.nextStart ? "Next: " + root.dateText(p.nextStart, true) + " – " + root.dateText(p.nextEnd, true) + " · " + p.timezone : "This schedule is disabled.")
     }
     function onRecordingMutationSerialChanged() {
       if (!root.pendingSerial || root.radio.recordingMutationSerial !== root.pendingSerial) return
@@ -219,7 +241,7 @@ Column {
     Column { required property var rowData; readonly property var modelData: rowData; width: root.width; spacing: Style.space(4)
       Ui.PanelSeparator { width: parent.width }
       Text { width: parent.width; text: (parent.modelData.label || parent.modelData.stationName) + (parent.modelData.enabled ? " · Enabled" : " · Disabled"); textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; wrapMode: Text.Wrap }
-      Text { width: parent.width; text: parent.modelData.stationName + " · " + (parent.modelData.weekdays || []).map(function(d) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d] }).join(", ") + " · " + parent.modelData.startTime + "–" + parent.modelData.endTime + " · " + parent.modelData.timezone + "\n" + (parent.modelData.nextStart ? "Next: " + parent.modelData.nextStart.replace("T", " ") + " – " + (parent.modelData.nextEnd || "").replace("T", " ") : "No upcoming occurrence"); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
+      Text { width: parent.width; text: parent.modelData.stationName + " · " + (parent.modelData.weekdays || []).map(function(d) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d] }).join(", ") + " · " + root.scheduleTimeText(parent.modelData.startTime) + "–" + root.scheduleTimeText(parent.modelData.endTime) + " · " + parent.modelData.timezone + "\n" + (parent.modelData.nextStart ? "Next: " + root.dateText(parent.modelData.nextStart, true) + " – " + root.dateText(parent.modelData.nextEnd, true) : "No upcoming occurrence"); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
       Row { width: parent.width; spacing: Style.space(4)
         Ui.Button { width: (parent.width-parent.spacing*2)/3; text: "Edit"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.beginEdit(parent.parent.modelData) }
         Ui.Button { width: (parent.width-parent.spacing*2)/3; text: parent.parent.modelData.enabled ? "Disable" : "Enable"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const s = parent.parent.modelData; root.submit(root.radio.upsertSchedule(root.snapshot.revision, {id:s.id, stationId:s.stationId, label:s.label, weekdays:s.weekdays, startTime:s.startTime, endTime:s.endTime, timezone:s.timezone, enabled:!s.enabled}), "toggle") } }

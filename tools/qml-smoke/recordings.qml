@@ -22,6 +22,13 @@ ShellRoot {
           panel.open(); panel.radio.acquire({})
           tryVerify(function() { return panel.radio.ready && panel.radio.recordings.available && panel.radio.stations.length > 0 }, 5000)
           wait(300)
+          compare(panel.testView.dateText(new Date(2026, 10, 20, 14, 30).toISOString()), "Fri Nov 20 2026 02:30PM")
+          compare(panel.testView.dateText("2026-11-20T14:30:00+09:00", true), "Fri Nov 20 2026 02:30PM")
+          compare(panel.testView.dateText("2026-11-20T00:05:00+14:00", true), "Fri Nov 20 2026 12:05AM")
+          compare(panel.testView.dateText("2026-11-20T12:00:00-05:00", true), "Fri Nov 20 2026 12:00PM")
+          compare(panel.testView.dateText("2026-03-08T02:30:00+09:00", true), "Sun Mar 8 2026 02:30AM")
+          compare(panel.testView.scheduleTimeText("23:59"), "11:59PM")
+          compare(panel.testView.dateText(""), "")
           verify(panel.testRecordingsButton.visible, "navigation absent")
           compare(panel.radio.stationId, "")
           verify(!panel.radio.hasStation && !panel.radio.wanted)
@@ -78,6 +85,7 @@ ShellRoot {
           var revisionBeforePreview = panel.radio.recordings.revision
           panel.testView.previewNext()
           tryVerify(function() { return panel.testView.previewSerial === 0 && panel.testView.previewText.indexOf("Next:") === 0 }, 5000)
+          verify(!/\d{4}-\d{2}-\d{2}T?/.test(panel.testView.previewText), "Preview still shows an ISO timestamp")
           compare(panel.radio.recordings.revision, revisionBeforePreview)
           panel.testView.testStart.text = "00:01"
           compare(panel.testView.previewText, "")

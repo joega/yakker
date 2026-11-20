@@ -252,6 +252,9 @@ live**. Missing files become available again when their retained folder returns.
 Audio quality and exact broadcast boundaries depend on the source; connection
 startup, broadcaster buffering and network interruptions can affect the segment.
 
+Dates use a consistent format such as **Fri Nov 20 2026 02:30PM**. Library dates
+use local time; upcoming schedule times and previews use the schedule's timezone.
+
 Open **Settings → Recording storage**, or the storage controls in Recordings, to
 choose a folder and total library cap. Defaults:
 
