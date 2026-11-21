@@ -50,22 +50,22 @@ ShellRoot {
           radio.station = radio.stations.find(function(station) { return station.id === "wip-fm" }); radio.stationId = "wip-fm"
           radio.playbackKind = "live"; radio.wanted = true; radio.paused = false; radio.playbackState = "playing"
           radio.dvr = false; radio.temporaryBuffer = false
-          compare(barFixture.testStatus.text, "Live"); compare(barFixture.testStateIcon.name, "play")
+          verify(barFixture.testButton.tooltipText.indexOf(" · Live") >= 0); compare(barFixture.testStateIcon.name, "play")
           compare(barFixture.testLogo.station.id, "wip-fm")
           captureBar("bar-live")
           radio.station = radio.stations.find(function(station) { return station.id === "weei-fm" }); radio.stationId = "weei-fm"
           radio.paused = true; radio.playbackState = "paused"; radio.temporaryBuffer = true
-          compare(barFixture.testStatus.text, "Paused · buffering"); compare(barFixture.testStateIcon.name, "pause")
+          verify(barFixture.testButton.tooltipText.indexOf("Paused · buffering") >= 0); compare(barFixture.testStateIcon.name, "pause")
           verify(barFixture.testLogo.station.id === "weei-fm", "Pausing removed the source artwork")
           verify(barFixture.testButton.tooltipText.indexOf("Stream stays connected") >= 0)
           captureBar("bar-paused-buffering")
           radio.station = radio.stations.find(function(station) { return station.id === "bbc-radio-5-live" }); radio.stationId = "bbc-radio-5-live"
           barConfig.vertical = true
           captureBar("bar-vertical-paused")
-          verify(barFixture.width <= barConfig.barSize, "The vertical bar expanded to fit the horizontal state label")
+          verify(barFixture.width <= barConfig.barSize, "The vertical bar expanded to fit the horizontal controls")
           barConfig.vertical = false
           radio.wanted = false; radio.paused = false; radio.playbackState = "stopped"
-          compare(barFixture.testStatus.text, "Stopped"); compare(barFixture.testStateIcon.name, "stop")
+          verify(barFixture.testButton.tooltipText.indexOf("Listening stopped") >= 0); compare(barFixture.testStateIcon.name, "stop")
           verify(!barFixture.testLogo.station.id)
           verify(barFixture.testButton.tooltipText.indexOf("Stream disconnected · Replay cleared") >= 0)
           radio.recordings = Object.assign({}, radio.recordings, {activeCount:1})
@@ -73,19 +73,19 @@ ShellRoot {
           captureBar("bar-stopped-recording")
           radio.recordings = saved[keys.indexOf("recordings")]
           radio.wanted = true; radio.paused = true; radio.playbackState = "retrying"
-          compare(barFixture.testStatus.text, "Reconnecting")
+          verify(barFixture.testButton.tooltipText.indexOf("Reconnecting") >= 0)
           verify(barFixture.testButton.tooltipText.indexOf("Stream stays connected") < 0, "Reconnect claims to preserve paused audio")
           radio.playbackState = "error"
-          compare(barFixture.testStateIcon.name, "warning"); compare(barFixture.testStatus.text, "Offline")
+          compare(barFixture.testStateIcon.name, "warning"); verify(barFixture.testButton.tooltipText.indexOf("Unable to play") >= 0)
           captureBar("bar-error")
           radio.playbackKind = "recording"; radio.recordingId = "test-recording"; radio.recordingTitle = "Saved show"
           radio.playbackState = "paused"
-          compare(barFixture.testStatus.text, "Paused")
+          verify(barFixture.testButton.tooltipText.indexOf("Recording paused") >= 0)
           verify(barFixture.testButton.tooltipText.indexOf("buffering") < 0, "A saved recording is labeled as buffering")
           captureBar("bar-paused-recording")
           radio.paused = false; radio.playbackState = "playing"
-          compare(barFixture.testStatus.text, "Playing")
-          verify(barFixture.testStatus.text !== "Recording", "Playback looks like a recording capture")
+          verify(barFixture.testButton.tooltipText.indexOf("Playing recording") >= 0)
+          verify(!barFixture.testRecordingIndicator.visible, "Saved playback looks like a recording capture")
         } finally {
           keys.forEach(function(key,index) { radio[key] = saved[index] })
           barConfig.vertical = false; barFixture.visible = false

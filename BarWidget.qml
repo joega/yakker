@@ -16,12 +16,6 @@ Ui.BarWidget {
 
   readonly property var radio: Radio.RadioService
   readonly property bool recordingActive: Number(radio.recordings.activeCount) > 0
-  readonly property string playbackLabel: radio.playbackState === "error" ? "Offline"
-    : radio.playbackState === "retrying" ? "Reconnecting"
-    : radio.playbackState === "connecting" ? "Connecting"
-    : radio.playbackPaused ? (radio.playbackKind === "live" ? "Paused · buffering" : "Paused")
-    : radio.wanted && radio.playbackState === "playing" ? (radio.playbackKind === "recording" ? "Playing"
-      : radio.dvr && radio.behindLive > 3 ? "Behind live" : "Live") : "Stopped"
   readonly property string playbackIcon: radio.playbackState === "error" ? "warning"
     : radio.playbackState === "connecting" || radio.playbackState === "retrying" ? "radio"
     : radio.playbackPaused ? "pause"
@@ -140,8 +134,8 @@ Ui.BarWidget {
       anchors.centerIn: parent
       spacing: Style.space(6)
       Item {
-        width: Style.space(24)
-        height: Math.max(Style.space(12), Math.min(Style.space(22), button.height - Style.space(4)))
+        width: Style.bar.iconCanvas
+        height: Math.min(width, Math.max(Style.space(12), button.height - Style.space(8)))
         anchors.verticalCenter: parent.verticalCenter
         Radio.StationLogo {
           id: stationLogo
@@ -155,7 +149,7 @@ Ui.BarWidget {
           visible: root.vertical
           anchors.right: parent.right
           anchors.bottom: parent.bottom
-          width: Style.space(13); height: width
+          width: Style.space(10); height: width
           radius: Style.space(3)
           color: root.bar ? root.bar.background : Commons.Color.background
           Radio.FocusIcon { anchors.fill: parent; anchors.margins: Style.space(1); name: root.playbackIcon; foreground: root.playbackColor }
@@ -176,26 +170,13 @@ Ui.BarWidget {
         font.pixelSize: Style.font.body
         anchors.verticalCenter: parent.verticalCenter
       }
-      Row {
+      Radio.FocusIcon {
+        id: stateIcon
         visible: !root.vertical
-        spacing: Style.space(4)
+        width: Style.space(12); height: width
         anchors.verticalCenter: parent.verticalCenter
-        Radio.FocusIcon {
-          id: stateIcon
-          width: Style.space(12); height: width
-          anchors.verticalCenter: parent.verticalCenter
-          name: root.playbackIcon
-          foreground: root.playbackColor
-        }
-        Text {
-          id: playbackStateLabel
-          text: root.playbackLabel
-          textFormat: Text.PlainText
-          color: root.playbackColor
-          font.family: button.fontFamily
-          font.pixelSize: Style.fontPx(1)
-          anchors.verticalCenter: parent.verticalCenter
-        }
+        name: root.playbackIcon
+        foreground: root.playbackColor
       }
       Row {
         id: recordingIndicator

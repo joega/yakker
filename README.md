@@ -101,7 +101,10 @@ The build produces `yakker-controller` (the runtime controller) and `yakker`
 (standalone playback and local installation). Run the installer from this checkout. It validates and copies the compiled controller, QML, and assets to
 `~/.config/omarchy/plugins/io.github.joega.yakker`, rescans the existing shell,
 and enables a new widget in its default right section. Existing widgets remain
-in place. It uses Omarchy's documented drop-in workflow; `omarchy dev link` is
+in place. The manifest's `barWidget.defaultSection` sets the default for new
+widgets; dragging a widget saves its section and order in
+`~/.config/omarchy/shell.json`. For example, `centerEnd` places it beside the
+center island. It uses Omarchy's documented drop-in workflow; `omarchy dev link` is
 for developing the shell itself. No second Quickshell instance is launched.
 Run the installer again after editing this checkout. For helper/controller code
 updates, stop playback and run `omarchy restart shell` after reinstalling so the
@@ -163,14 +166,13 @@ Enter selects, F toggles the highlighted favorite, and Escape closes.
 Changing stations while playing makes a fresh live connection; while stopped it
 selects the next station without starting playback. The last station, volume,
 mute setting and listening buffer length are remembered across shell restarts.
-The bar keeps station artwork visible while playing or paused. A compact icon
-and label show **Live**, **Behind live**, **Paused · buffering**, or **Stopped**;
-saved recordings show **Playing** or **Paused** without suggesting live buffering.
-Connecting, reconnecting, and offline states have their own labels. Stop restores
-the neutral radio icon. A separate **REC** count shows background recordings even
-when listening is stopped. Vertical bars use a compact state marker over the
-artwork and a separate recording dot. Hover for the source, connection/replay
-status, and active recording count.
+The bar uses the standard icon canvas for smaller station artwork, retained
+while playing or paused. Compact state icons indicate playing, paused, stopped,
+behind-live, connecting/reconnecting, and offline states. Full status text and
+connection/replay details stay in the tooltip. Stop restores the neutral radio
+icon. A separate **REC** count shows background recordings even when listening
+is stopped. Vertical bars use a compact state marker over the artwork and a
+separate recording dot.
 
 ![Native bar widget states: live, paused buffering, stopped with a background recording, offline, and paused saved recording](docs/yakker-bar-states.png)
 

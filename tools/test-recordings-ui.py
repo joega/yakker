@@ -48,7 +48,6 @@ def main():
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
         bar_widget = plugin / "BarWidget.qml"
         bar_widget.write_text(bar_widget.read_text().replace('  property bool attached: false', '''  property alias testButton: button
-  property alias testStatus: playbackStateLabel
   property alias testStateIcon: stateIcon
   property alias testLogo: stationLogo
   property alias testRecordingIndicator: recordingIndicator
