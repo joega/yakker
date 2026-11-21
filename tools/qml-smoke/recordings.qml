@@ -121,6 +121,50 @@ ShellRoot {
           console.log("QA: chosen station", panel.radio.stationId, panel.radio.hasStation, panel.testStationPicker.popupOpen, panel.radio.error)
           tryVerify(function() { return panel.radio.stationId === "wfan" && panel.radio.hasStation }, 3000)
           verify(!panel.radio.wanted, "Choosing a station started playback")
+          console.log("QA: station picker search and hearts")
+          panel.radio.favoriteIds = []
+          panel.testStationPicker.open()
+          tryVerify(function() { return panel.testStationPicker.testSearch.activeFocus }, 2000)
+          panel.testStationPicker.testSearch.text = "weei Boston US"
+          tryVerify(function() { return panel.testStationPicker.testList.count === 1 && !!panel.testStationPicker.testList.itemAtIndex(0) }, 2000)
+          var pickerRow = panel.testStationPicker.testList.itemAtIndex(0)
+          compare(pickerRow.testTitle.text, "WEEI 93.7")
+          pickerRow.testFavorite.clicked()
+          verify(panel.radio.favoriteIds.indexOf("weei-fm") >= 0)
+          verify(panel.testStationPicker.popupOpen && panel.radio.stationId === "wfan" && !panel.radio.wanted, "Favorite control tuned a station or closed the picker")
+          compare(panel.testStationPicker.testSearch.text, "weei Boston US")
+          tryVerify(function() { return panel.testStationPicker.highlightedValue === "weei-fm" }, 2000)
+          panel.testStationPicker.testList.forceActiveFocus(); keyClick(Qt.Key_F)
+          verify(panel.radio.favoriteIds.indexOf("weei-fm") < 0 && panel.testStationPicker.popupOpen)
+          panel.testStationPicker.testClear.clicked()
+          compare(panel.testStationPicker.testSearch.text, "")
+          panel.testStationPicker.testFavorites.clicked()
+          compare(panel.testStationPicker.filtered.length, 0)
+          panel.testStationPicker.testAll.clicked()
+          const pickerStations = panel.radio.stations
+          panel.radio.stations = pickerStations.concat([{id:"picker-markup",name:"<b>Literal radio</b>",city:"<img src='remote'>",country:"US",custom:true,streamUrl:"http://127.0.0.1:1/fixture"}])
+          panel.testStationPicker.testSearch.text = "literal"
+          tryVerify(function() { return panel.testStationPicker.testList.count === 1 && !!panel.testStationPicker.testList.itemAtIndex(0) }, 2000)
+          pickerRow = panel.testStationPicker.testList.itemAtIndex(0)
+          compare(pickerRow.testTitle.text, "<b>Literal radio</b>")
+          compare(pickerRow.testTitle.textFormat, Text.PlainText)
+          verify(pickerRow.testResult.tooltipText.indexOf("<b>Literal radio</b>") === 0)
+          panel.radio.stations = pickerStations
+          panel.testStationPicker.close()
+          panel.radio.favoriteIds = ["weei-fm"]
+          panel.testStationPicker.open()
+          tryVerify(function() { return panel.testStationPicker.testSearch.activeFocus }, 2000)
+          compare(panel.testStationPicker.filtered[0].value, "weei-fm", "Favorites were not sorted first on reopening")
+          window.width = 320; window.height = 300
+          wait(50)
+          verify(panel.testStationPicker.testPopup.width <= window.width && panel.testStationPicker.testPopup.height <= window.height, "Station picker escaped the small window")
+          const pickerCorner = panel.testStationPicker.testPopup.background.mapToItem(window.contentItem, 0, 0)
+          verify(pickerCorner.x >= 0 && pickerCorner.x + panel.testStationPicker.testPopup.background.width <= window.width, "Picker edge was clipped by the window")
+          capture("station-picker-small")
+          keyClick(Qt.Key_Escape)
+          tryVerify(function() { return !panel.testStationPicker.popupOpen }, 2000)
+          window.width = 420; window.height = 650
+          wait(50)
           panel.radio.favoriteIds = ["wfan", "tsn-690"]
           tryCompare(panel.testPresets, "count", 2)
           panel.testPresets.itemAt(1).clicked()

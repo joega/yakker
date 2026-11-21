@@ -126,6 +126,8 @@ def main():
         property alias testProgress: listeningProgress
         property alias testTitle: recordTitle""", 1))
         view.write_text(view.read_text().replace('        id: scheduleRow', '        id: scheduleRow\n        property alias testEdit: scheduleEditButton\n        property alias testTitle: scheduleTitle', 1))
+        picker = plugin / "StationPicker.qml"
+        picker.write_text(picker.read_text().replace('  property string value: ""', '  property alias testSearch: search\n  property alias testList: list\n  property alias testPopup: popup\n  property alias testAll: allFilter\n  property alias testFavorites: favoritesFilter\n  property alias testClear: clearSearch\n  property string value: ""', 1).replace('          id: stationRow', '          id: stationRow\n          property alias testTitle: stationTitle\n          property alias testFavorite: favoriteButton\n          property alias testResult: stationResult', 1))
         service = plugin / "RadioService.qml"
         service.write_text(service.read_text().replace('  property int clients: 0', '  property alias testHelper: helper\n  property int clients: 0', 1))
         stations = json.loads((ROOT / "stations.json").read_text())

@@ -74,7 +74,9 @@ Item {
     const favorites = [], others = []
     for (const item of stations) {
       const favorite = root.favoriteIds.indexOf(item.id) !== -1
-      const option = {value: item.id, label: (favorite ? "♥ " : "") + (item.city ? item.city + " · " : "") + item.name,
+      const option = {value: item.id, name: item.name, city: item.city || "", favorite: favorite, station: item,
+        countryName: ({US:"United States", CA:"Canada", GB:"United Kingdom", IE:"Ireland"})[item.country] || item.country || "",
+        label: (favorite ? "♥ " : "") + (item.city ? item.city + " · " : "") + item.name,
         description: (root.countryNames[item.country] || item.country || "") + (item.subtitle ? " · " + item.subtitle : "")}
       if (favorite) favorites.push(option); else others.push(option)
     }

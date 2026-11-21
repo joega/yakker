@@ -868,6 +868,7 @@ Ui.Panel {
                     emptyText: "No matching stations"
                     value: root.radio.stationId
                     options: root.radio.stationOptions
+                    onFavoriteRequested: value => root.radio.toggleFavorite(value)
                     foreground: root.barForeground
                     hasCursor: root.cursor === 0
                     onHovered: hovered => { if (hovered) root.cursor = 0 }

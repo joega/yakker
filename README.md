@@ -146,7 +146,13 @@ an active player; **Stop** releases it. Playing a stopped radio starts a fresh
 live stream. Closing the popup leaves audio playing.
 Right-click the bar icon to open the station list directly.
 The popup includes a text-style searchable station selector, volume, mute, connection status, and Retry after errors. Compact underline tabs and proportional typography keep the station name and transport controls prominent.
-Search by station, city or country—for example, `690`, `Seattle`, `UK` or `Ireland`.
+Search by station, city or country—for example, `690`, `Seattle`, `UK` or
+`Ireland`; multiple words narrow the results together. Results show station
+artwork, name, location and the selected station. **All / Favorites** filters
+make saved stations easy to find. Use each row's heart to save or remove a
+favorite without tuning in or closing the picker. Rows stay in place while you
+change hearts, and favorites sort first on the next opening. Down/Up browses,
+Enter selects, F toggles the highlighted favorite, and Escape closes.
 Changing stations while playing makes a fresh live connection; while stopped it
 selects the next station without starting playback. The last station, volume,
 mute setting and listening buffer length are remembered across shell restarts.
