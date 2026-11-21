@@ -248,7 +248,7 @@ Ui.Panel {
           }
           Ui.Button {
             id: recordingsButton
-            iconText: "󱫝" // nf-md-timer_music_outline
+            iconText: "󰲸" // nf-md-playlist_music
             tooltipText: "Open recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
             Accessible.role: Accessible.Button
             Accessible.name: recordingsButton.tooltipText
