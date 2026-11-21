@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -86,7 +87,7 @@ func validateState(s diskState) error {
 		if r.Failures < 0 || r.Failures > 3 || (r.ResumeAfter != "" && parseTime(r.ResumeAfter).IsZero()) {
 			return errors.New("invalid recording retry state")
 		}
-		if !identifier.MatchString(r.ID) || ids[r.ID] || !identifier.MatchString(r.ScheduleID) || !identifier.MatchString(r.StationID) || !textOK(r.Label, 256) || !textOK(r.StationName, 256) || !textOK(r.Reason, 1024) || r.Bytes < 0 || r.DurationSeconds < 0 {
+		if !identifier.MatchString(r.ID) || ids[r.ID] || !identifier.MatchString(r.ScheduleID) || !identifier.MatchString(r.StationID) || !textOK(r.Label, 256) || !textOK(r.StationName, 256) || !textOK(r.Reason, 1024) || r.Bytes < 0 || r.DurationSeconds < 0 || math.IsNaN(r.DurationSeconds) || math.IsInf(r.DurationSeconds, 0) || math.IsNaN(r.ResumePosition) || math.IsInf(r.ResumePosition, 0) || r.ResumePosition < 0 || r.ResumePosition > r.DurationSeconds {
 			return errors.New("invalid recording index entry")
 		}
 		ids[r.ID] = true

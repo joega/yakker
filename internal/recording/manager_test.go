@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -911,5 +912,290 @@ func TestIndexCapacityStopsCapturesWithoutBlockingHistoryCleanup(t *testing.T) {
 	row := m.Snapshot().Recordings[0]
 	if err := m.DeleteRecording(m.Snapshot().Revision, row.ID); err != nil {
 		t.Fatal("history could not be removed after capacity rejection", err)
+	}
+}
+
+func TestOnceOutageAndNoRepeatAfterRestart(t *testing.T) {
+	m, now, count := engineFixture(t)
+	s := rule("single")
+	s.Kind, s.Date, s.Weekdays = "once", "2026-01-05", nil
+	saveRule(t, m, s)
+	*now = now.Add(14 * 24 * time.Hour)
+	tick(m)
+	snap := m.Snapshot()
+	if len(snap.Recordings) != 1 || snap.Recordings[0].Status != "missed" || *count != 0 {
+		t.Fatalf("outage: %+v", snap.Recordings)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	tick(reopened)
+	if got := reopened.Snapshot().Recordings; len(got) != 1 {
+		t.Fatalf("repeated on restart: %+v", got)
+	}
+}
+
+func TestStartNowAndPlaybackCheckpoint(t *testing.T) {
+	m, _, count := engineFixture(t)
+	station := rule("")
+	rev := m.Snapshot().Revision
+	if err := m.StartNow(rev+1, station, time.Minute); err == nil {
+		t.Fatal("accepted stale revision")
+	}
+	if err := m.StartNow(rev, station, time.Second); err == nil {
+		t.Fatal("accepted short duration")
+	}
+	if err := m.StartNow(rev, station, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	snap := m.Snapshot()
+	if len(snap.Schedules) != 0 || snap.ActiveCount != 1 || *count != 1 {
+		t.Fatalf("start: %+v", snap)
+	}
+	id := snap.Recordings[0].ID
+	if err := m.StopRecording(snap.Revision, id); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	snap = m.Snapshot()
+	rev = snap.Revision
+	if err := m.SetPlaybackPosition(id, 3); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.SetPlaybackPosition(id, math.NaN()); err == nil {
+		t.Fatal("accepted NaN")
+	}
+	if err := m.SetPlaybackPosition(id, 100); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.Snapshot(); got.Revision != rev || got.Recordings[0].ResumePosition != 5 {
+		t.Fatalf("checkpoint: %+v", got)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	if got := reopened.Snapshot(); got.Recordings[0].ResumePosition != 5 {
+		t.Fatalf("reload: %+v", got)
+	}
+}
+
+func TestStartNowRespectsConcurrencyAndReserve(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	settings := m.Snapshot().Settings
+	settings.Concurrency = 1
+	if err := m.SetSettings(m.Snapshot().Revision, settings); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StartNow(m.Snapshot().Revision, rule(""), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.StartNow(m.Snapshot().Revision, rule(""), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	snap := m.Snapshot()
+	if snap.ActiveCount != 1 || len(snap.Recordings) != 2 || snap.Recordings[1].Status != "missed" {
+		t.Fatalf("concurrency: %+v", snap)
+	}
+	m.freeBytes = func(string) (int64, error) { return 0, nil }
+	if err := m.StopRecording(snap.Revision, snap.Recordings[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	if err := m.StartNow(m.Snapshot().Revision, rule(""), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	snap = m.Snapshot()
+	found := false
+	for _, r := range snap.Recordings {
+		if r.Reason == "free-space reserve reached" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("reserve: %+v", snap.Recordings)
+	}
+}
+
+func TestStartNowRetainsRemainderOnRestart(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	if err := m.StartNow(m.Snapshot().Revision, rule(""), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	id := m.Snapshot().Recordings[0].ID
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	m2, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	m2.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
+	}
+	m2.dependencyError = ""
+	m2.freeBytes = m.freeBytes
+	tick(m2)
+	snap := m2.Snapshot()
+	linked := false
+	for _, r := range snap.Recordings {
+		if r.ParentID == id {
+			linked = true
+		}
+	}
+	if len(snap.Schedules) != 0 || !linked || snap.ActiveCount != 1 {
+		t.Fatalf("recovery: %+v", snap)
+	}
+}
+
+func TestLegacyIndexWithoutNewFields(t *testing.T) {
+	m, _, _ := engineFixture(t)
+	saveRule(t, m, rule("old"))
+	if err := m.StartNow(m.Snapshot().Revision, rule(""), time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	snap := m.Snapshot()
+	if err := m.StopRecording(snap.Revision, snap.Recordings[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(m.path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range doc["recordings"].([]any) {
+		delete(item.(map[string]any), "resumePosition")
+	}
+	for _, item := range doc["schedules"].([]any) {
+		delete(item.(map[string]any), "kind")
+		delete(item.(map[string]any), "date")
+	}
+	raw, err = json.Marshal(doc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(m.path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	m2, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	if got := m2.Snapshot(); !got.Available || len(got.Schedules) != 1 || got.Recordings[0].ResumePosition != 0 {
+		t.Fatalf("legacy: %+v", got)
+	}
+}
+
+func TestOnceCaptureDoesNotRepeatNextWeek(t *testing.T) {
+	m, now, count := engineFixture(t)
+	s := rule("single")
+	s.Kind, s.Date, s.Weekdays = "once", "2026-01-05", nil
+	saveRule(t, m, s)
+	*now = now.Add(time.Hour)
+	tick(m)
+	snap := m.Snapshot()
+	if *count != 1 || snap.ActiveCount != 1 {
+		t.Fatalf("first: %+v", snap)
+	}
+	if err := m.StopRecording(snap.Revision, snap.Recordings[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, m)
+	*now = now.Add(7 * 24 * time.Hour)
+	tick(m)
+	if *count != 1 || len(m.Snapshot().Recordings) != 1 {
+		t.Fatalf("one-time schedule repeated: %+v", m.Snapshot())
+	}
+}
+
+func TestOnceMidnightGapLongOutagePreservesDate(t *testing.T) {
+	m, now, count := engineFixture(t)
+	*now = time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
+	m.mu.Lock()
+	m.state.Cursor = timestamp(*now)
+	m.lastNow = *now
+	m.mu.Unlock()
+	s := rule("santiago")
+	s.Kind, s.Date, s.Timezone, s.StartTime, s.EndTime, s.Weekdays = "once", "2026-09-06", "America/Santiago", "01:30", "02:30", nil
+	saveRule(t, m, s)
+	*now = time.Date(2026, 9, 20, 0, 0, 0, 0, time.UTC)
+	tick(m)
+	rows := m.Snapshot().Recordings
+	if *count != 0 || len(rows) != 1 || rows[0].Status != "missed" || rows[0].PlannedStart != "2026-09-06T04:30:00Z" {
+		t.Fatalf("wrong missed occurrence: %+v", rows)
+	}
+}
+
+func TestStartNowRetrySurvivesRestart(t *testing.T) {
+	m, now, count := engineFixture(t)
+	m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		*count++
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		result := CaptureResult{Bytes: 40, DurationSeconds: 5, Err: errors.New("fixture disconnect")}
+		return &finishedCapture{result: result, done: resultChannel(result)}, nil
+	}
+	if err := m.StartNow(m.Snapshot().Revision, rule(""), time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	tick(m)
+	first := m.Snapshot().Recordings[0]
+	if first.Status != "partial" || *count != 1 {
+		t.Fatalf("initial failure: %+v", first)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+	m2, err := Open(m.config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer m2.Close()
+	m2.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		*count++
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		return &fakeCapture{done: make(chan CaptureResult, 1)}, nil
+	}
+	m2.dependencyError = ""
+	m2.freeBytes = m.freeBytes
+	tick(m2)
+	if *count != 1 {
+		t.Fatal("retry ignored persisted backoff")
+	}
+	*now = now.Add(time.Second)
+	tick(m2)
+	snap := m2.Snapshot()
+	linked := false
+	for _, r := range snap.Recordings {
+		if r.ParentID == first.ID && r.ScheduleID == first.ScheduleID && r.StationID == first.StationID {
+			linked = true
+		}
+	}
+	if *count != 2 || !linked || len(snap.Schedules) != 0 || snap.ActiveCount != 1 {
+		t.Fatalf("retry recovery: %+v", snap)
 	}
 }

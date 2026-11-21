@@ -62,15 +62,25 @@ func validateSchedule(s Schedule) error {
 	if !validStreamURL(s.StreamURL) {
 		return errors.New("recording stream must use an HTTP or HTTPS URL")
 	}
-	if len(s.Weekdays) < 1 || len(s.Weekdays) > 7 {
-		return errors.New("choose at least one weekday")
-	}
-	seen := map[int]bool{}
-	for _, d := range s.Weekdays {
-		if d < 0 || d > 6 || seen[d] {
-			return errors.New("invalid or repeated weekday")
+	switch s.Kind {
+	case "", "weekly":
+		if len(s.Weekdays) < 1 || len(s.Weekdays) > 7 {
+			return errors.New("choose at least one weekday")
 		}
-		seen[d] = true
+		seen := map[int]bool{}
+		for _, d := range s.Weekdays {
+			if d < 0 || d > 6 || seen[d] {
+				return errors.New("invalid or repeated weekday")
+			}
+			seen[d] = true
+		}
+	case "once":
+		date, err := time.Parse("2006-01-02", s.Date)
+		if err != nil || date.Format("2006-01-02") != s.Date {
+			return errors.New("date must use YYYY-MM-DD")
+		}
+	default:
+		return errors.New("invalid schedule kind")
 	}
 	a, err := clockMinutes(s.StartTime)
 	if err != nil {
@@ -131,7 +141,8 @@ func occurrenceOn(s Schedule, date time.Time) occurrence {
 	a, _ := clockMinutes(s.StartTime)
 	b, _ := clockMinutes(s.EndTime)
 	y, m, d := date.Date()
-	day := time.Date(y, m, d, 12, 0, 0, 0, loc)
+	// Keep the requested civil date independent of timezone normalization.
+	day := time.Date(y, m, d, 12, 0, 0, 0, time.UTC)
 	o := occurrence{Key: s.ID + ":" + day.Format("2006-01-02")}
 	starts := wallInstants(day, a, loc)
 	if len(starts) == 0 {
@@ -144,7 +155,16 @@ func occurrenceOn(s Schedule, date time.Time) occurrence {
 			}
 		}
 		if o.Start.IsZero() {
-			o.Start = day.AddDate(0, 0, 1)
+			next := day.AddDate(0, 0, 1)
+			for minute := 0; minute < 1440; minute++ {
+				if matches := wallInstants(next, minute, loc); len(matches) > 0 {
+					o.Start = matches[0]
+					break
+				}
+			}
+			if o.Start.IsZero() {
+				o.Start = next.AddDate(0, 0, 1)
+			}
 		}
 		o.End = o.Start
 		o.Reason = "start time does not exist because of a timezone transition"
@@ -169,6 +189,9 @@ func occurrenceOn(s Schedule, date time.Time) occurrence {
 }
 
 func chosenDay(s Schedule, day time.Time) bool {
+	if s.Kind == "once" {
+		return day.Format("2006-01-02") == s.Date
+	}
 	for _, d := range s.Weekdays {
 		if d == int(day.Weekday()) {
 			return true
@@ -185,6 +208,17 @@ func preview(s Schedule, now time.Time) Schedule {
 	}
 	loc, err := time.LoadLocation(s.Timezone)
 	if err != nil {
+		return s
+	}
+	if s.Kind == "once" {
+		day, err := time.Parse("2006-01-02", s.Date)
+		if err == nil {
+			o := occurrenceOn(s, day)
+			if o.Reason == "" && o.End.After(now) {
+				s.NextStart = o.Start.In(loc).Format(time.RFC3339)
+				s.NextEnd = o.End.In(loc).Format(time.RFC3339)
+			}
+		}
 		return s
 	}
 	date := now.In(loc).AddDate(0, 0, -1)

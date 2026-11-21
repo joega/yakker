@@ -11,6 +11,8 @@ type Settings struct {
 
 type Schedule struct {
 	ID          string `json:"id"`
+	Kind        string `json:"kind,omitempty"`
+	Date        string `json:"date,omitempty"`
 	Label       string `json:"label"`
 	StationID   string `json:"stationId"`
 	StationName string `json:"stationName"`
@@ -38,6 +40,7 @@ type Recording struct {
 	Reason          string  `json:"reason"`
 	Bytes           int64   `json:"bytes"`
 	DurationSeconds float64 `json:"durationSeconds"`
+	ResumePosition  float64 `json:"resumePosition"`
 	Folder          string  `json:"folder"`
 	Filename        string  `json:"filename"`
 	ParentID        string  `json:"parentId,omitempty"`

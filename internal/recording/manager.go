@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -298,6 +299,60 @@ func (m *Manager) UpsertSchedule(revision int64, schedule Schedule) error {
 	// intervals during which it was disabled. Already running jobs own snapshots.
 	s.RuleFrom[schedule.ID] = timestamp(m.config.Now())
 	return m.commit(s)
+}
+
+// StartNow starts an independent capture without adding a schedule.
+func (m *Manager) StartNow(revision int64, station Schedule, duration time.Duration) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := m.writable(revision); err != nil {
+		return err
+	}
+	if duration < time.Minute || duration > 12*time.Hour {
+		return errors.New("recordings must last between 1 minute and 12 hours")
+	}
+	if !identifier.MatchString(station.StationID) || !textOK(station.StationName, 256) || strings.TrimSpace(station.StationName) == "" || !textOK(station.Label, 256) || !validStreamURL(station.StreamURL) {
+		return errors.New("invalid recording station")
+	}
+	station.ID = newID()
+	now := m.config.Now()
+	return m.startLocked(station, occurrence{Key: station.ID + ":" + now.UTC().Format("2006-01-02"), Start: now, End: now.Add(duration)}, now, "")
+}
+
+// SetPlaybackPosition checkpoints progress without invalidating editing drafts.
+func (m *Manager) SetPlaybackPosition(id string, seconds float64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.closed {
+		return errors.New("recording manager is closed")
+	}
+	if m.readOnly {
+		return errors.New(m.err)
+	}
+	if math.IsNaN(seconds) || math.IsInf(seconds, 0) {
+		return errors.New("invalid playback position")
+	}
+	s := m.state.clone()
+	for i := range s.Recordings {
+		r := &s.Recordings[i]
+		if r.ID != id {
+			continue
+		}
+		if r.Deleting || r.Status == "recording" {
+			return errors.New("recording is not available for playback")
+		}
+		seconds = math.Max(0, math.Min(seconds, r.DurationSeconds))
+		if r.ResumePosition == seconds {
+			return nil
+		}
+		r.ResumePosition = seconds
+		if err := m.checkpointLocked(s); err != nil {
+			return err
+		}
+		m.notify()
+		return nil
+	}
+	return errors.New("recording not found")
 }
 
 func (m *Manager) DeleteSchedule(revision int64, id string) error {
@@ -932,10 +987,25 @@ func (m *Manager) boundCatchupLocked(now time.Time) error {
 	if !boundary.After(from) {
 		return nil
 	}
+	// A one-time rule has exactly one interval; preserve its actual missed
+	// occurrence even when the general weekly catch-up window is bounded.
+	for _, rule := range m.state.Schedules {
+		if !rule.Enabled || rule.Kind != "once" {
+			continue
+		}
+		day, _ := time.Parse("2006-01-02", rule.Date)
+		o := occurrenceOn(rule, day)
+		created := parseTime(m.state.RuleFrom[rule.ID])
+		if o.Start.Before(boundary) && !o.End.Before(created) && (!o.End.Before(from) || o.Start.After(from)) && !m.state.Seen[o.Key] {
+			if err := m.startLocked(rule, o, now, ""); err != nil {
+				return err
+			}
+		}
+	}
 	s := m.state.clone()
 	summaries := 0
 	for _, rule := range s.Schedules {
-		if !rule.Enabled {
+		if !rule.Enabled || rule.Kind == "once" {
 			continue
 		}
 		start := from
