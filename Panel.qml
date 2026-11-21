@@ -806,7 +806,7 @@ Ui.Panel {
                 SettingTitle { text: root.editingStationId ? "Edit station" : "New station" }
                 SettingHint { text: "Name and audio stream are required. Location and website are optional." }
                 SettingLabel { text: "Station name" }
-                Ui.TextField {
+                Radio.FocusTextField {
                   font.family: root.uiFontFamily
                   font.pixelSize: Style.fontPx(1.167)
                   id: stationName
@@ -820,7 +820,7 @@ Ui.Panel {
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingLabel { text: "Audio stream URL" }
-                Ui.TextField {
+                Radio.FocusTextField {
                   font.family: root.uiFontFamily
                   font.pixelSize: Style.fontPx(1.167)
                   id: stationURL
@@ -836,7 +836,7 @@ Ui.Panel {
                 SettingHint { text: "Use a direct HTTP or HTTPS audio stream, rather than a station web page." }
                 Ui.PanelSeparator { width: parent.width }
                 SettingLabel { text: "City · optional" }
-                Ui.TextField {
+                Radio.FocusTextField {
                   font.family: root.uiFontFamily
                   font.pixelSize: Style.fontPx(1.167)
                   id: stationCity
@@ -850,7 +850,7 @@ Ui.Panel {
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingLabel { text: "Country · optional" }
-                Ui.TextField {
+                Radio.FocusTextField {
                   font.family: root.uiFontFamily
                   font.pixelSize: Style.fontPx(1.167)
                   id: stationCountry
@@ -864,7 +864,7 @@ Ui.Panel {
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingLabel { text: "Website · optional" }
-                Ui.TextField {
+                Radio.FocusTextField {
                   font.family: root.uiFontFamily
                   font.pixelSize: Style.fontPx(1.167)
                   id: stationWebsite
@@ -1320,7 +1320,7 @@ Ui.Panel {
                       Row {
                         width: parent.width
                         spacing: Style.space(6)
-                        Ui.TextField {
+                        Radio.FocusTextField {
                           id: sleepMinutes
                           width: parent.width - sleepApply.width - parent.spacing
                           text: "30"
@@ -1334,7 +1334,7 @@ Ui.Panel {
                           onTextEdited: root.sleepError = ""
                           onAccepted: root.applySleepTimer()
                         }
-                        Radio.FocusButton { id: sleepApply; text: "Set timer"; fontSize: Style.fontPx(1); color: Qt.alpha(Commons.Color.accent, 0.16); foreground: root.barForeground; focusable: true; onClicked: root.applySleepTimer() }
+                        Radio.FocusButton { id: sleepApply; height: sleepMinutes.height; text: "Set timer"; fontSize: Style.fontPx(1); color: Qt.alpha(Commons.Color.accent, 0.16); foreground: root.barForeground; focusable: true; onClicked: root.applySleepTimer() }
                       }
                       Text { width: parent.width; visible: !root.sleepError; text: "1–240 min · Applies immediately"; textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.65); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
                       Text { width: parent.width; text: root.sleepError; visible: text.length > 0; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
@@ -1347,8 +1347,9 @@ Ui.Panel {
                 width: parent.width
                 spacing: Style.space(8)
                 visible: root.radio.playbackKind === "recording"
-                Ui.Dropdown {
+                Radio.FocusDropdown {
                   id: speedPicker
+                  label: "Playback speed"
                   fontFamily: root.uiFontFamily
                   width: (parent.width - parent.spacing) / 2
                   showLabel: false
@@ -1361,6 +1362,7 @@ Ui.Panel {
                 }
                 Radio.FocusButton {
                   id: returnLiveButton
+                  height: speedPicker.height
                   width: speedPicker.width
                   text: root.radio.hasStation ? "Return to live" : "Choose live station"
                   foreground: root.barForeground

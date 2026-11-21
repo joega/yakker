@@ -152,6 +152,68 @@ ShellRoot {
           barConfig.vertical = false; barFixture.visible = false; tooltipFixture.visible = false
         }
       }
+      function checkFields() {
+        const view = panel.testView
+        try {
+          panel.openRecordings(false)
+          tryVerify(function() { return view.testSearch.activeFocus }, 2000)
+          compare(view.testSearch.height,view.testStatus.testTrigger.height, "Search and dropdown heights differ")
+          compare(view.testSearch.font.pixelSize,view.testStatus.testTrigger.font.pixelSize)
+          const inset = view.testSearch.leftPadding
+          panel.testSettingsButton.forceActiveFocus()
+          mouseMove(view.testSearch,12,view.testSearch.height/2); wait(30)
+          compare(view.testSearch.leftPadding,inset, "Hover moved the search text")
+          view.testSearch.forceActiveFocus(); compare(view.testSearch.leftPadding,inset, "Focus moved the search text")
+          keyClick(Qt.Key_P); keyClick(Qt.Key_M)
+          compare(view.testSearch.text,"pm")
+          verify(view.testSearch.testClear.visible)
+          view.testSearch.testClear.clicked()
+          verify(!view.testSearch.text && view.testSearch.activeFocus)
+          view.testStatus.testTrigger.forceActiveFocus(); keyClick(Qt.Key_Return)
+          tryVerify(function() { return view.testStatus.popupOpen && view.testStatus.testResults.activeFocus },2000)
+          keyClick(Qt.Key_Down); keyClick(Qt.Key_Down)
+          console.log("QA field selection",view.testStatus.testResults.currentIndex,view.testStatus.filtered.length)
+          keyClick(Qt.Key_Return)
+          console.log("QA field chosen",view.statusFilter,view.testStatus.popupOpen)
+          tryVerify(function() { return !view.testStatus.popupOpen && view.statusFilter === "complete" },2000)
+          view.clearLibraryFilters()
+          compare(view.testStatus.value,"all", "Clearing filters left the dropdown selection stale")
+          window.width=288; window.height=300; wait(50)
+          verify(view.testStatus.y > view.testSearch.y, "Narrow library filters did not stack")
+          compare(view.testSearch.width,view.width); compare(view.testStatus.width,view.width)
+          view.testStatus.testTrigger.forceActiveFocus(); wait(50); keyClick(Qt.Key_Return)
+          tryVerify(function() { return view.testStatus.popupOpen },2000)
+          wait(50)
+          const popup=view.testStatus.testPopup, corner=popup.background.mapToItem(window.contentItem,0,0)
+          verify(corner.x>=0 && corner.y>=0 && corner.x+popup.width<=window.width && corner.y+popup.height<=window.height, "Dropdown escaped the compact window")
+          capture("filter-dropdown-small")
+          keyClick(Qt.Key_Escape)
+          tryVerify(function() { return !view.testStatus.popupOpen && view.testStatus.activeFocus },2000)
+          window.width=420;window.height=650
+          view.beginEdit(null)
+          tryVerify(function() { return view.testLabel.activeFocus },2000)
+          const picker=view.testStationPicker
+          picker.testTrigger.forceActiveFocus(); wait(50); keyClick(Qt.Key_Return)
+          tryVerify(function() { return picker.popupOpen && picker.testSearch.activeFocus },2000)
+          picker.testSearch.text="WFAN New York"
+          tryCompare(picker.testResults,"count",1)
+          keyClick(Qt.Key_Return)
+          tryVerify(function() { return !picker.popupOpen && view.stationValue === "wfan" },2000)
+          verify(!panel.radio.wanted && !panel.radio.hasStation, "Schedule station selection tuned live playback")
+          picker.open(); tryVerify(function() { return picker.testSearch.activeFocus },2000)
+          picker.testSearch.text="no matching option"
+          compare(picker.filtered.length,0); keyClick(Qt.Key_Return); verify(picker.popupOpen)
+          keyClick(Qt.Key_Escape)
+          tryVerify(function() { return !picker.popupOpen && picker.activeFocus },2000)
+          compare(view.stationValue,"wfan", "Cancel changed the schedule station")
+          view.beginEdit(null)
+          compare(picker.value,view.stationValue, "Editing another schedule left stale station selection")
+        } finally {
+          view.testStatus.close(); view.testStationPicker.close()
+          view.clearLibraryFilters(); view.editing=false
+          window.width=420;window.height=650;panel.showPlayer()
+        }
+      }
       function checkNavigationRows() {
         const savedFont = Commons.Style.fontBaseSize
         function fit(tabs, action) {
@@ -341,6 +403,7 @@ ShellRoot {
           verify(!panel.testPlayButton.enabled && !panel.testFavoriteButton.enabled)
           compare(panel.testStationPicker.placeholderText, "Choose a station")
           capture("first-launch")
+          checkFields()
           checkNavigationRows()
           checkPlaybackStates()
           checkBarStates()

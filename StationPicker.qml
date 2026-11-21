@@ -116,8 +116,9 @@ Item {
         Row {
           width: parent.width
           spacing: Style.space(6)
-          Ui.TextField {
+          FocusTextField {
             id: search
+            searchField: true
             width: parent.width - (clearSearch.visible ? clearSearch.width + parent.spacing : 0)
             placeholderText: root.placeholderText
             Accessible.name: placeholderText
@@ -130,7 +131,7 @@ Item {
             Keys.onEnterPressed: root.selectCurrent()
             Keys.onEscapePressed: root.close()
           }
-          FocusButton { id: clearSearch; visible: !!search.text; width: Style.space(28); iconName: "close"; iconSize: Style.space(14); tooltipText: "Clear search"; foreground: root.foreground; focusable: true; onClicked: { search.text = ""; search.forceActiveFocus() } }
+          FocusButton { id: clearSearch; visible: !!search.text; width: Style.space(28); height: Style.space(32); anchors.verticalCenter: parent.verticalCenter; iconName: "close"; iconSize: Style.space(14); tooltipText: "Clear search"; foreground: root.foreground; focusable: true; onClicked: { search.text = ""; search.forceActiveFocus() } }
         }
         Row {
           width: parent.width

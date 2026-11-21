@@ -585,9 +585,9 @@ Column {
     Column {
       width: parent.width; spacing: Style.space(6)
       FieldLabel { text: "Show name" }
-      Ui.TextField { id: labelField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "Optional · e.g. Morning drive"; Accessible.name: "Show name (optional)"; foreground: root.foreground; maximumLength: 160; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+      Radio.FocusTextField { id: labelField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "Optional · e.g. Morning drive"; Accessible.name: "Show name (optional)"; foreground: root.foreground; maximumLength: 160; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
       FieldLabel { text: "Station" }
-      Ui.SearchableDropdown { id: stationPicker; fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.stationValue; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.stationValue = value } }
+      Radio.FocusDropdown { searchable: true; emptyText: "No matching stations"; id: stationPicker; label: "Station"; fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.stationValue; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.stationValue = value } }
     }
     Ui.PanelSeparator { width: parent.width }
     Column {
@@ -601,7 +601,7 @@ Column {
       Column {
         width: parent.width; spacing: Style.space(6); visible: root.scheduleKind === "once"
         FieldLabel { text: "Date · YYYY-MM-DD" }
-        Ui.TextField { id: dateField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "YYYY-MM-DD"; Accessible.name: "Recording date YYYY-MM-DD"; foreground: root.foreground; maximumLength: 10; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+        Radio.FocusTextField { id: dateField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "YYYY-MM-DD"; Accessible.name: "Recording date YYYY-MM-DD"; foreground: root.foreground; maximumLength: 10; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
       }
       Row {
         width: parent.width; spacing: Style.space(2); visible: root.scheduleKind === "weekly"
@@ -614,12 +614,12 @@ Column {
         Column {
           width: (parent.width-parent.spacing)/2; spacing: Style.space(6)
           FieldLabel { text: "Start · 24h" }
-          Ui.TextField { id: startField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "HH:mm"; Accessible.name: "Start time in 24-hour format"; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+          Radio.FocusTextField { id: startField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "HH:mm"; Accessible.name: "Start time in 24-hour format"; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
         }
         Column {
           width: (parent.width-parent.spacing)/2; spacing: Style.space(6)
           FieldLabel { text: "End · 24h" }
-          Ui.TextField { id: endField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "HH:mm"; Accessible.name: "End time in 24-hour format"; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+          Radio.FocusTextField { id: endField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "HH:mm"; Accessible.name: "End time in 24-hour format"; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
         }
       }
       Hint { text: root.durationText() || "Enter start and end times." }
@@ -628,7 +628,7 @@ Column {
         Hint { width: Math.max(0, parent.width - changeZone.width - parent.spacing); anchors.verticalCenter: parent.verticalCenter; text: zoneField.text }
         Radio.FocusButton { id: changeZone; text: root.timezoneEditing ? "Done" : "Change zone"; fontSize: Style.fontPx(1); horizontalPadding: Style.space(6); foreground: root.foreground; focusable: true; onClicked: { root.timezoneEditing = !root.timezoneEditing; if (root.timezoneEditing) root.focusItem(zoneField) } }
       }
-      Ui.TextField { id: zoneField; visible: root.timezoneEditing; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "e.g. America/New_York"; Accessible.name: "Recording timezone"; foreground: root.foreground; maximumLength: 128; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+      Radio.FocusTextField { id: zoneField; visible: root.timezoneEditing; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "e.g. America/New_York"; Accessible.name: "Recording timezone"; foreground: root.foreground; maximumLength: 128; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
     }
     Ui.Toggle {
       id: scheduleEnabledToggle
@@ -701,13 +701,18 @@ Column {
         onClicked: root.embedded ? root.requestStorage() : root.beginStorage()
       }
     }
-    Row {
+    Grid {
+      id: libraryFilters
       width: parent.width
-      spacing: Style.space(8)
+      columns: width < Style.space(340) ? 1 : 2
+      columnSpacing: Style.space(8)
+      rowSpacing: Style.space(8)
       visible: (root.snapshot.recordings || []).length > 0 || root.hasLibraryFilters
-      Ui.TextField {
+      Radio.FocusTextField {
         id: searchField
-        width: parent.width - statusPicker.width - parent.spacing
+        searchField: true
+        clearable: true
+        width: parent.columns === 1 ? parent.width : parent.width - statusPicker.width - parent.columnSpacing
         font.family: root.uiFontFamily
         font.pixelSize: Style.fontPx(1.167)
         placeholderText: "Search recordings"
@@ -717,9 +722,10 @@ Column {
         onTextChanged: root.searchText = text
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
       }
-      Ui.Dropdown {
+      Radio.FocusDropdown {
         id: statusPicker
-        width: Math.min(Style.space(132), parent.width * 0.44)
+        label: "Recording status"
+        width: parent.columns === 1 ? parent.width : Style.space(132)
         fontFamily: root.uiFontFamily
         showLabel: false
         value: root.statusFilter
@@ -956,7 +962,7 @@ Column {
     Column {
       width: parent.width; spacing: Style.space(6)
       FieldLabel { text: "Station" }
-      Ui.SearchableDropdown { fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.nowStation; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.nowStation = value } }
+      Radio.FocusDropdown { searchable: true; emptyText: "No matching stations"; fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.nowStation; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.nowStation = value } }
     }
     Column {
       width: parent.width; spacing: Style.space(8)
@@ -967,7 +973,7 @@ Column {
       }
       Row {
         width: parent.width; spacing: Style.space(12)
-        Ui.TextField { id: durationField; width: Style.space(88); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "30"; Accessible.name: "Recording duration in minutes"; foreground: root.foreground; maximumLength: 3; inputMethodHints: Qt.ImhDigitsOnly; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+        Radio.FocusTextField { id: durationField; width: Style.space(88); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "30"; Accessible.name: "Recording duration in minutes"; foreground: root.foreground; maximumLength: 3; inputMethodHints: Qt.ImhDigitsOnly; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
         Hint { width: parent.width - durationField.width - parent.spacing; anchors.verticalCenter: parent.verticalCenter; text: "minutes · up to 12 hours" }
       }
     }
@@ -1010,7 +1016,7 @@ Column {
       width: parent.width
       spacing: Style.space(6)
       FieldLabel { text: "Save recordings to" }
-      Ui.TextField {
+      Radio.FocusTextField {
         id: folderField
         width: parent.width
         font.family: root.uiFontFamily
@@ -1056,7 +1062,7 @@ Column {
       Row {
         width: parent.width
         spacing: Style.space(10)
-        Ui.TextField {
+        Radio.FocusTextField {
           id: capField
           width: Style.space(100)
           font.family: root.uiFontFamily

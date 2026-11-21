@@ -68,7 +68,7 @@ illustrative playback and recording data; see [how to refresh them](docs/screens
 
 ## Requirements
 
-- Omarchy / Quattro with `qs.Ui.SearchableDropdown` and the documented bar-widget API (tested on Omarchy 4.5.0).
+- Omarchy / Quattro with `qs.Ui` controls and the documented bar-widget API (tested on Omarchy 4.5.0).
 - Quickshell 0.3.2, Qt 6.12, and mpv 0.41 (tested versions).
 - Go 1.26+ and Make to build from source. Go is only needed at build time.
 - Linux with working audio. The bar widget also needs a desktop session with a private `XDG_RUNTIME_DIR`.
@@ -144,7 +144,10 @@ independent animations; playback status can wrap to keep paused/stopped states
 readable. The player includes up to six favorite presets in the order you added them. The **Listen**, **Library**,
 and **Schedules** tabs form the first row, with Settings at the right edge. Both
 navigation rows use the same label alignment, hover/focus treatment, and compact
-spacing on narrow panels. **Rewind · Play/Pause · Forward** form the
+spacing on narrow panels. Search fields, editors, and dropdowns share proportional
+text, stable focus/hover insets, and a common minimum height. Library search and
+status filters stack vertically on narrow panels; station dropdowns keep keyboard
+search, selection, cancellation, and focus return. **Rewind · Play/Pause · Forward** form the
 main transport row, with a larger Play/Pause control; **Record**, **Stop**, and
 **Sleep** sit below it, with Stop centered beneath Play/Pause. Rewind and forward
 skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes

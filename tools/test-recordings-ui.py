@@ -43,7 +43,7 @@ def main():
         shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
         for name in ("Commons", "services"):
             (qs / name).symlink_to(shell / name, target_is_directory=True)
-        for name in ("BarWidget.qml", "Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "qmldir"):
+        for name in ("BarWidget.qml", "Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "FocusTextField.qml", "FocusDropdown.qml", "qmldir"):
             shutil.copy2(ROOT / name, plugin / name)
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
         bar_widget = plugin / "BarWidget.qml"
@@ -52,6 +52,15 @@ def main():
   property alias testLogo: stationLogo
   property alias testRecordingIndicator: recordingIndicator
   property bool attached: false''', 1))
+        dropdown = plugin / "FocusDropdown.qml"
+        dropdown.write_text(dropdown.read_text().replace('  id: root', '''  id: root
+  property alias testTrigger: trigger
+  property alias testLabel: triggerLabel
+  property alias testSearch: search
+  property alias testResults: results
+  property alias testPopup: popup''', 1))
+        field = plugin / "FocusTextField.qml"
+        field.write_text(field.read_text().replace('  id: root', '  id: root\n  property alias testClear: clearButton', 1))
         panel = plugin / "Panel.qml"
         panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testPlayerStatus: playerStatus
   property alias testDockStatus: dockStatus
@@ -118,6 +127,7 @@ def main():
   property alias testDuration: durationField
   property alias testSearch: searchField
   property alias testStatus: statusPicker
+  property alias testStationPicker: stationPicker
   property alias testLibrary: libraryRepeater
   property alias testLabel: labelField
   property alias testStart: startField

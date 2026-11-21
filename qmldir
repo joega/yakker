@@ -6,3 +6,5 @@ FocusIcon 1.0 FocusIcon.qml
 StationPicker 1.0 StationPicker.qml
 MarqueeText 1.0 MarqueeText.qml
 StateCard 1.0 StateCard.qml
+FocusTextField 1.0 FocusTextField.qml
+FocusDropdown 1.0 FocusDropdown.qml

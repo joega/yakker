@@ -28,7 +28,7 @@ import (
 var bundleFiles = []string{
 	"docs/yakker-bar-states.png", "docs/yakker-bar-tooltips.png",
 	"manifest.json", "qmldir", "BarWidget.qml",
-	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml",
+	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "FocusTextField.qml", "FocusDropdown.qml",
 	"stations.json", "README.md", "LICENSE",
 	"assets/wbns-fm.png", "assets/wkrk-fm.webp", "assets/kwfn-fm.webp",
 	"assets/wzgc-fm.webp", "assets/kkfn-fm.webp", "assets/klac.png",
