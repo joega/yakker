@@ -12,6 +12,7 @@ Ui.Panel {
   property var anchorItem: null
   property var hostWidget: null
   property int cursor: 1
+  property bool keyboardNavigation: true
   property bool settingsOpen: false
   property string settingsReturnView: "listen"
   property real settingsReturnScroll: 0
@@ -107,7 +108,7 @@ Ui.Panel {
       Qt.callLater(function() { addStationButton.forceActiveFocus() })
     } else closeSettings()
   }
-  function selectSettingsTab(section) {
+  function selectSettingsTab(section, keepTabFocus) {
     if (stationMutationPending || recordingsView.pending) return
     settingsTab = section
     cursor = section === "listening" ? 30 : -1
@@ -118,7 +119,12 @@ Ui.Panel {
     scroller.contentY = 0
     Qt.callLater(function() {
       if (!root.settingsOpen || root.settingsTab !== section) return
-      if (section === "storage") recordingsView.focusStorage()
+      if (keepTabFocus) {
+        root.keyboardNavigation = true
+        root.cursor = 30 + ["listening", "storage", "alerts", "stations"].indexOf(section)
+        settingsTabs.itemAt(root.cursor - 30).forceActiveFocus()
+      }
+      else if (section === "storage") recordingsView.focusStorage()
       else if (section === "alerts") recordingsView.focusNotifications()
       else if (section === "stations") (stationEditorOpen ? stationName : addStationButton).forceActiveFocus()
       else { cursor = 30; keyCatcher.forceActiveFocus() }
@@ -139,10 +145,10 @@ Ui.Panel {
     scroller.contentY = 0
     keyCatcher.forceActiveFocus()
   }
-  function openSchedules() {
-    openRecordings(false)
+  function openSchedules(keepTabFocus) {
+    openRecordings(false, keepTabFocus)
     recordingsView.tab = "schedules"
-    Qt.callLater(function() { recordingsView.activate() })
+    if (!keepTabFocus) Qt.callLater(function() { recordingsView.activate() })
   }
   function recordNow() {
     openRecordings(false)
@@ -171,50 +177,72 @@ Ui.Panel {
       return root.bar.switchPanelFrom(root.hostWidget || root, direction)
     return false
   }
+  function moveTab(direction, settingsIndex) {
+    keyboardNavigation = true
+    if (settingsOpen) {
+      const current = settingsIndex === undefined ? cursor - 30 : settingsIndex
+      const next = (current + direction + 4) % 4
+      selectSettingsTab(["listening", "storage", "alerts", "stations"][next], true)
+    } else {
+      const tabs = [20,14,21]
+      const next = (tabs.indexOf(cursor) + direction + tabs.length) % tabs.length
+      if (next === 0) showPlayer()
+      else if (next === 1) openRecordings(false, true)
+      else openSchedules(true)
+      cursor = tabs[next]
+      Qt.callLater(function() {
+        if (!root.settingsOpen) {
+          root.cursor = tabs[next]
+          if (next === 0) keyCatcher.forceActiveFocus()
+          else (next === 1 ? recordingsButton : schedulesButton).forceActiveFocus()
+        }
+      })
+    }
+  }
   function advanceCursor(direction) {
+    keyboardNavigation = true
     let order = [4,20,14,21]
     if (settingsOpen) {
       order = [4,30,31,32,33]
       if (settingsTab === "listening") order = order.concat([40,41,42,43])
-      order = order.concat([2,3])
+      if (dockBack.enabled) order.push(54)
+      if (dockPlay.enabled) order.push(55)
+      if (dockForward.enabled) order.push(56)
+      if (dockStop.enabled) order.push(57)
       if (dockRetry.visible) order.push(53)
-      const index = Math.max(0, order.indexOf(cursor))
-      cursor = order[(index + direction + order.length) % order.length]
-      Qt.callLater(ensureCursorVisible)
-      return
+    } else {
+      order.push(0)
+      if (favoriteButton.visible && favoriteButton.enabled) order.push(13)
+      if (radio.playbackKind !== "recording")
+        for (let i = 0; i < favoritePresets.length; i++) order.push(100 + i)
+      if (connectionState.visible) {
+        order.push(50)
+        if (connectionState.secondaryText) order.push(51)
+        if (connectionState.detailText) order.push(52)
+      }
+      if (timelineSlider.visible && timelineSlider.enabled) order.push(22)
+      if (liveButton.visible && liveButton.enabled) order.push(9)
+      if (fileTimeline.visible && fileTimeline.enabled) order.push(15)
+      if (backButton.enabled) order.push(7)
+      if (playButton.enabled) order.push(1)
+      if (forwardButton.enabled) order.push(8)
+      order.push(23)
+      if (sleepButton.enabled) order.push(19)
+      if (stopButton.enabled) order.push(6)
+      if (speedPicker.visible) order.push(18)
+      if (returnLiveButton.visible && returnLiveButton.enabled) order.push(16)
     }
-    order.push(0)
-    if (favoriteButton.visible && favoriteButton.enabled) order.push(13)
-    if (radio.playbackKind !== "recording")
-      for (let i = 0; i < favoritePresets.length; i++) order.push(100 + i)
-    if (connectionState.visible) {
-      order.push(50)
-      if (connectionState.secondaryText) order.push(51)
-      if (connectionState.detailText) order.push(52)
-    }
-    if (timelineSlider.visible && timelineSlider.enabled) order.push(22)
-    if (liveButton.visible && liveButton.enabled) order.push(9)
-    if (backButton.enabled) order.push(7)
-    if (playButton.enabled) order.push(1)
-    if (forwardButton.enabled) order.push(8)
-    order.push(23)
-    if (sleepButton.enabled) order.push(19)
-    if (stopButton.enabled) order.push(6)
-    if (speedPicker.visible) order.push(18)
-    if (radio.playbackKind === "recording") {
-      if (radio.wanted && radio.duration > 0 && (radio.playbackState === "playing" || radio.paused)) order.push(15)
-      if (radio.wanted || radio.bufferActive) order.push(16)
-    }
-    order = order.concat([2,3])
-    const index = Math.max(0, order.indexOf(cursor))
-    cursor = order[(index + direction + order.length) % order.length]
+    order = order.concat([3,2])
+    const index = order.indexOf(cursor)
+    cursor = index < 0 ? order[direction > 0 ? 0 : order.length - 1]
+                      : order[(index + direction + order.length) % order.length]
     Qt.callLater(ensureCursorVisible)
   }
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
                      addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
-    ensureItemVisible(cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
+    ensureItemVisible(cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
   function ensureItemVisible(item) {
     scrollTarget = item
@@ -257,6 +285,10 @@ Ui.Panel {
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
     else if (cursor === 24) backFromSettings()
+    else if (cursor >= 54 && cursor <= 57 && auxiliaryView) {
+      const target = [dockBack, dockPlay, dockForward, dockStop][cursor - 54]
+      if (target.enabled) target.clicked()
+    }
     else if (cursor === 53 && dockRetry.visible && dockRetry.enabled) dockRetry.clicked()
     else if (cursor >= 50 && cursor <= 52 && connectionState.visible) {
       const target = [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50]
@@ -266,7 +298,7 @@ Ui.Panel {
     else if (cursor >= 30 && cursor <= 33) selectSettingsTab(["listening", "storage", "alerts", "stations"][cursor - 30])
     else if (cursor >= 100 && cursor < 100 + favoritePresets.length) radio.selectStation(favoritePresets[cursor - 100].id)
   }
-  function openRecordings(storage) {
+  function openRecordings(storage, keepTabFocus) {
     if (storage) { openSettingsStorage(); return }
     settingsOpen = false
     recordingsOpen = true
@@ -274,7 +306,7 @@ Ui.Panel {
     recordingsView.storageEditing = false
     recordingsView.nowEditing = false
     recordingsView.tab = "library"
-    recordingsView.activate()
+    if (!keepTabFocus) recordingsView.activate()
     scroller.contentY = 0
   }
   function openStationEditor(edit) {
@@ -355,13 +387,15 @@ Ui.Panel {
       onMoveRequested: (dx, dy) => {
         if (dy) root.advanceCursor(dy)
         if (dx) {
-          if (root.cursor === 15 && root.radio.playbackKind === "recording") root.radio.seekRecording(root.radio.position + dx * 30)
+          root.keyboardNavigation = true
+          if (root.settingsOpen && root.cursor >= 30 && root.cursor <= 33 || !root.settingsOpen && [20,14,21].indexOf(root.cursor) >= 0) root.moveTab(dx)
+          else if (root.cursor === 15 && root.radio.playbackKind === "recording") root.radio.seekRecording(root.radio.position + dx * 30)
           else if (root.cursor === 22 && root.radio.dvr) root.radio.seek(root.radio.position + dx * 30)
           else { root.cursor = 2; root.radio.commitVolume(root.radio.volume + dx * 5) }
         }
       }
       onActivateRequested: root.activate()
-      onTextKey: text => root.playbackShortcut(text)
+      onTextKey: (text, modifiers) => { if (modifiers === Qt.NoModifier) root.playbackShortcut(text) }
 
       Column {
         anchors.fill: parent
@@ -431,6 +465,8 @@ Ui.Panel {
             spacing: Style.space(6)
             Radio.FocusButton {
               id: listenButton
+              Keys.onLeftPressed: { root.cursor = 20; root.moveTab(-1) }
+              Keys.onRightPressed: { root.cursor = 20; root.moveTab(1) }
               width: Style.space(72)
               text: "Listen"
               height: Style.space(38)
@@ -441,7 +477,7 @@ Ui.Panel {
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: !root.recordingsOpen
-              focusable: root.auxiliaryView
+              focusable: true
               hasCursor: root.cursor === 20
               onHovered: hovered => { if (hovered) root.cursor = 20 }
               onClicked: root.showPlayer()
@@ -449,6 +485,8 @@ Ui.Panel {
             }
             Radio.FocusButton {
               id: recordingsButton
+              Keys.onLeftPressed: { root.cursor = 14; root.moveTab(-1) }
+              Keys.onRightPressed: { root.cursor = 14; root.moveTab(1) }
               width: Style.space(74)
               text: "Library"
               tooltipText: "Open recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
@@ -462,7 +500,7 @@ Ui.Panel {
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "library"
-              focusable: root.auxiliaryView
+              focusable: true
               hasCursor: root.cursor === 14
               onHovered: hovered => { if (hovered) root.cursor = 14 }
               onClicked: root.openRecordings(false)
@@ -470,6 +508,8 @@ Ui.Panel {
             }
             Radio.FocusButton {
               id: schedulesButton
+              Keys.onLeftPressed: { root.cursor = 21; root.moveTab(-1) }
+              Keys.onRightPressed: { root.cursor = 21; root.moveTab(1) }
               width: Style.space(90)
               text: "Schedules"
               height: Style.space(38)
@@ -480,7 +520,7 @@ Ui.Panel {
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "schedules"
-              focusable: root.auxiliaryView
+              focusable: true
               hasCursor: root.cursor === 21
               onHovered: hovered => { if (hovered) root.cursor = 21 }
               onClicked: root.openSchedules()
@@ -510,6 +550,8 @@ Ui.Panel {
                 focusable: true
                 enabled: !root.stationMutationPending && !recordingsView.pending
                 hasCursor: root.cursor === 30 + index
+                Keys.onLeftPressed: root.moveTab(-1, index)
+                Keys.onRightPressed: root.moveTab(1, index)
                 Accessible.role: Accessible.PageTab
                 Accessible.name: text
                 onHovered: hovered => { if (hovered) root.cursor = 30 + index }
@@ -714,7 +756,7 @@ Ui.Panel {
                   Accessible.name: "Station name (required)"
                   foreground: root.barForeground
                   maximumLength: 160
-                  KeyNavigation.tab: stationURL
+
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingLabel { text: "Audio stream URL" }
@@ -728,7 +770,7 @@ Ui.Panel {
                   Accessible.name: "Audio stream URL"
                   foreground: root.barForeground
                   maximumLength: 2048
-                  KeyNavigation.tab: stationCity
+
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingHint { text: "Use a direct HTTP or HTTPS audio stream, rather than a station web page." }
@@ -744,7 +786,7 @@ Ui.Panel {
                   Accessible.name: "City · optional"
                   foreground: root.barForeground
                   maximumLength: 100
-                  KeyNavigation.tab: stationCountry
+
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingLabel { text: "Country · optional" }
@@ -758,7 +800,7 @@ Ui.Panel {
                   Accessible.name: "Country · optional"
                   foreground: root.barForeground
                   maximumLength: 100
-                  KeyNavigation.tab: stationWebsite
+
                   Keys.onEscapePressed: root.backFromSettings()
                 }
                 SettingLabel { text: "Website · optional" }
@@ -772,7 +814,7 @@ Ui.Panel {
                   Accessible.name: "Website · optional"
                   foreground: root.barForeground
                   maximumLength: 2048
-                  KeyNavigation.tab: saveStationButton
+
                   Keys.onReturnPressed: root.saveStation()
                   Keys.onEscapePressed: root.backFromSettings()
                 }
@@ -788,7 +830,7 @@ Ui.Panel {
                     focusable: true
                     enabled: root.radio.ready && !root.stationMutationPending
                     onActiveFocusChanged: if (activeFocus) root.ensureItemVisible(this)
-                    KeyNavigation.tab: cancelStationButton
+
                     Keys.onEscapePressed: root.backFromSettings()
                     onClicked: root.saveStation()
                   }
@@ -799,7 +841,7 @@ Ui.Panel {
                     foreground: root.barForeground
                     focusable: true
                     onActiveFocusChanged: if (activeFocus) root.ensureItemVisible(this)
-                    KeyNavigation.tab: deleteStationButton.visible ? deleteStationButton : stationName
+
                     Keys.onEscapePressed: root.backFromSettings()
                     onClicked: root.backFromSettings()
                   }
@@ -807,7 +849,7 @@ Ui.Panel {
                 Radio.FocusButton {
                   id: deleteStationButton
                   visible: !!root.editingStationId
-                  KeyNavigation.tab: stationName
+
                   text: root.confirmStationDelete ? "Confirm delete station" : "Delete station"
                   fontSize: Style.fontPx(1)
                   horizontalPadding: 0
@@ -1302,10 +1344,10 @@ Ui.Panel {
               Radio.MarqueeText { scrolling: false; width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold }
               Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); elide: Text.ElideRight }
             }
-            Radio.FocusButton { id: dockBack; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
-            Radio.FocusButton { id: dockPlay; width: Style.space(34); horizontalPadding: 0; iconName: playButton.iconName; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
-            Radio.FocusButton { id: dockForward; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
-            Radio.FocusButton { id: dockStop; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
+            Radio.FocusButton { id: dockBack; hasCursor: root.cursor === 54; onHovered: hovered => { if (hovered) root.cursor = 54 }; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
+            Radio.FocusButton { id: dockPlay; hasCursor: root.cursor === 55; onHovered: hovered => { if (hovered) root.cursor = 55 }; width: Style.space(34); horizontalPadding: 0; iconName: playButton.iconName; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
+            Radio.FocusButton { id: dockForward; hasCursor: root.cursor === 56; onHovered: hovered => { if (hovered) root.cursor = 56 }; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
+            Radio.FocusButton { id: dockStop; hasCursor: root.cursor === 57; onHovered: hovered => { if (hovered) root.cursor = 57 }; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
           }
           Row {
             width: parent.width

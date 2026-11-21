@@ -121,6 +121,24 @@ ShellRoot {
           console.log("QA: chosen station", panel.radio.stationId, panel.radio.hasStation, panel.testStationPicker.popupOpen, panel.radio.error)
           tryVerify(function() { return panel.radio.stationId === "wfan" && panel.radio.hasStation }, 3000)
           verify(!panel.radio.wanted, "Choosing a station started playback")
+          console.log("QA: keyboard tab strips")
+          const navigationVolume = panel.radio.volume
+          panel.testCatcher.forceActiveFocus(); panel.cursor = 20
+          keyClick(Qt.Key_Right)
+          tryVerify(function() { return panel.recordingsOpen && panel.testRecordingsButton.activeFocus }, 2000)
+          compare(panel.cursor, 14)
+          keyClick(Qt.Key_Right)
+          tryVerify(function() { return panel.testView.tab === "schedules" && panel.testSchedulesButton.activeFocus }, 2000)
+          keyClick(Qt.Key_Left)
+          tryVerify(function() { return panel.testView.tab === "library" && panel.testRecordingsButton.activeFocus }, 2000)
+          keyClick(Qt.Key_Left)
+          tryVerify(function() { return !panel.recordingsOpen && panel.testCatcher.activeFocus }, 2000)
+          compare(panel.radio.volume, navigationVolume, "Tab arrows changed volume")
+          panel.cursor = -1; keyClick(Qt.Key_Tab); compare(panel.cursor, 4)
+          panel.cursor = -1; keyClick(Qt.Key_Backtab); compare(panel.cursor, 2)
+          const navigationMuted = panel.radio.muted
+          keyClick(Qt.Key_M, Qt.ControlModifier)
+          compare(panel.radio.muted, navigationMuted, "Modified shortcut toggled mute")
           console.log("QA: station picker search and hearts")
           panel.radio.favoriteIds = []
           panel.testStationPicker.open()
@@ -531,6 +549,19 @@ ShellRoot {
           compare(panel.testSectionTitle.text, "· Settings")
           compare(panel.testSettingsTabs.count, 4)
           compare(panel.testSettingsButton.iconName, "close")
+          const settingsVolume = panel.radio.volume
+          panel.testSettingsTabs.itemAt(0).forceActiveFocus(); panel.cursor = 30
+          keyClick(Qt.Key_Right)
+          tryVerify(function() { return panel.settingsTab === "storage" && panel.testSettingsTabs.itemAt(1).activeFocus }, 2000)
+          keyClick(Qt.Key_Right)
+          tryVerify(function() { return panel.settingsTab === "alerts" && panel.testSettingsTabs.itemAt(2).activeFocus }, 2000)
+          keyClick(Qt.Key_Left); keyClick(Qt.Key_Left)
+          tryVerify(function() { return panel.settingsTab === "listening" && panel.testSettingsTabs.itemAt(0).activeFocus }, 2000)
+          compare(panel.radio.volume, settingsVolume)
+          panel.testCatcher.forceActiveFocus(); panel.cursor = 43
+          keyClick(Qt.Key_Tab); compare(panel.cursor, 55, "Listening skips the persistent play control")
+          keyClick(Qt.Key_Tab); compare(panel.cursor, 3)
+          keyClick(Qt.Key_Backtab); compare(panel.cursor, 55)
           console.log("QA: buffer presets")
           const savedBuffer = panel.radio.bufferMinutes
           panel.testBufferPresets.itemAt(2).forceActiveFocus(); keyClick(Qt.Key_Space)
@@ -684,6 +715,15 @@ ShellRoot {
           panel.openSettings(); panel.selectSettingsTab("stations"); panel.openStationEditor(false)
           tryVerify(function() { return panel.testName.activeFocus }, 2000)
           keyClick(Qt.Key_P); keyClick(Qt.Key_M); compare(panel.testName.text, "pm")
+          keyClick(Qt.Key_Tab); verify(panel.testStationURL.activeFocus)
+          keyClick(Qt.Key_Tab); verify(panel.testStationCity.activeFocus)
+          keyClick(Qt.Key_Tab); verify(panel.testStationCountry.activeFocus)
+          keyClick(Qt.Key_Tab); verify(panel.testStationWebsite.activeFocus)
+          keyClick(Qt.Key_Tab); verify(panel.testStationSave.activeFocus)
+          keyClick(Qt.Key_Tab); verify(panel.testStationCancel.activeFocus)
+          keyClick(Qt.Key_Tab); verify(!panel.testName.activeFocus, "Tab was trapped inside the custom station editor")
+          keyClick(Qt.Key_Backtab); verify(panel.testStationCancel.activeFocus)
+
           panel.testStationURL.text = "not-a-url"
           panel.testStationSave.clicked()
           tryVerify(function() { return !panel.stationMutationPending && !!panel.stationError }, 5000)

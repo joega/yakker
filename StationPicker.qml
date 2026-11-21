@@ -203,6 +203,7 @@ Item {
             Accessible.checkable: true
             Accessible.checked: stationRow.modelData.favorite === true
             focusable: true
+            onActiveFocusChanged: if (activeFocus) root.setCurrent(stationRow.index)
             onClicked: root.toggleFavorite(String(stationRow.modelData.value))
           }
         }
