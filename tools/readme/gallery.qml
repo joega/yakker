@@ -146,6 +146,9 @@ ShellRoot {
           radio.playbackKind = "live"; radio.position = 0
           selectExample("tsn-1050")
           radio.sleepRemaining = 0
+          radio.wanted = true; radio.paused = true; radio.playbackState = "paused"
+          radio.temporaryBuffer = true; radio.dvr = true
+          radio.bufferEnd = 90; radio.position = 60
           panel.settingsOpen = true
           capture("settings")
           panel.settingsOpen = false
@@ -153,7 +156,11 @@ ShellRoot {
           radio.sleepRemaining = 0
           panel.openSettings()
           panel.openSettingsStorage()
+          radio.wanted = false; radio.paused = false; radio.playbackState = "stopped"
+          radio.temporaryBuffer = false; radio.dvr = false
+          radio.bufferEnd = 0; radio.position = 0
           capture("storage")
+          radio.wanted = true; radio.playbackState = "playing"
           selectExample("wkrk-fm")
           panel.selectSettingsTab("alerts")
           capture("notifications")

@@ -19,6 +19,52 @@ ShellRoot {
         window.contentItem.grabToImage(function(result) { saved = result.saveToFile("__OUTPUT__/" + name + ".png"); done = true })
         tryVerify(function() { return done }, 5000); verify(saved, "screenshot failed: " + name)
       }
+      function checkPlaybackStates() {
+        const radio = panel.radio
+        const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","sleepRemaining","duration"]
+        const saved = keys.map(function(key) { return radio[key] })
+        try {
+          radio.station = radio.stations.find(function(station) { return station.id === "tsn-690" })
+          radio.stationId = "tsn-690"
+          radio.playbackKind = "live"; radio.wanted = true; radio.paused = true; radio.playbackState = "paused"
+          radio.bufferMinutes = 0; radio.temporaryBuffer = true; radio.dvr = true
+          radio.bufferStart = 0; radio.bufferEnd = 45; radio.position = 15; radio.sleepRemaining = 0
+          verify(panel.testPlayerStatus.text.indexOf("Paused · buffering") === 0)
+          verify(panel.testPlaybackHint.text.indexOf("Stream stays connected") === 0)
+          verify(panel.testTimeline.visible && panel.testPlayButton.iconName === "play" && panel.testStopButton.enabled)
+          capture("paused-live")
+          panel.openRecordings(false)
+          compare(panel.testDockStatus.text, "Paused · buffering")
+          radio.bufferMinutes = 15; radio.temporaryBuffer = false
+          panel.openSchedules(); compare(panel.testDockStatus.text, "Paused · buffering")
+          radio.station = radio.stations.find(function(station) { return station.id === "weei-fm" }); radio.stationId = "weei-fm"
+          panel.openSettings()
+          window.width = 320; window.height = 300; wait(50)
+          compare(panel.testDockStatus.text, "Paused · buffering")
+          verify(!panel.testDockStatus.truncated, "The compact player hides the buffering state")
+          capture("paused-buffering-dock-small")
+          radio.bufferExpired = true
+          verify(panel.testPlaybackHint.text.indexOf("Earlier audio expired") >= 0, "Expired replay still promises the original paused position")
+          radio.bufferExpired = false
+          radio.wanted = false; radio.paused = false; radio.playbackState = "stopped"
+          radio.dvr = false; radio.position = 0; radio.bufferStart = 0; radio.bufferEnd = 0
+          compare(panel.testDockStatus.text, "Listening stopped")
+          verify(panel.testPlaybackHint.text.indexOf("Stream disconnected · Replay cleared") === 0)
+          verify(!panel.testDockStop.enabled)
+          window.width = 420; window.height = 650
+          radio.station = radio.stations.find(function(station) { return station.id === "bbc-radio-5-live" }); radio.stationId = "bbc-radio-5-live"
+          panel.showPlayer(); wait(50)
+          verify(!panel.testTimeline.visible, "Stopped playback still displays the configured replay buffer")
+          compare(panel.testPlayerStatus.text, "Listening stopped")
+          capture("stopped-live")
+          radio.wanted = true; radio.paused = true; radio.playbackState = "retrying"
+          verify(radio.statusText.indexOf("Reconnecting") === 0 && !panel.playbackHint, "A reconnecting stream claims to preserve the paused position")
+        } finally {
+          keys.forEach(function(key,index) { radio[key] = saved[index] })
+          window.width = 420; window.height = 650
+          panel.showPlayer()
+        }
+      }
       function runChecks() {
         try {
           const reducedMotion = Commons.Style.reduceMotion
@@ -92,6 +138,7 @@ ShellRoot {
           verify(!panel.testPlayButton.enabled && !panel.testFavoriteButton.enabled)
           compare(panel.testStationPicker.placeholderText, "Choose a station")
           capture("first-launch")
+          checkPlaybackStates()
           panel.radio.play(); verify(!panel.radio.wanted, "Play started without a station choice")
           panel.radio.configureSettings({stationId: "tsn-690"})
           tryVerify(function() { return panel.radio.hasStation && panel.radio.stationId === "tsn-690" }, 3000)
@@ -491,6 +538,8 @@ ShellRoot {
           compare(panel.testPlayButton.tooltipText, "Pause")
           panel.cursor = 1; panel.activate(); tryVerify(function() { return panel.radio.paused }, 5000)
           compare(panel.testPlayButton.tooltipText, "Resume")
+          compare(panel.testPlayerStatus.text, "Recording paused")
+          verify(panel.testPlaybackHint.text.indexOf("buffer") < 0, "A paused saved recording claims to buffer live audio")
           panel.testCatcher.forceActiveFocus(); panel.cursor = 0
           keyClick(Qt.Key_Tab); compare(panel.cursor, 15, "Recording seek is out of visual tab order")
           console.log("QA: seek")
@@ -542,6 +591,8 @@ ShellRoot {
           wait(50); panel.testDockStop.forceActiveFocus(); keyClick(Qt.Key_Return)
           tryVerify(function() { return !panel.radio.wanted && panel.radio.playbackState === "stopped" }, 5000)
           verify(!panel.testDockStop.enabled && !panel.radio.paused, "Persistent Stop paused playback instead of stopping it")
+          compare(panel.testDockStatus.text, "Recording stopped")
+          verify(panel.testPlaybackHint.text.indexOf("Resume from Library") >= 0)
           panel.showPlayer()
           verify(!panel.testStopButton.enabled && !panel.testBackButton.enabled && !panel.testForwardButton.enabled)
           compare(panel.testPlayButton.tooltipText, "Play")

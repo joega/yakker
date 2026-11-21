@@ -43,12 +43,43 @@ Ui.Panel {
   readonly property bool connectionIssue: radio.playbackKind === "live" && (radio.playbackState === "error" || radio.playbackState === "retrying")
   readonly property bool canPlay: (radio.hasStation || radio.wanted) && (!radio.wanted || radio.paused || radio.playbackState === "playing")
   readonly property string playTooltip: !radio.hasStation && !radio.wanted ? "Choose a station first" : radio.wanted ? (radio.paused ? "Resume" : "Pause") : radio.playbackState === "error" ? "Retry" : "Play"
-  readonly property string listeningStatus: radio.playbackKind === "recording"
-    ? (radio.paused ? "Paused recording" : radio.statusText)
-    : radio.dvr && (radio.paused || radio.behindLive > 3)
-      ? (radio.paused ? "Paused · " : "") + radio.clock(radio.behindLive) + " behind live"
-      : radio.statusText
+  readonly property bool pausedLive: radio.playbackKind === "live" && radio.playbackPaused
+  readonly property string listeningStatus: radio.playbackKind === "live" && radio.wanted && radio.dvr
+      && (radio.playbackPaused || radio.playbackState === "playing" && radio.behindLive > 3)
+    ? (pausedLive ? "Paused · buffering · " : "") + radio.clock(radio.behindLive) + " behind live"
+    : radio.statusText
+  readonly property string playbackHint: connectionIssue ? ""
+    : radio.playbackStopped ? (radio.playbackKind === "recording" ? "Position saved · Resume from Library"
+      : radio.hasStation ? "Stream disconnected · Replay cleared" : "Choose a station, then press Play")
+    : radio.playbackPaused ? (pausedLive ? (radio.bufferExpired ? "Stream stays connected · Earlier audio expired" : "Stream stays connected · Resume keeps your place")
+      : "Position saved · Resume when ready")
+    : radio.playbackKind === "recording" ? "Saved recording · Position saved as you listen"
+    : radio.playbackState === "connecting" ? "Connecting to the station"
+    : radio.temporaryBuffer ? "Temporary 15 min replay · In memory"
+    : radio.bufferMinutes > 0 ? radio.bufferMinutes + " min replay · In memory" : "Live only · Pause to keep your place"
+  readonly property string playbackDescription: radio.playbackPaused ? (pausedLive
+      ? "Resume from your paused position. The station is still buffering." : "Resume this recording from the paused position.")
+    : radio.playbackStopped ? (radio.playbackKind === "recording"
+      ? "Start live radio. Resume the saved recording from Library." : "Start a fresh live stream.")
+    : radio.playbackKind === "recording" ? "Pause this recording and keep your position."
+    : "Pause and keep your place while the station continues buffering."
 
+  component PlaybackStatusIndicator: Item {
+    width: Style.space(12)
+    height: width
+    Rectangle {
+      anchors.centerIn: parent
+      width: Style.space(6); height: width; radius: width / 2
+      visible: !root.radio.playbackPaused && !root.radio.playbackStopped
+      color: root.radio.playbackState === "playing" ? Commons.Color.accent : root.barForeground
+    }
+    Radio.FocusIcon {
+      anchors.fill: parent
+      visible: root.radio.playbackPaused || root.radio.playbackStopped
+      name: root.radio.playbackPaused ? "pause" : "stop"
+      foreground: root.pausedLive ? Commons.Color.accent : root.barForeground
+    }
+  }
   component PlaybackButton: Radio.FocusButton {
     width: Style.space(64)
     height: width
@@ -56,6 +87,7 @@ Ui.Panel {
     iconName: root.radio.wanted && !root.radio.paused ? "pause" : "play"
     iconSize: Style.space(25)
     tooltipText: root.playTooltip
+    Accessible.description: root.playbackDescription
     foreground: Commons.Color.background
     color: Commons.Color.accent
     borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent)
@@ -1028,27 +1060,28 @@ Ui.Panel {
                   width: parent.width
                   spacing: Style.space(8)
                   visible: !root.connectionIssue
-                  Rectangle { width: Style.space(6); height: width; radius: width / 2; color: root.radio.playbackState === "error" ? Commons.Color.urgent : root.radio.playbackState === "playing" ? Commons.Color.accent : root.barForeground; anchors.verticalCenter: parent.verticalCenter }
+                  PlaybackStatusIndicator { anchors.verticalCenter: parent.verticalCenter }
                   Text {
-                    width: parent.width - liveButton.width - Style.space(6) - parent.spacing * 2
+                    id: playerStatus
+                    width: parent.width - liveButton.width - Style.space(12) - parent.spacing * 2
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.listeningStatus
                     textFormat: Text.PlainText
-                    color: root.radio.playbackState === "error" ? Commons.Color.urgent : root.barForeground
+                    color: root.pausedLive ? Commons.Color.accent : root.barForeground
                     font.family: root.uiFontFamily
                     font.pixelSize: Style.fontPx(1)
                     wrapMode: Text.Wrap
                   }
                   Radio.FocusButton {
                     id: liveButton
-                    visible: root.radio.playbackKind !== "recording" && root.radio.dvr && (root.radio.behindLive > 3 || root.radio.paused)
+                    visible: root.radio.playbackKind !== "recording" && root.radio.wanted && root.radio.dvr && (root.radio.behindLive > 3 || root.radio.paused)
                     width: visible ? implicitWidth : 0
                     text: "Go live"
                     fontSize: Style.fontPx(1)
                     height: Style.space(30)
                     foreground: Commons.Color.accent
                     background: Qt.alpha(Commons.Color.accent, 0.1)
-                    enabled: root.radio.dvr
+                    enabled: root.radio.wanted && root.radio.dvr
                     hasCursor: root.virtualFocus && root.cursor === 9
                     onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 9 } }
                     onClicked: root.radio.goLive()
@@ -1057,7 +1090,7 @@ Ui.Panel {
                 Ui.BorderSurface {
                   width: parent.width
                   implicitHeight: timelineSlider.implicitHeight + Style.space(4)
-                  visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
+                  visible: root.radio.wanted && root.radio.bufferActive && root.radio.playbackKind !== "recording"
                   color: "transparent"
                   radius: Style.cornerRadius
                   borderSpec: root.virtualFocus && root.cursor === 22 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
@@ -1087,7 +1120,7 @@ Ui.Panel {
                 Ui.BorderSurface {
                   width: parent.width
                   implicitHeight: fileTimeline.implicitHeight + Style.space(4)
-                  visible: root.radio.playbackKind === "recording"
+                  visible: root.radio.wanted && root.radio.playbackKind === "recording"
                   color: "transparent"
                   radius: Style.cornerRadius
                   borderSpec: root.virtualFocus && root.cursor === 15 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
@@ -1108,8 +1141,8 @@ Ui.Panel {
                     onReleased: value => root.radio.seekRecording(value)
                   }
                 }
-                Text { width: parent.width; visible: root.radio.playbackKind === "recording"; text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                Text { width: parent.width; visible: root.radio.bufferExpired; text: "Older audio expired. Playback moved to the available buffer."; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+                Text { width: parent.width; visible: root.radio.wanted && root.radio.playbackKind === "recording"; text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                Text { width: parent.width; visible: root.radio.wanted && root.radio.playbackKind === "live" && root.radio.bufferExpired; text: "Older audio expired. Playback moved to the available buffer."; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
               }
               Radio.StateCard {
                 id: connectionState
@@ -1358,7 +1391,25 @@ Ui.Panel {
               y: Math.max(0, (dockPlay.height - implicitHeight) / 2)
               spacing: Style.space(3)
               Radio.MarqueeText { scrolling: false; width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold }
-              Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); elide: Text.ElideRight }
+              Row {
+                width: parent.width
+                spacing: Style.space(4)
+                PlaybackStatusIndicator { anchors.verticalCenter: parent.verticalCenter }
+                Text {
+                  id: dockStatus
+                  width: parent.width - Style.space(12) - parent.spacing
+                  text: root.radio.playbackKind === "recording" && root.radio.wanted
+                    ? (root.radio.playbackPaused ? "Paused · " : "") + root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration)
+                    : root.radio.playbackKind === "live" && root.pausedLive ? "Paused · buffering" : root.listeningStatus
+                  textFormat: Text.PlainText
+                  color: root.pausedLive ? Commons.Color.accent : Qt.alpha(root.barForeground, 0.8)
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1)
+                  wrapMode: Text.Wrap
+                  maximumLineCount: 2
+                  elide: Text.ElideRight
+                }
+              }
             }
             Column {
               id: dockControls
@@ -1484,10 +1535,9 @@ Ui.Panel {
           }
           Text {
             width: parent.width
-            text: root.radio.sleepRemaining > 0 ? "Sleep in " + root.radio.clock(root.radio.sleepRemaining)
-              : root.radio.playbackKind === "recording" ? "Saved recording · Position saved as you listen"
-              : root.radio.temporaryBuffer ? "Temporary 15 min replay · In memory"
-              : root.radio.bufferMinutes > 0 ? root.radio.bufferMinutes + " min replay · In memory" : "Live only · Pause to keep your place"
+            id: playbackHintText
+            visible: text.length > 0
+            text: root.playbackHint + (root.radio.wanted && root.radio.sleepRemaining > 0 ? " · Sleep in " + root.radio.clock(root.radio.sleepRemaining) : "")
             textFormat: Text.PlainText
             color: root.barForeground
             opacity: 0.75

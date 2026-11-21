@@ -47,7 +47,11 @@ def main():
             shutil.copy2(ROOT / name, plugin / name)
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
         panel = plugin / "Panel.qml"
-        panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testConnectionState: connectionState
+        panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testPlayerStatus: playerStatus
+  property alias testDockStatus: dockStatus
+  property alias testPlaybackHint: playbackHintText
+  property alias testTimeline: timelineSlider
+  property alias testConnectionState: connectionState
   property alias testDockRetry: dockRetry
   property alias testView: recordingsView
   property alias testCatcher: keyCatcher

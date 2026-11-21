@@ -90,11 +90,13 @@ Item {
   property string stationId: ""
   property string mprisPlugin: ""
   property int pendingVolume: -1
+  readonly property bool playbackPaused: wanted && paused && playbackState === "paused"
+  readonly property bool playbackStopped: !wanted && playbackState === "stopped"
   readonly property string statusText: playbackState === "playing" ? (playbackKind === "recording" ? "Playing recording" : (dvr && behindLive > 3 ? "Delayed · " + clock(behindLive) : "Live"))
-    : playbackState === "paused" ? "Paused"
+    : playbackPaused ? (playbackKind === "recording" ? "Recording paused" : "Paused · buffering")
     : playbackState === "connecting" ? "Connecting…"
     : playbackState === "retrying" ? "Reconnecting in " + retryDelay + "s · attempt " + retry + "/5"
-    : playbackState === "error" ? "Unable to play" : !hasStation ? "Choose a station to start listening" : "Stopped"
+    : playbackState === "error" ? "Unable to play" : playbackKind === "recording" ? "Recording stopped" : !hasStation ? "Choose a station to start listening" : "Listening stopped"
   signal preferencesChanged(int volume, bool muted, string stationId, int bufferMinutes)
   signal favoritesUpdated()
   signal statusReceived(int serial)

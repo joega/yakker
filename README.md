@@ -136,14 +136,21 @@ the catalogue, choose another station; Yakker never substitutes a broadcaster.
 The Focus player keeps the station title on one line above **Change station**.
 Titles that overflow scroll slowly to the end and back, pausing at both ends.
 Short titles stay still; reduced-motion mode uses an ellipsis and a full-title
-tooltip instead. Presets and the playback dock also stay on one line, without
-independent animations. The player includes
-up to six favorite presets in the order you added them. The **Listen**, **Library**,
+tooltip instead. Preset and playback dock titles also stay on one line, without
+independent animations; playback status can wrap to keep paused/stopped states
+readable. The player includes up to six favorite presets in the order you added them. The **Listen**, **Library**,
 and **Schedules** tabs stay at the top. **Rewind · Play/Pause · Forward** form the
-main transport row, with a larger Play/Pause control; **Record**, **Sleep**, and
-**Stop** sit below it. Rewind and forward skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
+main transport row, with a larger Play/Pause control; **Record**, **Stop**, and
+**Sleep** sit below it, with Stop centered beneath Play/Pause. Rewind and forward
+skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
 an active player; **Stop** releases it. Playing a stopped radio starts a fresh
-live stream. Closing the popup leaves audio playing.
+live stream. Paused live radio is labeled **Paused · buffering**, with a pause
+indicator and a reminder that the stream stays connected. Fully stopped radio
+is labeled **Listening stopped**, with **Stream disconnected · Replay cleared**;
+its replay track is hidden until listening starts again. These states also appear
+in the persistent controls on Library, Schedules, and Settings. Saved recordings
+use **Recording paused** or **Recording stopped**, and stopped recordings can be
+resumed from Library. Closing the popup leaves audio playing.
 Right-click the bar icon to open the station list directly.
 The popup includes a text-style searchable station selector, volume, mute, connection status, and Retry after errors. Compact underline tabs and proportional typography keep the station name and transport controls prominent.
 Search by station, city or country—for example, `690`, `Seattle`, `UK` or
