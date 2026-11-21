@@ -173,7 +173,7 @@ Ui.Panel {
     let order = [4,20,14,21]
     if (settingsOpen) {
       order = [4,30,31,32,33]
-      if (settingsTab === "listening") order.push(5)
+      if (settingsTab === "listening") order = order.concat([40,41,42,43])
       order = order.concat([2,3])
       const index = Math.max(0, order.indexOf(cursor))
       cursor = order[(index + direction + order.length) % order.length]
@@ -206,7 +206,7 @@ Ui.Panel {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
                      addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
-    ensureItemVisible(cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
+    ensureItemVisible(cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
   function ensureItemVisible(item) {
     scrollTarget = item
@@ -232,7 +232,6 @@ Ui.Panel {
     else if (cursor === 1 && playButton.enabled) playButton.clicked()
     else if (cursor === 3) radio.toggleMute()
     else if (cursor === 4) openSettings()
-    else if (cursor === 5 && settingsOpen) bufferPicker.toggle()
     else if (cursor === 6 && stopButton.enabled) radio.stop()
     else if (cursor === 7 && backButton.enabled) radio.skip(-30)
     else if (cursor === 8 && forwardButton.enabled) radio.skip(30)
@@ -250,6 +249,7 @@ Ui.Panel {
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
     else if (cursor === 24) backFromSettings()
+    else if (cursor >= 40 && cursor <= 43 && settingsOpen) bufferPresets.itemAt(cursor - 40).clicked()
     else if (cursor >= 30 && cursor <= 33) selectSettingsTab(["listening", "storage", "alerts", "stations"][cursor - 30])
     else if (cursor >= 100 && cursor < 100 + favoritePresets.length) radio.selectStation(favoritePresets[cursor - 100].id)
   }
@@ -295,14 +295,13 @@ Ui.Panel {
     keyCatcher.forceActiveFocus()
   }
   onOpenedChanged: {
-    if (!opened) { stationPicker.close(); bufferPicker.close(); speedPicker.close(); sleepPopup.close(); stationEditorOpen = false; confirmStationDelete = false }
+    if (!opened) { stationPicker.close(); speedPicker.close(); sleepPopup.close(); stationEditorOpen = false; confirmStationDelete = false }
     else if (!radio.hasStation && radio.playbackKind !== "recording") cursor = 0
   }
   Connections {
     target: root.radio
     function onWantedChanged() { if (!root.radio.wanted) sleepPopup.close() }
     function onStationIdChanged() { stationPicker.value = root.radio.stationId; root.confirmStationDelete = false }
-    function onBufferMinutesChanged() { bufferPicker.value = String(root.radio.bufferMinutes) }
     function onReadyChanged() {
       if (!root.radio.ready && root.stationMutationPending) {
         root.pendingStationSerial = 0
@@ -326,14 +325,14 @@ Ui.Panel {
     owner: root.hostWidget || root
     bar: root.bar
     open: root.opened
-    focusTarget: (stationPicker.popupOpen || bufferPicker.popupOpen || speedPicker.popupOpen || sleepPopup.opened || stationEditorOpen || recordingsOpen || settingsStorage || settingsOpen && settingsTab === "stations") ? null : keyCatcher
+    focusTarget: (stationPicker.popupOpen || speedPicker.popupOpen || sleepPopup.opened || stationEditorOpen || recordingsOpen || settingsStorage || settingsOpen && settingsTab === "stations") ? null : keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(420))
     contentHeight: panel.fittedContentHeight(header.implicitHeight + panelContent.implicitHeight + playbackDock.implicitHeight + Style.space(28))
 
     Ui.PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: root.recordingsOpen || root.settingsOpen && (root.settingsStorage || root.settingsTab === "stations") || sleepPopup.opened || speedPicker.popupOpen || stationPicker.popupOpen || bufferPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
+      blocked: root.recordingsOpen || root.settingsOpen && (root.settingsStorage || root.settingsTab === "stations") || sleepPopup.opened || speedPicker.popupOpen || stationPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
       Keys.onEscapePressed: event => {
         if (root.settingsOpen) { root.backFromSettings(); event.accepted = true }
         else event.accepted = false
@@ -423,7 +422,7 @@ Ui.Panel {
               text: "Listen"
               height: Style.space(38)
               leftAlign: true
-              horizontalPadding: 0
+              horizontalPadding: Style.space(8)
               radius: 0
               color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
@@ -444,7 +443,7 @@ Ui.Panel {
               Accessible.name: tooltipText
               height: Style.space(38)
               leftAlign: true
-              horizontalPadding: 0
+              horizontalPadding: Style.space(8)
               radius: 0
               color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
@@ -462,7 +461,7 @@ Ui.Panel {
               text: "Schedules"
               height: Style.space(38)
               leftAlign: true
-              horizontalPadding: 0
+              horizontalPadding: Style.space(8)
               radius: 0
               color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
@@ -489,7 +488,7 @@ Ui.Panel {
                 height: Style.space(38)
                 text: modelData.label
                 fontSize: Style.fontPx(1)
-                horizontalPadding: 0
+                horizontalPadding: Style.space(8)
                 radius: 0
                 color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
                 borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
@@ -545,30 +544,101 @@ Ui.Panel {
               width: parent.width
               spacing: Style.space(12)
               visible: root.settingsOpen && !root.settingsStorage
-              Text { width: parent.width; visible: root.settingsTab === "listening"; text: "Listening"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
-              Ui.Dropdown {
-                id: bufferPicker
-                visible: root.settingsTab === "listening"
-                fontFamily: root.uiFontFamily
+              Column {
                 width: parent.width
-                label: "Listening buffer"
-                options: [{value:"0",label:"Live only"}, {value:"5",label:"5 minutes"}, {value:"15",label:"15 minutes"}, {value:"30",label:"30 minutes"}]
-                value: String(root.radio.bufferMinutes)
-                foreground: root.barForeground
-                hasCursor: root.cursor === 5
-                onHovered: hovered => { if (hovered) root.cursor = 5 }
-                onChanged: value => { root.radio.setBufferMinutes(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
-              }
-              Text {
-                width: parent.width
+                spacing: Style.space(12)
                 visible: root.settingsTab === "listening"
-                text: "Replay stays in memory. In Live only, Pause starts a temporary 15-minute buffer. Changing this setting clears history and returns to live."
-                textFormat: Text.PlainText
-                color: root.barForeground
-                opacity: 0.8
-                font.family: root.uiFontFamily
-                font.pixelSize: Style.fontPx(1)
-                wrapMode: Text.WordWrap
+                SettingTitle { text: "Replay buffer" }
+                SettingHint { text: "Choose how much live radio to keep for rewinding." }
+                Row {
+                  id: bufferPicker
+                  width: parent.width
+                  spacing: Style.space(4)
+                  Repeater {
+                    id: bufferPresets
+                    model: [0,5,15,30]
+                    Radio.FocusButton {
+                      required property int modelData
+                      required property int index
+                      width: (parent.width - parent.spacing * 3) / 4
+                      text: modelData ? modelData + " min" : "Live only"
+                      fontSize: Style.fontPx(1)
+                      horizontalPadding: Style.space(8)
+                      foreground: root.barForeground
+                      selected: root.radio.bufferMinutes === modelData
+                      hasCursor: root.cursor === 40 + index
+                      focusable: true
+                      Accessible.role: Accessible.RadioButton
+                      Accessible.name: modelData ? modelData + " minutes of replay" : "Live only"
+                      Accessible.checkable: true
+                      Accessible.checked: selected
+                      onHovered: hovered => { if (hovered) root.cursor = 40 + index }
+                      onClicked: root.radio.setBufferMinutes(modelData)
+                    }
+                  }
+                }
+                Rectangle {
+                  width: parent.width
+                  implicitHeight: bufferExplanation.implicitHeight + Style.space(20)
+                  radius: Style.space(8)
+                  color: Qt.alpha(Commons.Color.accent, 0.06)
+                  Column {
+                    id: bufferExplanation
+                    x: Style.space(10); y: Style.space(10)
+                    width: parent.width - Style.space(20)
+                    spacing: Style.space(5)
+                    SettingLabel { id: bufferSummary; text: root.radio.bufferMinutes ? root.radio.bufferMinutes + " minutes of replay" : "Live only" }
+                    SettingHint {
+                      id: bufferDescription
+                      text: root.radio.bufferMinutes
+                        ? "History grows as you listen and stays in memory. No recording files are created."
+                        : "Pause still keeps your place with a temporary 15-minute buffer."
+                    }
+                  }
+                }
+                SettingHint { text: "Changes apply immediately, clear replay history and return to live." }
+                Ui.PanelSeparator { width: parent.width }
+                Column {
+                  width: parent.width
+                  spacing: Style.space(8)
+                  SettingLabel { text: "Keyboard shortcuts" }
+                  Grid {
+                    id: shortcutGrid
+                    width: parent.width
+                    columns: 2
+                    columnSpacing: Style.space(12)
+                    rowSpacing: Style.space(6)
+                    Repeater {
+                      model: [{key:"P",action:"Pause/resume"}, {key:"[  ]",action:"Skip 30 sec"}, {key:"G",action:"Go live"}, {key:"M",action:"Mute/unmute"}, {key:"←  →",action:"Volume"}, {key:"R",action:"Play"}]
+                      Row {
+                        required property var modelData
+                        width: (shortcutGrid.width - shortcutGrid.columnSpacing) / 2
+                        height: Math.max(shortcutKey.height, shortcutLabel.implicitHeight)
+                        spacing: Style.space(8)
+                        Rectangle {
+                          id: shortcutKey
+                          width: Style.space(44)
+                          height: Style.space(24)
+                          anchors.verticalCenter: parent.verticalCenter
+                          radius: Style.space(4)
+                          color: Qt.alpha(root.barForeground, 0.06)
+                          Text { anchors.centerIn: parent; text: modelData.key; textFormat: Text.PlainText; color: root.barForeground; font.family: Style.font.family; font.pixelSize: Style.fontPx(0.917) }
+                        }
+                        Text {
+                          id: shortcutLabel
+                          width: parent.width - shortcutKey.width - parent.spacing
+                          anchors.verticalCenter: parent.verticalCenter
+                          text: modelData.action
+                          textFormat: Text.PlainText
+                          color: Qt.alpha(root.barForeground, 0.8)
+                          font.family: root.uiFontFamily
+                          font.pixelSize: Style.fontPx(1)
+                          wrapMode: Text.Wrap
+                        }
+                      }
+                    }
+                  }
+                }
               }
               Column {
                 width: parent.width
@@ -745,16 +815,6 @@ Ui.Panel {
                 font.family: root.uiFontFamily
                 font.pixelSize: Style.fontPx(1)
                 wrapMode: Text.Wrap
-              }
-              Text { width: parent.width; visible: root.settingsTab === "listening"; text: "Keyboard shortcuts"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
-              Repeater {
-                model: root.settingsTab !== "listening" ? [] : [ {key:"P", action:"Pause / resume"}, {key:"[  /  ]", action:"Skip 30 seconds"}, {key:"G", action:"Return to live"}, {key:"M", action:"Mute / unmute"}, {key:"←  /  →", action:"Adjust volume"} ]
-                Row {
-                  required property var modelData
-                  width: settingsView.width
-                  Text { width: parent.width * 0.64; text: modelData.action; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                  Text { width: parent.width * 0.36; text: modelData.key; textFormat: Text.PlainText; color: root.barForeground; horizontalAlignment: Text.AlignRight; font.family: Style.font.family; font.pixelSize: Style.fontPx(0.917) }
-                }
               }
             }
             Column {

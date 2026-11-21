@@ -49,6 +49,12 @@ def main():
         panel = plugin / "Panel.qml"
         panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testView: recordingsView
   property alias testCatcher: keyCatcher
+  property alias testListenButton: listenButton
+  property alias testSchedulesButton: schedulesButton
+  property alias testBufferPresets: bufferPresets
+  property alias testBufferSummary: bufferSummary
+  property alias testBufferDescription: bufferDescription
+  property alias testShortcuts: shortcutGrid
   property alias testRecordingsButton: recordingsButton
   property alias testSettingsTabs: settingsTabs
   property alias testStationList: customStations

@@ -142,6 +142,9 @@ ShellRoot {
           verify(backCenter.x < playCenter.x && playCenter.x < forwardCenter.x, "Time skips must flank the primary play control")
           verify(panel.testPlayButton.height > panel.testStopButton.height, "Play/Pause lost primary emphasis")
           capture("player")
+          panel.cursor = 21
+          capture("tab-hover-padding")
+          panel.cursor = 1
           panel.cursor = 14; panel.advanceCursor(1); compare(panel.cursor, 21)
           panel.advanceCursor(-1); compare(panel.cursor, 14)
           panel.activate(); verify(panel.recordingsOpen); verify(panel.testCatcher.blocked)
@@ -420,6 +423,27 @@ ShellRoot {
           compare(panel.testSectionTitle.text, "· Settings")
           compare(panel.testSettingsTabs.count, 4)
           compare(panel.testSettingsButton.iconName, "close")
+          console.log("QA: buffer presets")
+          const savedBuffer = panel.radio.bufferMinutes
+          panel.testBufferPresets.itemAt(2).forceActiveFocus(); keyClick(Qt.Key_Space)
+          tryCompare(panel.radio, "bufferMinutes", 15)
+          compare(panel.testBufferSummary.text, "15 minutes of replay")
+          verify(panel.testBufferPresets.itemAt(2).selected && !panel.radio.wanted)
+          panel.testBufferPresets.itemAt(3).clicked(); tryCompare(panel.radio, "bufferMinutes", 30)
+          panel.testBufferPresets.itemAt(1).clicked(); tryCompare(panel.radio, "bufferMinutes", 5)
+          panel.testBufferPresets.itemAt(0).clicked(); tryCompare(panel.radio, "bufferMinutes", 0)
+          verify(panel.testBufferDescription.text.indexOf("temporary 15-minute") >= 0)
+          panel.cursor = 33; panel.advanceCursor(1); compare(panel.cursor, 40)
+          window.width = 320; window.height = 300
+          wait(50); compare(panel.width, 320)
+          panel.cursor = 43; panel.ensureCursorVisible()
+          tryVerify(function() { var y = panel.testBufferPresets.itemAt(3).mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testBufferPresets.itemAt(3).height <= panel.testDock.mapToItem(panel, 0, 0).y }, 2000)
+          capture("listening-small")
+          panel.ensureItemVisible(panel.testShortcuts)
+          wait(50); capture("shortcuts-small")
+          window.width = 420; window.height = 650
+          wait(50)
+          panel.radio.setBufferMinutes(savedBuffer)
           panel.cursor = 30; panel.advanceCursor(1); compare(panel.cursor, 31)
           panel.testSettingsTabs.itemAt(1).clicked()
           tryVerify(function() { return panel.testView.testFolder.activeFocus }, 2000)

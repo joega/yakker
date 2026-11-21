@@ -185,7 +185,7 @@ listening when it expires; captures continue. Changing stations keeps the
 deadline, and pressing **Stop** cancels the timer.
 
 The optional DVR-style buffer lets you pause a live station and listen from that
-point later. Open **Settings** in the radio popup and choose a **Listening buffer**:
+point later. Open **Settings → Listening** and choose a **Replay buffer** preset:
 
 - **Live only** (default): no replay history is exposed until you pause.
 - **5 minutes**, **15 minutes**, or **30 minutes**: enable pause and rewind for the selected station.
@@ -433,7 +433,9 @@ This is a plain line-oriented CLI; each command requires Enter.
 ## Settings and stations
 
 The gear opens **YAKKER · Settings**, with four tabs: **Listening**, **Storage**,
-**Alerts**, and **Stations**. Each tab replaces the content below it; the playback
+**Alerts**, and **Stations**. Listening shows the Live only / 5 / 15 / 30 minute
+buffer choices directly, with an explanation of the selected mode and a compact
+two-column keyboard shortcut reference. Each tab replaces the content below it; the playback
 dock and top-right X stay available. X returns to your previous player section.
 Storage has its own Save and Reset controls. Alerts apply immediately and have
 no save buttons. Switching tabs preserves unfinished storage and station drafts;

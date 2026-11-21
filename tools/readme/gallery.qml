@@ -132,7 +132,8 @@ ShellRoot {
           capture("recording-player")
 
           radio.playbackKind = "live"; radio.position = 0
-          selectExample("kfan")
+          selectExample("tsn-1050")
+          radio.sleepRemaining = 0
           panel.settingsOpen = true
           capture("settings")
           panel.settingsOpen = false
