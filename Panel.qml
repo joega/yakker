@@ -259,8 +259,8 @@ Ui.Panel {
       if (playButton.enabled) order.push(1)
       if (forwardButton.enabled) order.push(8)
       order.push(23)
-      if (sleepButton.enabled) order.push(19)
       if (stopButton.enabled) order.push(6)
+      if (sleepButton.enabled) order.push(19)
       if (speedPicker.visible) order.push(18)
       if (returnLiveButton.visible && returnLiveButton.enabled) order.push(16)
     }
@@ -1189,6 +1189,8 @@ Ui.Panel {
                 spacing: Style.space(6)
                 Radio.FocusButton {
                   id: recordNowButton
+                  width: Math.max(implicitWidth, sleepButton.implicitWidth)
+                  anchors.verticalCenter: parent.verticalCenter
                   iconSize: Style.space(16)
                   text: "Record"
                   iconName: "record"
@@ -1200,7 +1202,26 @@ Ui.Panel {
                   onClicked: root.recordNow()
                 }
                 Radio.FocusButton {
+                  id: stopButton
+                  iconSize: Style.space(18)
+                  iconName: "stop"
+                  text: "Stop"
+                  fontSize: Style.fontPx(1.083)
+                  verticalPadding: Style.space(8)
+                  tooltipText: "Stop listening" + (root.radio.playbackKind === "recording" ? "" : " and clear replay history")
+                  Accessible.role: Accessible.Button
+                  Accessible.name: tooltipText
+                  foreground: root.barForeground
+                  enabled: root.radio.wanted
+                  opacity: enabled ? 1 : 0.35
+                  hasCursor: root.virtualFocus && root.cursor === 6
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 6 } }
+                  onClicked: root.radio.stop()
+                }
+                Radio.FocusButton {
                   id: sleepButton
+                  width: Math.max(recordNowButton.implicitWidth, implicitWidth)
+                  anchors.verticalCenter: parent.verticalCenter
                   iconSize: Style.space(16)
                   iconName: "moon" // nf-md-timer_outline
                   text: "Sleep"
@@ -1279,23 +1300,6 @@ Ui.Panel {
                       Radio.FocusButton { id: sleepOff; visible: root.radio.sleepRemaining > 0; text: "Cancel timer"; fontSize: Style.fontPx(1); horizontalPadding: Style.space(6); foreground: Qt.alpha(root.barForeground, 0.8); focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
                     }
                   }
-                }
-
-                Radio.FocusButton {
-                  id: stopButton
-                  iconSize: Style.space(16)
-                  iconName: "stop"
-                  text: "Stop"
-                  fontSize: Style.fontPx(1)
-                  tooltipText: "Stop listening" + (root.radio.playbackKind === "recording" ? "" : " and clear replay history")
-                  Accessible.role: Accessible.Button
-                  Accessible.name: tooltipText
-                  foreground: root.barForeground
-                  enabled: root.radio.wanted
-                  opacity: enabled ? 1 : 0.35
-                  hasCursor: root.virtualFocus && root.cursor === 6
-                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 6 } }
-                  onClicked: root.radio.stop()
                 }
               }
               Row {
