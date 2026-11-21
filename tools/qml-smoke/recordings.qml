@@ -152,6 +152,68 @@ ShellRoot {
           barConfig.vertical = false; barFixture.visible = false; tooltipFixture.visible = false
         }
       }
+      function checkNavigationRows() {
+        const savedFont = Commons.Style.fontBaseSize
+        function fit(tabs, action) {
+          tabs.forEach(function(tab) {
+            verify(tab.width + 0.5 >= tab.implicitWidth, tab.text + " label is constrained at " + window.width + "px / " + Commons.Style.fontBaseSize + "px font")
+            verify(tab.leftAlign, "Tab labels use different alignment")
+          })
+          const last = tabs[tabs.length - 1]
+          verify(last.mapToItem(panel, last.width, 0).x <= action.mapToItem(panel, 0, 0).x, "Tab labels overlap the header action")
+          const center = tabs[0].mapToItem(panel, 0, tabs[0].height / 2).y
+          verify(Math.abs(action.mapToItem(panel, 0, action.height / 2).y - center) <= 0.5, "Header action is vertically misaligned")
+          if (action.mapToItem(panel, action.width, 0).x > panel.width + 0.5)
+            console.log("QA NAV overflow",Commons.Style.fontBaseSize,window.width,action.mapToItem(panel,action.width,0).x)
+          verify(action.mapToItem(panel, action.width, 0).x <= panel.width + 0.5, "Header action overflowed the available width")
+        }
+        try {
+          for (const base of [savedFont, Math.max(savedFont, 14)]) {
+            Commons.Style.fontBaseSize = base
+            const widths = base === savedFont ? [420,360,320,288] : [420,360,320]
+            for (const width of widths) {
+              window.width = width; wait(20)
+              panel.showPlayer(); wait(20)
+              const main = [panel.testListenButton,panel.testRecordingsButton,panel.testSchedulesButton]
+              fit(main, panel.testSettingsButton)
+              const font = main[0].fontSize, padding = main[0].horizontalPadding
+              const actionX = panel.testSettingsButton.mapToItem(panel, 0, 0).x
+              if (base === savedFont && width === 288) capture("main-tabs-compact")
+              panel.openSettings(); wait(20)
+              const tabs = [0,1,2,3].map(function(i) { return panel.testSettingsTabs.itemAt(i) })
+              const sizes = tabs.map(function(tab) { return tab.width })
+              for (let i = 0; i < tabs.length; i++) {
+                panel.selectSettingsTab(["listening","storage","alerts","stations"][i], true); wait(10)
+                fit(tabs, panel.testSettingsClose)
+                tabs.forEach(function(tab,j) {
+                  if (tab.width !== sizes[j] || tab.fontSize !== font || tab.horizontalPadding !== padding)
+                    console.log("QA NAV mismatch",base,width,i,tab.text,tab.width,sizes[j],tab.fontSize,font,tab.horizontalPadding,padding)
+                  compare(tab.width,sizes[j], "Selecting " + i + " changed " + tab.text + " from " + sizes[j] + " to " + tab.width)
+                  compare(tab.fontSize,font, "Tab font differs: " + tab.fontSize + " vs " + font)
+                  compare(tab.horizontalPadding,padding, "Tab inset differs: " + tab.horizontalPadding + " vs " + padding)
+                })
+              }
+              compare(panel.testSettingsClose.mapToItem(panel, 0, 0).x, actionX)
+              if (base === savedFont && width === 288) { panel.selectSettingsTab("listening",true); wait(20); capture("settings-tabs-compact") }
+            }
+          }
+          Commons.Style.fontBaseSize = savedFont; window.width = 420
+          panel.showPlayer(); panel.testCatcher.forceActiveFocus(); wait(20)
+          mouseMove(panel.testListenButton,8,panel.testListenButton.height/2); wait(Commons.Style.duration(160) + 20)
+          const hoverFill = panel.testListenButton.color.toString()
+          panel.testListenButton.forceActiveFocus(); mouseMove(panel,panel.width-2,panel.height-2); wait(Commons.Style.duration(160) + 20)
+          const focusFill = panel.testListenButton.color.toString()
+          panel.openSettings(); wait(Commons.Style.duration(160) + 20)
+          const listening = panel.testSettingsTabs.itemAt(0)
+          mouseMove(listening,8,listening.height/2); wait(Commons.Style.duration(160) + 20); if (listening.color.toString() !== hoverFill) console.log("QA NAV hover",listening.color.toString(),hoverFill,listening.hot,listening.activeFocus,listening.hasCursor,panel.keyboardNavigation)
+          compare(listening.color.toString(),hoverFill)
+          listening.forceActiveFocus(); mouseMove(panel,panel.width-2,panel.height-2); wait(Commons.Style.duration(160) + 20); compare(listening.color.toString(),focusFill)
+        } finally {
+          Commons.Style.fontBaseSize = savedFont
+          window.width = 420; window.height = 650
+          panel.showPlayer()
+        }
+      }
       function checkPlaybackStates() {
         const radio = panel.radio
         const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","sleepRemaining","duration","recordings"]
@@ -279,6 +341,7 @@ ShellRoot {
           verify(!panel.testPlayButton.enabled && !panel.testFavoriteButton.enabled)
           compare(panel.testStationPicker.placeholderText, "Choose a station")
           capture("first-launch")
+          checkNavigationRows()
           checkPlaybackStates()
           checkBarStates()
           panel.radio.play(); verify(!panel.radio.wanted, "Play started without a station choice")

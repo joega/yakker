@@ -32,6 +32,9 @@ Ui.Panel {
   property var scrollTarget: null
   property string sleepError: ""
   readonly property string uiFontFamily: "Adwaita Sans"
+  readonly property bool compactNavigation: header.width < Style.space(340)
+  readonly property real navigationFontSize: Style.fontPx(compactNavigation ? 1 : 1.083)
+  readonly property real navigationPadding: Style.space(compactNavigation ? 3 : 8)
   readonly property var favoritePresets: radio.favoriteIds.map(function(id) {
     return root.radio.stations.find(function(station) { return station.id === id })
   }).filter(function(station) { return !!station }).slice(0, 6)
@@ -100,6 +103,10 @@ Ui.Panel {
     hasCursor: root.virtualFocus && root.cursor === 4
     onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 4 } }
   }
+  component NavigationRow: Row {
+    width: parent.width
+    spacing: Style.space(root.compactNavigation ? 3 : 4)
+  }
   component NavigationTab: Radio.FocusButton {
     property int cursorId: -1
     function traverse(direction, event) {
@@ -111,10 +118,34 @@ Ui.Panel {
     }
     Keys.onTabPressed: event => traverse(1, event)
     Keys.onBacktabPressed: event => traverse(-1, event)
+    // Reserve both native text measurements so selection and focus never
+    // squeeze a label or move the neighboring tabs.
+    width: Math.ceil(Math.max(regularLabelSize.implicitWidth, selectedLabelSize.implicitWidth)) + horizontalPadding * 2 + _reservedBorderLeft + _reservedBorderRight
+    Text {
+      id: regularLabelSize
+      visible: false
+      text: parent.text
+      textFormat: Text.PlainText
+      font.family: parent.fontFamily
+      font.pixelSize: parent.fontSize
+      font.bold: false
+    }
+    Text {
+      id: selectedLabelSize
+      visible: false
+      text: parent.text
+      textFormat: Text.PlainText
+      font.family: parent.fontFamily
+      font.pixelSize: parent.fontSize
+      font.bold: true
+    }
     height: Style.space(38)
-    horizontalPadding: Style.space(8)
+    horizontalPadding: root.navigationPadding
+    fontSize: root.navigationFontSize
+    leftAlign: true
     radius: 0
-    color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
+    color: hasCursor || activeFocus ? Style.focusFillFor(root.barForeground, Commons.Color.accent)
+      : hot ? Style.hoverFillFor(root.barForeground, Commons.Color.accent) : "transparent"
     borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent)
       : hot ? Border.controlSpec("hover-cursor", root.barForeground, Commons.Color.accent) : Border.none()
     foreground: root.barForeground
@@ -489,19 +520,15 @@ Ui.Panel {
           id: header
           width: parent.width
           spacing: Style.space(4)
-          Row {
+          NavigationRow {
             id: mainNavigation
             visible: !root.settingsOpen
-            width: parent.width
-            spacing: Style.space(4)
             NavigationTab {
               id: listenButton
               cursorId: 20
               Keys.onLeftPressed: { root.cursor = 20; root.moveTab(-1) }
               Keys.onRightPressed: { root.cursor = 20; root.moveTab(1) }
-              width: Style.space(72)
               text: "Listen"
-              leftAlign: true
               selected: !root.recordingsOpen
               focusable: true
               hasCursor: root.virtualFocus && root.cursor === 20
@@ -513,11 +540,9 @@ Ui.Panel {
               cursorId: 14
               Keys.onLeftPressed: { root.cursor = 14; root.moveTab(-1) }
               Keys.onRightPressed: { root.cursor = 14; root.moveTab(1) }
-              width: Style.space(74)
               text: "Library"
               tooltipText: "Open recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
               Accessible.name: tooltipText
-              leftAlign: true
               selected: root.recordingsOpen && recordingsView.tab === "library"
               focusable: true
               hasCursor: root.virtualFocus && root.cursor === 14
@@ -527,7 +552,7 @@ Ui.Panel {
                 visible: Number(root.radio.recordings.activeCount) > 0
                 width: Style.space(5); height: width; radius: width / 2
                 anchors.right: parent.right; anchors.rightMargin: Style.space(5)
-                anchors.top: parent.top; anchors.topMargin: Style.space(6)
+                anchors.top: parent.top; anchors.topMargin: Style.space(3)
                 color: Commons.Color.urgent
               }
             }
@@ -536,9 +561,7 @@ Ui.Panel {
               cursorId: 21
               Keys.onLeftPressed: { root.cursor = 21; root.moveTab(-1) }
               Keys.onRightPressed: { root.cursor = 21; root.moveTab(1) }
-              width: Style.space(90)
               text: "Schedules"
-              leftAlign: true
               selected: root.recordingsOpen && recordingsView.tab === "schedules"
               focusable: true
               hasCursor: root.virtualFocus && root.cursor === 21
@@ -558,39 +581,41 @@ Ui.Panel {
               onClicked: root.openSettings()
             }
           }
-          Row {
+          NavigationRow {
             id: settingsNavigation
-            width: parent.width
             visible: root.settingsOpen
-            spacing: Style.space(4)
-            Repeater {
-              id: settingsTabs
-              model: [{key:"listening",label:"Listening"}, {key:"storage",label:"Storage"}, {key:"alerts",label:"Alerts"}, {key:"stations",label:"Stations"}]
-              NavigationTab {
-                required property var modelData
-                required property int index
-                width: (settingsNavigation.width - settingsCloseButton.width - settingsNavigation.spacing * 4) / 4
-                horizontalPadding: Style.space(4)
-                text: modelData.label
-                cursorId: 30 + index
-                fontSize: Style.fontPx(1)
-                selected: root.settingsTab === modelData.key
-                focusable: true
-                enabled: !root.stationMutationPending && !recordingsView.pending
-                hasCursor: root.virtualFocus && root.cursor === 30 + index
-                Keys.onLeftPressed: root.moveTab(-1, index)
-                Keys.onRightPressed: root.moveTab(1, index)
-                Accessible.name: text
-                onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 30 + index } }
-                onClicked: root.selectSettingsTab(modelData.key)
+            Row {
+              id: settingsTabGroup
+              spacing: settingsNavigation.spacing
+              Repeater {
+                id: settingsTabs
+                model: [{key:"listening",label:"Listening"}, {key:"storage",label:"Storage"}, {key:"alerts",label:"Alerts"}, {key:"stations",label:"Stations"}]
+                NavigationTab {
+                  required property var modelData
+                  required property int index
+                  text: modelData.label
+                  cursorId: 30 + index
+                  selected: root.settingsTab === modelData.key
+                  focusable: true
+                  enabled: !root.stationMutationPending && !recordingsView.pending
+                  hasCursor: root.virtualFocus && root.cursor === 30 + index
+                  Keys.onLeftPressed: root.moveTab(-1, index)
+                  Keys.onRightPressed: root.moveTab(1, index)
+                  Accessible.name: text
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 30 + index } }
+                  onClicked: root.selectSettingsTab(modelData.key)
+                }
               }
+            }
+            Item {
+              width: Math.max(0, parent.width - settingsTabGroup.width - settingsCloseButton.width - parent.spacing * 2)
+              height: 1
             }
             SettingsControl {
               id: settingsCloseButton
               anchors.verticalCenter: parent.verticalCenter
               iconName: "close"
               tooltipText: "Close settings"
-              selected: true
               focusable: true
               onClicked: root.closeSettings()
             }

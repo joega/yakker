@@ -142,7 +142,9 @@ Short titles stay still; reduced-motion mode uses an ellipsis and a full-title
 tooltip instead. Preset and playback dock titles also stay on one line, without
 independent animations; playback status can wrap to keep paused/stopped states
 readable. The player includes up to six favorite presets in the order you added them. The **Listen**, **Library**,
-and **Schedules** tabs form the first row, with Settings at the right edge. **Rewind · Play/Pause · Forward** form the
+and **Schedules** tabs form the first row, with Settings at the right edge. Both
+navigation rows use the same label alignment, hover/focus treatment, and compact
+spacing on narrow panels. **Rewind · Play/Pause · Forward** form the
 main transport row, with a larger Play/Pause control; **Record**, **Stop**, and
 **Sleep** sit below it, with Stop centered beneath Play/Pause. Rewind and forward
 skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
