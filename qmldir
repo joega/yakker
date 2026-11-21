@@ -1,3 +1,6 @@
 singleton RadioService 1.0 RadioService.qml
 StationLogo 1.0 StationLogo.qml
 RecordingsView 1.0 RecordingsView.qml
+FocusButton 1.0 FocusButton.qml
+FocusIcon 1.0 FocusIcon.qml
+StationPicker 1.0 StationPicker.qml

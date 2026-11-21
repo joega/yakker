@@ -23,6 +23,7 @@ Ui.Panel {
   readonly property var radio: Radio.RadioService
   property var scrollTarget: null
   property string sleepError: ""
+  readonly property string uiFontFamily: "Adwaita Sans"
   readonly property var favoritePresets: radio.favoriteIds.map(function(id) {
     return root.radio.stations.find(function(station) { return station.id === id })
   }).filter(function(station) { return !!station }).slice(0, 6)
@@ -267,34 +268,35 @@ Ui.Panel {
         Column {
           id: header
           width: parent.width
-          spacing: Style.space(10)
+          spacing: Style.space(4)
           Row {
             width: parent.width
             spacing: Style.space(8)
             Text {
               width: parent.width - captureIndicator.width - settingsButton.width - parent.spacing * 2
               anchors.verticalCenter: parent.verticalCenter
-              text: "Y A K K E R"
+              text: "YAKKER"
+              font.letterSpacing: Style.space(2)
               textFormat: Text.PlainText
               color: root.barForeground
-              font.family: Style.font.family
-              font.pixelSize: Style.font.body
-              font.bold: true
+              font.family: root.uiFontFamily
+              font.pixelSize: Style.fontPx(1.167)
+              font.weight: Font.DemiBold
             }
-            Ui.Button {
+            Radio.FocusButton {
               id: captureIndicator
               visible: Number(root.radio.recordings.activeCount) > 0
               width: visible ? implicitWidth : 0
               text: "● REC " + root.radio.recordings.activeCount
-              fontSize: Style.font.caption
+              fontSize: Style.fontPx(1)
               foreground: Commons.Color.urgent
               tooltipText: "Background captures · Open recordings"
               focusable: root.recordingsOpen
               onClicked: root.openRecordings(false)
             }
-            Ui.Button {
+            Radio.FocusButton {
               id: settingsButton
-              iconText: "󰒓"
+              iconName: "settings"
               tooltipText: root.settingsOpen ? "Close settings" : "Open settings"
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
@@ -309,41 +311,62 @@ Ui.Panel {
           Row {
             width: parent.width
             spacing: Style.space(6)
-            Ui.Button {
+            Radio.FocusButton {
               id: listenButton
-              width: (parent.width - parent.spacing * 2) / 3
+              width: Style.space(72)
               text: "Listen"
+              height: Style.space(38)
+              leftAlign: true
+              horizontalPadding: 0
+              radius: 0
+              color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
+              borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: !root.recordingsOpen
               focusable: root.recordingsOpen
               hasCursor: root.cursor === 20
               onHovered: hovered => { if (hovered) root.cursor = 20 }
               onClicked: root.showPlayer()
+              Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
-            Ui.Button {
+            Radio.FocusButton {
               id: recordingsButton
-              width: listenButton.width
+              width: Style.space(74)
               text: "Library"
               tooltipText: "Open recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
+              height: Style.space(38)
+              leftAlign: true
+              horizontalPadding: 0
+              radius: 0
+              color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
+              borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "library"
               focusable: root.recordingsOpen
               hasCursor: root.cursor === 14
               onHovered: hovered => { if (hovered) root.cursor = 14 }
               onClicked: root.openRecordings(false)
+              Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
-            Ui.Button {
+            Radio.FocusButton {
               id: schedulesButton
-              width: listenButton.width
+              width: Style.space(90)
               text: "Schedules"
+              height: Style.space(38)
+              leftAlign: true
+              horizontalPadding: 0
+              radius: 0
+              color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
+              borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "schedules"
               focusable: root.recordingsOpen
               hasCursor: root.cursor === 21
               onHovered: hovered => { if (hovered) root.cursor = 21 }
               onClicked: root.openSchedules()
+              Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
           }
           Ui.PanelSeparator { width: parent.width }
@@ -378,7 +401,7 @@ Ui.Panel {
             Column {
               width: parent.width
               visible: !root.recordingsOpen
-              spacing: Style.space(18)
+              spacing: Style.space(16)
               Column {
                 width: parent.width
                 spacing: Style.space(8)
@@ -400,11 +423,11 @@ Ui.Panel {
                   textFormat: Text.PlainText
                   color: root.barForeground
                   opacity: 0.8
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.caption
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1)
                   wrapMode: Text.WordWrap
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: storageButton
                   width: parent.width
                   text: "Recording storage settings"
@@ -414,7 +437,7 @@ Ui.Panel {
                   onHovered: hovered => { if (hovered) root.cursor = 17 }
                   onClicked: root.openRecordings(true)
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: addStationButton
                   width: parent.width
                   text: "Add custom station"
@@ -424,7 +447,7 @@ Ui.Panel {
                   onHovered: hovered => { if (hovered) root.cursor = 10 }
                   onClicked: root.openStationEditor(false)
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: editStationButton
                   width: parent.width
                   visible: root.radio.station.custom === true
@@ -435,7 +458,7 @@ Ui.Panel {
                   onHovered: hovered => { if (hovered) root.cursor = 11 }
                   onClicked: root.openStationEditor(true)
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: deleteStationButton
                   width: parent.width
                   visible: root.radio.station.custom === true
@@ -507,7 +530,7 @@ Ui.Panel {
                     Keys.onReturnPressed: root.saveStation()
                     Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
                   }
-                  Ui.Button {
+                  Radio.FocusButton {
                     id: saveStationButton
                     onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(saveStationButton) })
                     width: parent.width
@@ -519,7 +542,7 @@ Ui.Panel {
                     Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
                     onClicked: root.saveStation()
                   }
-                  Ui.Button {
+                  Radio.FocusButton {
                     id: cancelStationButton
                     onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(cancelStationButton) })
                     width: parent.width
@@ -538,8 +561,8 @@ Ui.Panel {
                   text: root.stationError || root.radio.customCatalogError
                   textFormat: Text.PlainText
                   color: Commons.Color.urgent
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.caption
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1)
                   wrapMode: Text.Wrap
                 }
                 Text {
@@ -548,8 +571,8 @@ Ui.Panel {
                   textFormat: Text.PlainText
                   color: root.barForeground
                   opacity: 0.8
-                  font.family: Style.font.family
-                  font.pixelSize: Style.font.caption
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1)
                   wrapMode: Text.Wrap
                 }
                 Ui.PanelSeparator { width: parent.width }
@@ -574,8 +597,8 @@ Ui.Panel {
                     textFormat: Text.PlainText
                     color: root.barForeground
                     opacity: 0.8
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.caption
+                    font.family: root.uiFontFamily
+                    font.pixelSize: Style.fontPx(1)
                     wrapMode: Text.Wrap
                   }
                   Text {
@@ -584,17 +607,17 @@ Ui.Panel {
                     text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name
                     textFormat: Text.PlainText
                     color: root.barForeground
-                    font.family: Style.font.family
-                    font.pixelSize: Style.space(22)
-                    font.bold: true
+                    font.family: root.uiFontFamily
+                    font.pixelSize: Style.fontPx(2)
+                    font.weight: Font.DemiBold
                     wrapMode: Text.Wrap
                   }
-                  Ui.SearchableDropdown {
+                  Radio.StationPicker {
                     id: stationPicker
                     width: parent.width
-                    showLabel: false
+                    popupWidth: panelContent.width
+                    popupX: -stationPicker.mapToItem(panelContent, 0, 0).x
                     triggerLabel: root.radio.playbackKind === "recording" ? "Live station" : "Change station"
-                    function currentLabel() { return root.radio.hasStation ? triggerLabel : "Choose a station" }
                     placeholderText: root.radio.hasStation ? "Station, city or country" : "Choose a station"
                     emptyText: "No matching stations"
                     value: root.radio.stationId
@@ -605,11 +628,11 @@ Ui.Panel {
                     onChanged: value => { root.radio.selectStation(value); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
                   }
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: favoriteButton
                   visible: root.radio.playbackKind !== "recording"
                   width: visible ? implicitWidth : 0
-                  iconText: selected ? "♥" : "♡"
+                  iconName: "heart"
                   selected: root.radio.favoriteIds.indexOf(root.radio.stationId) !== -1
                   tooltipText: selected ? "Remove from favorites" : "Add to favorites"
                   Accessible.role: Accessible.Button
@@ -628,7 +651,7 @@ Ui.Panel {
                 width: parent.width
                 visible: root.favoritePresets.length > 0 && root.radio.playbackKind !== "recording"
                 spacing: Style.space(6)
-                Text { text: "FAVORITES"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                Text { text: "FAVORITES"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 Grid {
                   id: presetGrid
                   width: parent.width
@@ -637,11 +660,11 @@ Ui.Panel {
                   Repeater {
                     id: presetRepeater
                     model: root.favoritePresets
-                    Ui.Button {
+                    Radio.FocusButton {
                       required property var modelData
                       required property int index
                       width: (presetGrid.width - presetGrid.spacing * (presetGrid.columns - 1)) / presetGrid.columns
-                      height: Style.space(60)
+                      height: Style.space(54)
                       selected: root.radio.stationId === modelData.id
                       foreground: root.barForeground
                       tooltipText: modelData.name + (modelData.city ? " · " + modelData.city : "")
@@ -656,8 +679,8 @@ Ui.Panel {
                         anchors.fill: parent
                         anchors.margins: Style.space(7)
                         spacing: Style.space(2)
-                        Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: root.barForeground; font.family: Style.font.family; font.pixelSize: Style.font.caption; maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideRight }
-                        Text { width: parent.width; text: modelData.city || modelData.country || ""; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.space(11); elide: Text.ElideRight }
+                        Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideRight }
+                        Text { width: parent.width; text: modelData.city || modelData.country || ""; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.space(11); elide: Text.ElideRight }
                       }
                     }
                   }
@@ -669,8 +692,8 @@ Ui.Panel {
                 text: root.radio.title
                 textFormat: Text.PlainText
                 color: root.barForeground
-                font.family: Style.font.family
-                font.pixelSize: Style.font.body
+                font.family: root.uiFontFamily
+                font.pixelSize: Style.fontPx(1.167)
                 wrapMode: Text.Wrap
                 maximumLineCount: 3
                 elide: Text.ElideRight
@@ -681,23 +704,26 @@ Ui.Panel {
                 Row {
                   width: parent.width
                   spacing: Style.space(8)
+                  Rectangle { width: Style.space(6); height: width; radius: width / 2; color: root.radio.playbackState === "error" ? Commons.Color.urgent : root.radio.playbackState === "playing" ? Commons.Color.accent : root.barForeground; anchors.verticalCenter: parent.verticalCenter }
                   Text {
-                    width: parent.width - liveButton.width - parent.spacing
+                    width: parent.width - liveButton.width - Style.space(6) - parent.spacing * 2
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "● " + root.listeningStatus
+                    text: root.listeningStatus
                     textFormat: Text.PlainText
                     color: root.radio.playbackState === "error" ? Commons.Color.urgent : root.barForeground
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.caption
+                    font.family: root.uiFontFamily
+                    font.pixelSize: Style.fontPx(1)
                     wrapMode: Text.Wrap
                   }
-                  Ui.Button {
+                  Radio.FocusButton {
                     id: liveButton
                     visible: root.radio.playbackKind !== "recording" && root.radio.dvr && (root.radio.behindLive > 3 || root.radio.paused)
                     width: visible ? implicitWidth : 0
                     text: "Go live"
+                    fontSize: Style.fontPx(1)
+                    height: Style.space(30)
                     foreground: Commons.Color.accent
-                    selected: true
+                    background: Qt.alpha(Commons.Color.accent, 0.1)
                     enabled: root.radio.dvr
                     hasCursor: root.cursor === 9
                     onHovered: hovered => { if (hovered) root.cursor = 9 }
@@ -731,8 +757,8 @@ Ui.Panel {
                 Row {
                   width: parent.width
                   visible: timelineSlider.visible
-                  Text { width: parent.width / 2; text: "−" + root.radio.clock(root.radio.bufferEnd - root.radio.bufferStart); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                  Text { width: parent.width / 2; text: "LIVE"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; horizontalAlignment: Text.AlignRight; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                  Text { width: parent.width / 2; text: "−" + root.radio.clock(root.radio.bufferEnd - root.radio.bufferStart); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.fontPx(1) }
+                  Text { width: parent.width / 2; text: "LIVE"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; horizontalAlignment: Text.AlignRight; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 }
                 Ui.BorderSurface {
                   width: parent.width
@@ -758,22 +784,22 @@ Ui.Panel {
                     onReleased: value => root.radio.seekRecording(value)
                   }
                 }
-                Text { width: parent.width; visible: root.radio.playbackKind === "recording"; text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                Text { width: parent.width; visible: root.radio.bufferExpired; text: "Older audio expired. Playback moved to the available buffer."; textFormat: Text.PlainText; color: root.barForeground; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
+                Text { width: parent.width; visible: root.radio.playbackKind === "recording"; text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                Text { width: parent.width; visible: root.radio.bufferExpired; text: "Older audio expired. Playback moved to the available buffer."; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
               }
-              Text { width: parent.width; visible: text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
+              Text { width: parent.width; visible: text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
               Row {
                 width: implicitWidth
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: Style.space(24)
                 Column {
                   anchors.verticalCenter: parent.verticalCenter
-                  Ui.Button {
+                  Radio.FocusButton {
                     id: backButton
                     width: Style.space(48)
-                    height: Style.space(40)
-                    iconText: "󰑟"
-                    iconSize: Style.space(25)
+                    height: Style.space(36)
+                    iconName: "back"
+                    iconSize: Style.space(23)
                     tooltipText: "Rewind 30 seconds"
                     Accessible.role: Accessible.Button
                     Accessible.name: tooltipText
@@ -784,15 +810,15 @@ Ui.Panel {
                     onHovered: hovered => { if (hovered) root.cursor = 7 }
                     onClicked: root.radio.skip(-30)
                   }
-                  Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                  Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: playButton
                   width: Style.space(64)
                   height: width
                   radius: width / 2
-                  iconText: root.radio.wanted && !root.radio.paused ? "󰏤" : "󰐊"
-                  iconSize: Style.space(30)
+                  iconName: root.radio.wanted && !root.radio.paused ? "pause" : "play"
+                  iconSize: Style.space(25)
                   tooltipText: root.playTooltip
                   Accessible.role: Accessible.Button
                   Accessible.name: tooltipText
@@ -807,12 +833,12 @@ Ui.Panel {
                 }
                 Column {
                   anchors.verticalCenter: parent.verticalCenter
-                  Ui.Button {
+                  Radio.FocusButton {
                     id: forwardButton
                     width: Style.space(48)
-                    height: Style.space(40)
-                    iconText: "󰈑"
-                    iconSize: Style.space(25)
+                    height: Style.space(36)
+                    iconName: "forward"
+                    iconSize: Style.space(23)
                     tooltipText: "Forward 30 seconds"
                     Accessible.role: Accessible.Button
                     Accessible.name: tooltipText
@@ -823,27 +849,31 @@ Ui.Panel {
                     onHovered: hovered => { if (hovered) root.cursor = 8 }
                     onClicked: root.radio.skip(30)
                   }
-                  Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                  Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 }
               }
               Row {
                 width: implicitWidth
                 anchors.horizontalCenter: parent.horizontalCenter
                 spacing: Style.space(6)
-                Ui.Button {
+                Radio.FocusButton {
                   id: recordNowButton
+                  iconSize: Style.space(16)
                   text: "Record"
-                  iconText: "󰑊"
+                  iconName: "record"
                   foreground: root.barForeground
+                  fontSize: Style.fontPx(1)
                   tooltipText: "Record a live stream starting now"
                   hasCursor: root.cursor === 23
                   onHovered: hovered => { if (hovered) root.cursor = 23 }
                   onClicked: root.recordNow()
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: sleepButton
-                  iconText: "󰔛" // nf-md-timer_outline
+                  iconSize: Style.space(16)
+                  iconName: "moon" // nf-md-timer_outline
                   text: "Sleep"
+                  fontSize: Style.fontPx(1)
                   tooltipText: root.radio.sleepRemaining > 0 ? "Sleep in " + root.radio.clock(root.radio.sleepRemaining) : "Sleep timer"
                   Accessible.role: Accessible.Button
                   Accessible.name: tooltipText
@@ -871,14 +901,14 @@ Ui.Panel {
                     }
                     contentItem: Column {
                       spacing: Style.space(8)
-                      Text { width: parent.width; text: root.radio.sleepRemaining > 0 ? "Sleep in " + root.radio.clock(root.radio.sleepRemaining) : "Sleep timer"; textFormat: Text.PlainText; color: root.barForeground; font.family: Style.font.family; font.pixelSize: Style.font.body }
+                      Text { width: parent.width; text: root.radio.sleepRemaining > 0 ? "Sleep in " + root.radio.clock(root.radio.sleepRemaining) : "Sleep timer"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167) }
                       Row {
                         width: parent.width
                         spacing: Style.space(6)
                         Repeater {
                           id: sleepPresets
                           model: [15, 30, 60]
-                          Ui.Button {
+                          Radio.FocusButton {
                             required property int modelData
                             width: (parent.width - parent.spacing * 2) / 3
                             text: modelData + " min"
@@ -889,7 +919,7 @@ Ui.Panel {
                           }
                         }
                       }
-                      Text { width: parent.width; text: "Custom minutes (1–240)"; textFormat: Text.PlainText; color: root.barForeground; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+                      Text { width: parent.width; text: "Custom minutes (1–240)"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                       Row {
                         width: parent.width
                         spacing: Style.space(6)
@@ -904,18 +934,20 @@ Ui.Panel {
                           KeyNavigation.tab: sleepApply
                           onAccepted: root.applySleepTimer()
                         }
-                        Ui.Button { id: sleepApply; text: "Set"; foreground: root.barForeground; bordered: true; focusable: true; onClicked: root.applySleepTimer() }
+                        Radio.FocusButton { id: sleepApply; text: "Set"; foreground: root.barForeground; bordered: true; focusable: true; onClicked: root.applySleepTimer() }
                       }
-                      Text { width: parent.width; text: root.sleepError; visible: text.length > 0; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-                      Ui.Button { width: parent.width; text: "Turn timer off"; enabled: root.radio.sleepRemaining > 0; opacity: enabled ? 1 : 0.35; foreground: root.barForeground; bordered: true; focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
+                      Text { width: parent.width; text: root.sleepError; visible: text.length > 0; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                      Radio.FocusButton { width: parent.width; text: "Turn timer off"; enabled: root.radio.sleepRemaining > 0; opacity: enabled ? 1 : 0.35; foreground: root.barForeground; bordered: true; focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
                     }
                   }
                 }
 
-                Ui.Button {
+                Radio.FocusButton {
                   id: stopButton
-                  iconText: "󰓛"
+                  iconSize: Style.space(16)
+                  iconName: "stop"
                   text: "Stop"
+                  fontSize: Style.fontPx(1)
                   tooltipText: "Stop listening" + (root.radio.playbackKind === "recording" ? "" : " and clear replay history")
                   Accessible.role: Accessible.Button
                   Accessible.name: tooltipText
@@ -942,7 +974,7 @@ Ui.Panel {
                   onHovered: hovered => { if (hovered) root.cursor = 18 }
                   onChanged: value => { root.radio.setPlaybackSpeed(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
                 }
-                Ui.Button {
+                Radio.FocusButton {
                   id: returnLiveButton
                   width: speedPicker.width
                   text: root.radio.hasStation ? "Return to live" : "Choose live station"
@@ -975,23 +1007,23 @@ Ui.Panel {
               width: parent.width - Style.space(44) - dockBack.width - dockPlay.width - dockForward.width - dockStop.width - parent.spacing * 4
               spacing: Style.space(3)
               anchors.verticalCenter: parent.verticalCenter
-              Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true; maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideRight }
-              Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: Style.font.family; font.pixelSize: Style.font.caption; elide: Text.ElideRight }
+              Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold; maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideRight }
+              Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); elide: Text.ElideRight }
             }
-            Ui.Button { id: dockBack; width: Style.space(30); horizontalPadding: 0; iconText: "󰑟"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
-            Ui.Button { id: dockPlay; width: Style.space(34); horizontalPadding: 0; iconText: playButton.iconText; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
-            Ui.Button { id: dockForward; width: Style.space(30); horizontalPadding: 0; iconText: "󰈑"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
-            Ui.Button { id: dockStop; width: Style.space(30); horizontalPadding: 0; iconText: "󰓛"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
+            Radio.FocusButton { id: dockBack; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
+            Radio.FocusButton { id: dockPlay; width: Style.space(34); horizontalPadding: 0; iconName: playButton.iconName; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
+            Radio.FocusButton { id: dockForward; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
+            Radio.FocusButton { id: dockStop; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
           }
-          Text { width: parent.width; visible: root.recordingsOpen && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
+          Text { width: parent.width; visible: root.recordingsOpen && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
           Row {
             width: parent.width
             spacing: Style.space(8)
-            Ui.Button {
+            Radio.FocusButton {
               id: muteButton
               width: Style.space(32)
               horizontalPadding: 0
-              iconText: root.radio.muted ? "󰝟" : "󰕾"
+              iconName: root.radio.muted ? "muted" : "volume"
               tooltipText: root.radio.muted ? "Unmute" : "Mute"
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
@@ -1029,7 +1061,7 @@ Ui.Panel {
                 onRightClicked: root.radio.toggleMute()
               }
             }
-            Text { id: volumeLabel; width: Style.space(36); anchors.verticalCenter: parent.verticalCenter; text: root.radio.muted ? "Muted" : Math.round(volumeSlider.dragging ? volumeSlider.liveValue : root.radio.volume) + "%"; textFormat: Text.PlainText; horizontalAlignment: Text.AlignRight; color: root.barForeground; opacity: 0.7; font.family: Style.font.family; font.pixelSize: Style.font.caption }
+            Text { id: volumeLabel; width: Style.space(36); anchors.verticalCenter: parent.verticalCenter; text: root.radio.muted ? "Muted" : Math.round(volumeSlider.dragging ? volumeSlider.liveValue : root.radio.volume) + "%"; textFormat: Text.PlainText; horizontalAlignment: Text.AlignRight; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
           }
           Text {
             width: parent.width
@@ -1040,8 +1072,8 @@ Ui.Panel {
             textFormat: Text.PlainText
             color: root.barForeground
             opacity: 0.75
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
+            font.family: root.uiFontFamily
+            font.pixelSize: Style.fontPx(1)
             wrapMode: Text.Wrap
           }
         }

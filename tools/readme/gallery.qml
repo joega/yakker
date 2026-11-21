@@ -19,11 +19,18 @@ ShellRoot {
       when: false
       property var themes: ({})
       readonly property var radio: panel.radio
-      readonly property var schedule: ({id: "afternoon", label: "Afternoon sports", stationId: "wbz-fm", stationName: "98.5 The Sports Hub", weekdays: [1,2,3,4,5], startTime: "14:00", endTime: "14:20", timezone: "America/New_York", enabled: true, nextStart: "2026-11-23T14:00:00-05:00", nextEnd: "2026-11-23T14:20:00-05:00"})
+      readonly property var schedule: ({id: "football", label: "Football review", stationId: "talksport", stationName: "talkSPORT", weekdays: [1,2,3,4,5], startTime: "14:00", endTime: "14:20", timezone: "America/New_York", enabled: true, nextStart: "2026-11-23T14:00:00-05:00", nextEnd: "2026-11-23T14:20:00-05:00"})
       function snapshot(schedules, recordings, active) {
         return {available: true, revision: 1, error: "", localTimezone: "America/New_York",
           settings: {folder: "/home/demo/Music/Yakker", storageCapBytes: 5368709120, freeSpaceReserveBytes: 1073741824, concurrency: 3},
           usedBytes: recordings.reduce(function(total, item) { return total + item.bytes }, 0), schedules: schedules, recordings: recordings, activeCount: active || 0}
+      }
+      function selectExample(id) {
+        const station = radio.stations.find(function(item) { return item.id === id })
+        verify(!!station, "Unknown screenshot station: " + id)
+        radio.station = station
+        radio.stationId = id
+        radio.title = ""
       }
       function readFile(path) {
         const request = new XMLHttpRequest()
@@ -65,31 +72,35 @@ ShellRoot {
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
-          radio.favoriteIds = ["wbz-fm", "wfan", "tsn-690"]
+          radio.favoriteIds = ["wfan", "weei-fm", "tsn-690"]
           radio.initialized = true; radio.ready = true
           radio.wanted = true; radio.playbackState = "playing"
           radio.volume = 62
           radio.recordings = snapshot([], [], 0)
           panel.cursor = -1
           panel.open()
+          selectExample("wfan")
           capture("popup")
 
           radio.bufferMinutes = 15; radio.dvr = true
           radio.bufferStart = 0; radio.bufferEnd = 900; radio.position = 690
           radio.paused = true; radio.playbackState = "paused"
+          selectExample("wip-fm")
           capture("dvr")
 
           radio.bufferMinutes = 0; radio.dvr = false; radio.paused = false
           radio.playbackState = "playing"
+          selectExample("tsn-690")
           panel.screenshotPicker.open()
           capture("stations")
           panel.screenshotPicker.close()
 
-          const complete = {id: "saved", stationId: "wbz-fm", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "complete", bytes: 3600000, durationSeconds: 1200,
+          const complete = {id: "saved", stationId: "weei-fm", label: "Morning drive", stationName: "WEEI 93.7", status: "complete", bytes: 3600000, durationSeconds: 1200,
             plannedStart: "2026-11-19T14:00:00-05:00", plannedEnd: "2026-11-19T14:20:00-05:00", startedAt: "2026-11-19T14:00:01-05:00", endedAt: "2026-11-19T14:20:00-05:00", playable: true, resumePosition: 486}
-          const active = {id: "capturing", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "recording", bytes: 1800000,
+          const active = {id: "capturing", stationId: "kiro-am", label: "Seattle sports", stationName: "Seattle Sports 710", status: "recording", bytes: 1800000,
             plannedStart: "2026-11-20T14:00:00-05:00", plannedEnd: "2026-11-20T14:20:00-05:00", startedAt: "2026-11-20T14:00:01-05:00", playable: false}
           radio.recordings = snapshot([schedule], [active, complete], 1)
+          selectExample("kiro-am")
           panel.openRecordings(false)
           capture("recordings")
 
@@ -101,15 +112,17 @@ ShellRoot {
           panel.recordingsOpen = false
           radio.recordings = snapshot([], [complete], 0)
           radio.recordingId = "saved"
-          radio.playbackKind = "recording"; radio.recordingTitle = "Afternoon sports"
+          radio.playbackKind = "recording"; radio.recordingTitle = "Morning drive"
           radio.duration = 1200; radio.position = 486
           radio.playbackSpeed = 1.25; radio.sleepRemaining = 900
           capture("recording-player")
 
           radio.playbackKind = "live"; radio.position = 0
+          selectExample("kfan")
           panel.settingsOpen = true
           capture("settings")
           panel.settingsOpen = false
+          selectExample("sportsnet-590")
           panel.openRecordings(true)
           capture("storage")
           console.log("YAKKER_README_SCREENSHOTS_PASS")

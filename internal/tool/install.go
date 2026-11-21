@@ -16,7 +16,7 @@ import (
 
 var installFiles = []string{
 	"manifest.json", "qmldir", "BarWidget.qml",
-	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml",
+	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml",
 	"assets/sports-hub.png", "assets/weei-fm.png", "assets/wscr.webp",
 	"assets/wxyt-fm.webp", "assets/espn-new-york.png", "assets/wfan.webp",
 	"assets/wip-fm.webp", "assets/kdka-fm.png", "assets/tsn-1050.png",
