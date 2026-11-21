@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import QtQuick.Dialogs
 import qs.Commons
 import qs.Commons as Commons
@@ -249,6 +250,22 @@ Column {
     return locale.dayName(day, Locale.ShortFormat) + " " + locale.monthName(month, Locale.ShortFormat)
       + " " + date + " " + year + " " + timeText(hours, minutes)
   }
+  function shortDateText(value) {
+    const date = new Date(value)
+    if (!value || isNaN(date.getTime())) return "Date unavailable"
+    const locale = Qt.locale(Commons.I18n.formatLocale)
+    return locale.dayName(date.getDay(), Locale.ShortFormat) + " " + locale.monthName(date.getMonth(), Locale.ShortFormat)
+      + " " + date.getDate() + (date.getFullYear() !== new Date().getFullYear() ? " " + date.getFullYear() : "")
+      + " · " + timeText(date.getHours(), date.getMinutes())
+  }
+  function seconds(value) {
+    const number = Number(value)
+    return isFinite(number) && number > 0 ? number : 0
+  }
+  function recordingStation(recording) {
+    return radio.stations.find(function(station) { return station.id === recording.stationId })
+      || {name: recording.stationName || "Saved recording", icon: "󰲸"}
+  }
   function sizeText(n) {
     const bytes = Math.max(0, Number(n) || 0)
     if (bytes < 1024) return Math.round(bytes) + " B"
@@ -276,6 +293,7 @@ Column {
         if (kind === "schedule") root.editing = false
         if (kind === "settings") { root.storageEditing = false; root.storageClosed() }
         if (kind === "now") { root.nowEditing = false; root.tab = "library" }
+        if (kind === "deleteRecording" && root.visible && root.viewMode === "library") root.activate()
       }
     }
     function onStatusReceived(serial) {
@@ -297,7 +315,7 @@ Column {
     }
   }
   Radio.FocusButton { id: backButton; visible: !root.externalBack && (!root.embedded || root.editing || root.storageEditing || root.nowEditing); width: parent.width; text: root.editing ? "← Back to schedules" : (root.storageEditing || root.nowEditing) ? "← Back" : "← Back to player"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
-  Text { width: parent.width; visible: !root.externalBack; text: root.storageEditing ? "STORAGE" : root.nowEditing ? "RECORD NOW" : root.tab === "schedules" ? "SCHEDULES" : "RECORDINGS"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.bold: true }
+  Text { width: parent.width; visible: !root.externalBack; text: root.storageEditing ? "STORAGE" : root.nowEditing ? "RECORD NOW" : root.tab === "schedules" ? "SCHEDULES" : "Your recordings"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: root.viewMode === "library" ? Style.fontPx(1.5) : Style.fontPx(1); font.weight: Font.DemiBold }
   Text { width: parent.width; visible: !root.available || !!root.snapshot.error; text: !root.radio.ready ? "Recording manager disconnected." : (root.snapshot.error || "Recording manager unavailable."); textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.localError.length > 0; text: root.localError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.pending; text: "Working…"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
@@ -355,33 +373,223 @@ Column {
     }
   }
   }
-  Column { width: parent.width; spacing: Style.space(8); visible: root.viewMode === "library"
-    Row { width: parent.width; spacing: Style.space(4)
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Record now"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.available && !root.pending; onClicked: root.beginNow() }
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Storage"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.available && !root.pending; onClicked: root.beginStorage() }
+  Column {
+    width: parent.width
+    spacing: Style.space(12)
+    visible: root.viewMode === "library"
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
+      Radio.FocusButton {
+        id: libraryRecordButton
+        text: "Record now"
+        iconName: "record"
+        iconSize: Style.space(16)
+        fontSize: Style.fontPx(1)
+        foreground: root.foreground
+        focusable: true
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        enabled: root.available && !root.pending
+        onClicked: root.beginNow()
+      }
+      Item { width: Math.max(0, parent.width - libraryRecordButton.width - libraryStorageButton.width - parent.spacing * 2); height: 1 }
+      Radio.FocusButton {
+        id: libraryStorageButton
+        text: "Storage"
+        iconName: "folder"
+        iconSize: Style.space(16)
+        fontSize: Style.fontPx(1)
+        foreground: Qt.alpha(root.foreground, 0.8)
+        focusable: true
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        enabled: root.available && !root.pending
+        onClicked: root.beginStorage()
+      }
     }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: searchField; width: parent.width; placeholderText: "Search title or station"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 160; onTextChanged: root.searchText = text; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Ui.SearchableDropdown { fontFamily: root.uiFontFamily; id: statusPicker; width: parent.width; showLabel: false; placeholderText: "Status"; value: root.statusFilter; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); options: [{value:"all", label:"All statuses"}, {value:"recording", label:"Recording"}, {value:"complete", label:"Completed"}, {value:"partial", label:"Partial"}, {value:"error", label:"Failed"}, {value:"missing", label:"Missing"}, {value:"missed", label:"Missed"}]; onChanged: value => { root.statusFilter = value } }
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
+      Ui.TextField {
+        id: searchField
+        width: parent.width - statusPicker.width - parent.spacing
+        font.family: root.uiFontFamily
+        font.pixelSize: Style.fontPx(1.167)
+        placeholderText: "Search recordings"
+        Accessible.name: "Search title or station"
+        foreground: root.foreground
+        maximumLength: 160
+        onTextChanged: root.searchText = text
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+      }
+      Ui.Dropdown {
+        id: statusPicker
+        width: Math.min(Style.space(132), parent.width * 0.44)
+        fontFamily: root.uiFontFamily
+        showLabel: false
+        value: root.statusFilter
+        foreground: root.foreground
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        options: [{value:"all", label:"All statuses"}, {value:"recording", label:"Recording"}, {value:"complete", label:"Saved"}, {value:"partial", label:"Partial"}, {value:"error", label:"Failed"}, {value:"missing", label:"Missing"}, {value:"missed", label:"Missed"}]
+        onChanged: value => { root.statusFilter = value }
+      }
+    }
     Text { width: parent.width; visible: root.available && root.filteredRecordings.length === 0; text: (root.snapshot.recordings || []).length ? "No recordings match." : "No recordings yet."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Repeater { id: libraryRepeater; model: libraryRows
-      Column { id: recordRow; required property var rowData; readonly property bool expanded: !!root.expandedRecordings[rowData.id]; readonly property var modelData: rowData; readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.recordingId === rowData.id && root.radio.wanted; width: root.width; spacing: Style.space(4)
-        Text { width: parent.width; text: parent.modelData.label || parent.modelData.stationName; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); font.bold: true; wrapMode: Text.Wrap }
-        Text { width: parent.width; text: parent.modelData.stationName + " · " + root.dateText(parent.modelData.startedAt || parent.modelData.plannedStart) + (parent.modelData.status === "recording" ? "" : " · " + root.radio.clock(parent.modelData.durationSeconds || 0)) + " · " + root.statusText(parent.modelData.status); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-        Row { width: parent.width; spacing: Style.space(4)
-          Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: recordRow.modelData.status === "recording" ? "Stop capture" : recordRow.playingHere ? (root.radio.paused ? "Resume" : "Pause") : Number(recordRow.modelData.resumePosition) > 0 ? "Resume" : "Play"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.radio.ready && !root.pending && (recordRow.modelData.status === "recording" ? root.available : recordRow.modelData.playable === true); onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const r = recordRow.modelData; if (r.status === "recording") root.action("stopRecording", r.id, root.snapshot.revision); else if (recordRow.playingHere) root.radio.togglePause(); else root.playItem(r.id) } }
-          Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: recordRow.expanded ? "Hide details" : "Details"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.toggleDetails(recordRow.modelData.id) }
+    Repeater {
+      id: libraryRepeater
+      model: libraryRows
+      Column {
+        id: recordRow
+        required property var rowData
+        readonly property var modelData: rowData
+        readonly property bool expanded: !!root.expandedRecordings[rowData.id]
+        readonly property bool capturing: rowData.status === "recording"
+        readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.recordingId === rowData.id && root.radio.wanted
+        readonly property bool opening: playingHere && !root.radio.paused && root.radio.playbackState !== "playing"
+        readonly property real durationSeconds: playingHere && root.seconds(root.radio.duration) > 0 ? root.seconds(root.radio.duration) : root.seconds(rowData.durationSeconds)
+        readonly property real rawPosition: playingHere ? root.seconds(root.radio.position) : Math.floor(root.seconds(rowData.resumePosition))
+        readonly property real listeningPosition: durationSeconds > 0 ? Math.min(rawPosition, durationSeconds) : rawPosition
+        readonly property bool hasResume: listeningPosition > 0.5 && (durationSeconds === 0 || listeningPosition < durationSeconds - 0.5)
+        readonly property string primaryLabel: capturing ? "Stop capture" : opening ? "Opening…" : playingHere && !root.radio.paused ? "Pause"
+          : hasResume ? "Resume · " + root.radio.clock(listeningPosition) : "Play"
+        readonly property string progressLabel: (rowData.status !== "complete" && !capturing ? root.statusText(rowData.status) + " · " : "") + (capturing ? "Recording live audio"
+          : rowData.playable !== true ? (rowData.status === "missing" ? "File unavailable" : "No playable audio")
+          : opening ? "Opening recording…"
+          : durationSeconds > 0 ? ((playingHere ? (root.radio.paused ? "Paused · " : "Playing · ") : "")
+              + (listeningPosition > 0 || playingHere ? root.radio.clock(listeningPosition) + " / " + root.radio.clock(durationSeconds) + " · " + root.radio.clock(durationSeconds - listeningPosition) + " left" : root.radio.clock(durationSeconds) + " · Not started"))
+          : (listeningPosition > 0 ? root.radio.clock(listeningPosition) + " listened · " : "") + "Duration unavailable")
+        width: root.width
+        spacing: Style.space(8)
+        Item { width: 1; height: Style.space(2) }
+        Row {
+          width: parent.width
+          spacing: Style.space(12)
+          Radio.StationLogo {
+            width: Style.space(40)
+            height: width
+            station: root.recordingStation(recordRow.rowData)
+            fallbackColor: Commons.Color.accent
+          }
+          Column {
+            width: parent.width - Style.space(52)
+            spacing: Style.space(3)
+            Text {
+              id: recordTitle
+              width: parent.width
+              text: recordRow.rowData.label || recordRow.rowData.stationName || "Saved recording"
+              textFormat: Text.PlainText
+              color: root.foreground
+              font.family: root.uiFontFamily
+              font.pixelSize: Style.fontPx(1.25)
+              font.weight: Font.DemiBold
+              wrapMode: Text.Wrap
+            }
+            Text { width: parent.width; text: (recordRow.rowData.stationName || "Unknown station") + " · " + root.shortDateText(recordRow.rowData.startedAt || recordRow.rowData.plannedStart); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+          }
         }
-        Text { width: parent.width; visible: recordRow.expanded; text: "Planned: " + root.dateText(recordRow.modelData.plannedStart) + " – " + root.dateText(recordRow.modelData.plannedEnd) + (recordRow.modelData.startedAt ? "\nActual: " + root.dateText(recordRow.modelData.startedAt) + (recordRow.modelData.endedAt ? " – " + root.dateText(recordRow.modelData.endedAt) : "") : "") + "\nSize: " + root.sizeText(recordRow.modelData.bytes) + (recordRow.modelData.reason ? "\n" + recordRow.modelData.reason : ""); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-        Row { width: parent.width; spacing: Style.space(4); visible: recordRow.expanded
-          Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Restart from beginning"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: recordRow.modelData.playable === true && root.radio.ready && !root.pending; onClicked: root.playItem(recordRow.modelData.id, true) }
-          Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: root.confirmation === "deleteRecording:" + recordRow.modelData.id ? "Confirm delete" : "Delete"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.available && !root.pending && recordRow.modelData.status !== "recording"; onClicked: root.action("deleteRecording", recordRow.modelData.id, root.snapshot.revision) }
+        Column {
+          width: parent.width
+          spacing: Style.space(6)
+          QQC.ProgressBar {
+            id: listeningProgress
+            width: parent.width
+            height: Style.space(3)
+            visible: recordRow.rowData.playable === true && !recordRow.capturing && recordRow.durationSeconds > 0 && (recordRow.listeningPosition > 0 || recordRow.playingHere)
+            from: 0
+            to: recordRow.durationSeconds > 0 ? recordRow.durationSeconds : 1
+            value: recordRow.listeningPosition
+            Accessible.name: "Listening progress for " + (recordRow.rowData.label || recordRow.rowData.stationName)
+            Accessible.description: root.radio.clock(recordRow.listeningPosition) + " of " + root.radio.clock(recordRow.durationSeconds)
+            background: Rectangle { radius: height / 2; color: Qt.alpha(root.foreground, 0.14) }
+            contentItem: Item { Rectangle { width: parent.width * listeningProgress.visualPosition; height: parent.height; radius: height / 2; color: Commons.Color.accent } }
+          }
+          Text { width: parent.width; text: recordRow.progressLabel; textFormat: Text.PlainText; color: recordRow.capturing ? Commons.Color.urgent : recordRow.playingHere ? Commons.Color.accent : root.foreground; opacity: recordRow.playingHere || recordRow.capturing ? 1 : 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
         }
+        Row {
+          width: parent.width
+          spacing: Style.space(8)
+          Radio.FocusButton {
+            id: rowPrimary
+            visible: recordRow.capturing || recordRow.rowData.playable === true
+            text: recordRow.primaryLabel
+            iconName: recordRow.capturing ? "stop" : recordRow.playingHere && !root.radio.paused ? "pause" : "play"
+            iconSize: Style.space(16)
+            fontSize: Style.fontPx(1)
+            foreground: recordRow.capturing ? Commons.Color.urgent : Commons.Color.accent
+            background: Qt.alpha(foreground, 0.09)
+            tooltipText: text + " · " + (recordRow.rowData.label || recordRow.rowData.stationName)
+            focusable: true
+            enabled: root.radio.ready && !root.pending && !recordRow.opening && (recordRow.capturing ? root.available : recordRow.rowData.playable === true)
+            opacity: enabled ? 1 : 0.4
+            onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+            onClicked: {
+              if (recordRow.capturing) root.action("stopRecording", recordRow.rowData.id, root.snapshot.revision)
+              else if (recordRow.playingHere) root.radio.togglePause()
+              else root.playItem(recordRow.rowData.id, recordRow.durationSeconds > 0 && recordRow.listeningPosition >= recordRow.durationSeconds - 0.5)
+            }
+          }
+          Item { width: Math.max(0, parent.width - (rowPrimary.visible ? rowPrimary.width + parent.spacing : 0) - rowDetails.width - parent.spacing); height: 1 }
+          Radio.FocusButton {
+            id: rowDetails
+            text: recordRow.expanded ? "Hide details" : "Details"
+            fontSize: Style.fontPx(1)
+            foreground: Qt.alpha(root.foreground, 0.8)
+            focusable: true
+            Accessible.checkable: true
+            Accessible.checked: recordRow.expanded
+            onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+            onClicked: root.toggleDetails(recordRow.rowData.id)
+          }
+        }
+        Column {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: recordRow.expanded
+          Text {
+            width: parent.width
+            text: "Planned: " + root.dateText(recordRow.rowData.plannedStart) + " – " + root.dateText(recordRow.rowData.plannedEnd)
+              + (recordRow.rowData.startedAt ? "\nActual: " + root.dateText(recordRow.rowData.startedAt) + (recordRow.rowData.endedAt ? " – " + root.dateText(recordRow.rowData.endedAt) : "") : "")
+              + "\nSize: " + root.sizeText(recordRow.rowData.bytes) + " · " + root.statusText(recordRow.rowData.status)
+              + (recordRow.rowData.reason ? "\n" + recordRow.rowData.reason : "")
+            textFormat: Text.PlainText
+            color: root.foreground
+            opacity: 0.8
+            font.family: root.uiFontFamily
+            font.pixelSize: Style.fontPx(1)
+            wrapMode: Text.Wrap
+          }
+          Row {
+            width: parent.width
+            spacing: Style.space(8)
+            Radio.FocusButton {
+              id: rowRestart
+              visible: recordRow.rowData.playable === true
+              text: "Play from start"
+              fontSize: Style.fontPx(1)
+              foreground: root.foreground
+              focusable: true
+              enabled: root.radio.ready && !root.pending
+              onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+              onClicked: root.playItem(recordRow.rowData.id, true)
+            }
+            Radio.FocusButton {
+              id: rowDelete
+              text: root.confirmation === "deleteRecording:" + recordRow.rowData.id ? "Confirm delete" : "Delete"
+              fontSize: Style.fontPx(1)
+              foreground: Commons.Color.urgent
+              focusable: true
+              enabled: root.available && !root.pending && !recordRow.capturing
+              onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+              onClicked: root.action("deleteRecording", recordRow.rowData.id, root.snapshot.revision)
+            }
+          }
+        }
+        Item { width: 1; height: Style.space(2) }
         Ui.PanelSeparator { width: parent.width }
       }
     }
     Row { width: parent.width; spacing: Style.space(4); visible: root.libraryPages > 1
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "← Previous"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.libraryPage > 0; onClicked: root.libraryPage-- }
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Next →"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.libraryPage + 1 < root.libraryPages; onClicked: root.libraryPage++ }
+      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "← Previous"; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.libraryPage > 0; onClicked: root.libraryPage-- }
+      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Next →"; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.libraryPage + 1 < root.libraryPages; onClicked: root.libraryPage++ }
     }
     Text { width: parent.width; visible: root.libraryPages > 1; text: "Page " + (root.libraryPage + 1) + " of " + root.libraryPages; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
   }

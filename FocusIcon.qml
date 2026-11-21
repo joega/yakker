@@ -5,6 +5,8 @@ Image {
   id: root
   property string name: ""
   property color foreground: "black"
+  readonly property color opaqueForeground: Qt.rgba(foreground.r, foreground.g, foreground.b, 1)
+  opacity: foreground.a
   readonly property var paths: ({
     "play": '<path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/>',
     "pause": '<path d="M8 5v14M16 5v14" stroke-width="4"/>',
@@ -26,7 +28,7 @@ Image {
     "close": '<path d="M6 6l12 12M18 6L6 18"/>'
   })
   source: name && paths[name] ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" color="' + foreground
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" color="' + opaqueForeground
       + '" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + paths[name] + '</svg>') : ""
   sourceSize: Qt.size(Math.ceil(width * 2), Math.ceil(height * 2))
   fillMode: Image.PreserveAspectFit

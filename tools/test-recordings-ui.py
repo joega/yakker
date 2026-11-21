@@ -87,6 +87,13 @@ def main():
   property alias testFolder: folderField
   property alias testRefreshDraft: refreshDraftButton
   required property var radio''', 1))
+        view.write_text(view.read_text().replace('        id: recordRow', """        id: recordRow
+        property alias testPrimary: rowPrimary
+        property alias testDetails: rowDetails
+        property alias testDelete: rowDelete
+        property alias testRestart: rowRestart
+        property alias testProgress: listeningProgress
+        property alias testTitle: recordTitle""", 1))
         service = plugin / "RadioService.qml"
         service.write_text(service.read_text().replace('  property int clients: 0', '  property alias testHelper: helper\n  property int clients: 0', 1))
         stations = json.loads((ROOT / "stations.json").read_text())

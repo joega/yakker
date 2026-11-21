@@ -26,7 +26,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, favorite presets, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with search, status filter, saved shows, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, favorite presets, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Clean recording rows with station artwork, listening progress, timed Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
 
 | Favorites and search | Recording schedules | Settings and custom stations |
 | :---: | :---: | :---: |
@@ -261,7 +261,12 @@ the remaining interval, retaining separate segments. There is no wake timer or s
 Recordings use **mono Opus at 24 kbit/s VBR** in `.opus` files: roughly **3.6 MB
 per 20 minutes** or **10.8 MB per hour**, plus container overhead, with sizes
 varying by content. The bitrate is an internal encoder parameter; raising it later
-affects future captures. The Library shows compact rows for each recording. Search
+affects future captures. The Library shows station artwork, show titles and
+compact dates in each row. In-progress shows display a listening bar, elapsed
+and remaining audio time, and a **Resume** action labeled with the saved position.
+The current show updates live and its row can pause/resume the same player.
+Unknown durations never show an invented percentage. **Details**, restart,
+deletion and storage controls use quieter secondary actions. Search
 by title or station and filter by status across the full library before moving between pages. Open
 **Details** for times, size, reason, deletion, and **Restart from beginning**.
 **Play** or **Resume** starts a retained file while keeping the library open.
