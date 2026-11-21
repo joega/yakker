@@ -68,6 +68,7 @@ def main():
   property alias testDockPlay: dockPlay
   property alias testDockBack: dockBack
   property alias testDockForward: dockForward
+  property alias testDockStop: dockStop
   property alias testScroller: scroller
   property alias testPresets: presetRepeater
   property alias testHeading: stationHeading

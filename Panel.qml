@@ -49,6 +49,21 @@ Ui.Panel {
       ? (radio.paused ? "Paused · " : "") + radio.clock(radio.behindLive) + " behind live"
       : radio.statusText
 
+  component PlaybackButton: Radio.FocusButton {
+    width: Style.space(64)
+    height: width
+    radius: width / 2
+    iconName: root.radio.wanted && !root.radio.paused ? "pause" : "play"
+    iconSize: Style.space(25)
+    tooltipText: root.playTooltip
+    foreground: Commons.Color.background
+    color: Commons.Color.accent
+    borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent)
+      : hot ? Border.controlSpec("hover-cursor", root.barForeground, Commons.Color.accent) : Border.none()
+    enabled: root.canPlay
+    opacity: enabled ? 1 : 0.35
+    onClicked: root.togglePlayback()
+  }
   component NavigationTab: Radio.FocusButton {
     property int cursorId: -1
     function traverse(direction, event) {
@@ -1143,24 +1158,10 @@ Ui.Panel {
                   }
                   Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 }
-                Radio.FocusButton {
+                PlaybackButton {
                   id: playButton
-                  width: Style.space(64)
-                  height: width
-                  radius: width / 2
-                  iconName: root.radio.wanted && !root.radio.paused ? "pause" : "play"
-                  iconSize: Style.space(25)
-                  tooltipText: root.playTooltip
-                  Accessible.role: Accessible.Button
-                  Accessible.name: tooltipText
-                  foreground: Commons.Color.background
-                  color: Commons.Color.accent
-                  borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : hot ? Border.controlSpec("hover-cursor", root.barForeground, Commons.Color.accent) : Border.none()
-                  enabled: root.canPlay
-                  opacity: enabled ? 1 : 0.35
                   hasCursor: root.virtualFocus && root.cursor === 1
                   onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 1 } }
-                  onClicked: root.togglePlayback()
                 }
                 Column {
                   anchors.verticalCenter: parent.verticalCenter
@@ -1346,18 +1347,85 @@ Ui.Panel {
             width: parent.width
             visible: root.auxiliaryView
             spacing: Style.space(8)
-            Radio.StationLogo { width: Style.space(36); height: width; station: root.radio.playbackStation; fallbackColor: Commons.Color.accent; anchors.verticalCenter: parent.verticalCenter }
+            Radio.StationLogo {
+              width: Style.space(36); height: width
+              y: (dockPlay.height - height) / 2
+              station: root.radio.playbackStation
+              fallbackColor: Commons.Color.accent
+            }
             Column {
-              width: parent.width - Style.space(44) - dockBack.width - dockPlay.width - dockForward.width - dockStop.width - parent.spacing * 4
+              width: parent.width - Style.space(36) - dockControls.width - parent.spacing * 2
+              y: Math.max(0, (dockPlay.height - implicitHeight) / 2)
               spacing: Style.space(3)
-              anchors.verticalCenter: parent.verticalCenter
               Radio.MarqueeText { scrolling: false; width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold }
               Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); elide: Text.ElideRight }
             }
-            Radio.FocusButton { id: dockBack; hasCursor: root.virtualFocus && root.cursor === 54; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 54 } }; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
-            Radio.FocusButton { id: dockPlay; hasCursor: root.virtualFocus && root.cursor === 55; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 55 } }; width: Style.space(34); horizontalPadding: 0; iconName: playButton.iconName; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
-            Radio.FocusButton { id: dockForward; hasCursor: root.virtualFocus && root.cursor === 56; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 56 } }; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
-            Radio.FocusButton { id: dockStop; hasCursor: root.virtualFocus && root.cursor === 57; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 57 } }; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
+            Column {
+              id: dockControls
+              width: dockTransport.implicitWidth
+              spacing: Style.space(2)
+              Row {
+                id: dockTransport
+                spacing: Style.space(6)
+                Radio.FocusButton {
+                  id: dockBack
+                  width: Style.space(30)
+                  horizontalPadding: 0
+                  anchors.verticalCenter: parent.verticalCenter
+                  iconName: "back"
+                  tooltipText: "Rewind 30 seconds"
+                  foreground: Qt.alpha(root.barForeground, 0.8)
+                  enabled: root.canRewind
+                  opacity: enabled ? 1 : 0.35
+                  focusable: true
+                  hasCursor: root.virtualFocus && root.cursor === 54
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 54 } }
+                  onClicked: root.radio.skip(-30)
+                }
+                PlaybackButton {
+                  id: dockPlay
+                  width: Style.space(44)
+                  iconSize: Style.space(21)
+                  horizontalPadding: 0
+                  focusable: true
+                  hasCursor: root.virtualFocus && root.cursor === 55
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 55 } }
+                }
+                Radio.FocusButton {
+                  id: dockForward
+                  width: Style.space(30)
+                  horizontalPadding: 0
+                  anchors.verticalCenter: parent.verticalCenter
+                  iconName: "forward"
+                  tooltipText: "Forward 30 seconds"
+                  foreground: Qt.alpha(root.barForeground, 0.8)
+                  enabled: root.canForward
+                  opacity: enabled ? 1 : 0.35
+                  focusable: true
+                  hasCursor: root.virtualFocus && root.cursor === 56
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 56 } }
+                  onClicked: root.radio.skip(30)
+                }
+              }
+              Radio.FocusButton {
+                id: dockStop
+                anchors.horizontalCenter: parent.horizontalCenter
+                iconName: "stop"
+                iconSize: Style.space(14)
+                text: "Stop"
+                fontSize: Style.fontPx(1)
+                horizontalPadding: Style.space(6)
+                verticalPadding: Style.space(4)
+                tooltipText: stopButton.tooltipText
+                foreground: Qt.alpha(root.barForeground, 0.85)
+                enabled: root.radio.wanted
+                opacity: enabled ? 1 : 0.35
+                focusable: true
+                hasCursor: root.virtualFocus && root.cursor === 57
+                onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 57 } }
+                onClicked: root.radio.stop()
+              }
+            }
           }
           Row {
             width: parent.width

@@ -326,8 +326,9 @@ when no results or favorites are available.
 | [<img src="docs/yakker-empty-library.png" alt="Empty recording library with record-now and schedule guidance" width="300">](docs/yakker-empty-library.png) | [<img src="docs/yakker-empty-search.png" alt="No matching recordings with a clear-filters action" width="300">](docs/yakker-empty-search.png) |
 
 A fixed playback dock remains available while you scroll recordings, schedules,
-or editors, with pause/resume, 30-second skips, Stop, and volume. The playing row
-also offers Pause/Resume. Choose **Listen** for the full player, duration-based
+editors, or settings. It uses the same round Pause/Resume control as Listen, with
+a smaller labeled Stop directly beneath it, quieter 30-second skips, and volume.
+The playing row also offers Pause/Resume. Choose **Listen** for the full player, duration-based
 seek bar, speed controls, and **Return to live**. Artwork follows the source of
 the saved show, independently of the selected live station. Position is saved
 at most every 10 seconds and when pausing, stopping, switching, or shutting down;
