@@ -93,6 +93,13 @@ Ui.Panel {
     opacity: enabled ? 1 : 0.35
     onClicked: root.togglePlayback()
   }
+  component SettingsControl: Radio.FocusButton {
+    width: Style.space(32)
+    height: Style.space(32)
+    foreground: root.barForeground
+    hasCursor: root.virtualFocus && root.cursor === 4
+    onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 4 } }
+  }
   component NavigationTab: Radio.FocusButton {
     property int cursorId: -1
     function traverse(direction, event) {
@@ -277,9 +284,10 @@ Ui.Panel {
   function advanceCursor(direction) {
     keyboardNavigation = true
     keyCatcher.forceActiveFocus()
-    let order = [4,20,14,21]
+    let order = [20,14,21,4]
     if (settingsOpen) {
       order = [4,30,31,32,33]
+      if (captureIndicator.visible) order.unshift(58)
       if (settingsTab === "listening") order = order.concat([40,41,42,43])
       if (dockBack.enabled) order.push(54)
       if (dockPlay.enabled) order.push(55)
@@ -315,10 +323,10 @@ Ui.Panel {
     Qt.callLater(ensureCursorVisible)
   }
   function ensureCursorVisible() {
-    const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
+    const targets = [stationPicker, playButton, volumeSlider, muteButton, root.settingsOpen ? settingsCloseButton : settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
                      addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
-    ensureItemVisible(cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
+    ensureItemVisible(cursor === 58 ? captureIndicator : cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
   function ensureItemVisible(item) {
     scrollTarget = item
@@ -361,6 +369,7 @@ Ui.Panel {
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
     else if (cursor === 24) backFromSettings()
+    else if (cursor === 58 && settingsOpen && captureIndicator.visible) captureIndicator.clicked()
     else if (cursor >= 54 && cursor <= 57 && auxiliaryView) {
       const target = [dockBack, dockPlay, dockForward, dockStop][cursor - 54]
       if (target.enabled) target.clicked()
@@ -481,34 +490,20 @@ Ui.Panel {
           width: parent.width
           spacing: Style.space(4)
           Row {
+            visible: root.settingsOpen
             width: parent.width
             spacing: Style.space(8)
-            Row {
-              width: parent.width - captureIndicator.width - settingsButton.width - parent.spacing * 2
+            Text {
+              id: settingsSectionTitle
+              width: parent.width - settingsCloseButton.width - (captureIndicator.visible ? captureIndicator.width + parent.spacing * 2 : parent.spacing)
               anchors.verticalCenter: parent.verticalCenter
-              spacing: Style.space(10)
-              Text {
-                id: appTitle
-                text: "YAKKER"
-                font.letterSpacing: Style.space(2)
-                textFormat: Text.PlainText
-                color: root.barForeground
-                font.family: root.uiFontFamily
-                font.pixelSize: Style.fontPx(1.167)
-                font.weight: Font.DemiBold
-              }
-              Text {
-                id: settingsSectionTitle
-                visible: root.settingsOpen
-                width: Math.max(0, parent.width - appTitle.width - parent.spacing)
-                text: "· Settings"
-                textFormat: Text.PlainText
-                color: Qt.alpha(root.barForeground, 0.8)
-                font.family: root.uiFontFamily
-                font.pixelSize: Style.fontPx(1.167)
-                font.weight: Font.Medium
-                elide: Text.ElideRight
-              }
+              text: "Settings"
+              textFormat: Text.PlainText
+              color: root.barForeground
+              font.family: root.uiFontFamily
+              font.pixelSize: Style.fontPx(1.333)
+              font.weight: Font.DemiBold
+              elide: Text.ElideRight
             }
             Radio.FocusButton {
               id: captureIndicator
@@ -518,27 +513,25 @@ Ui.Panel {
               fontSize: Style.fontPx(1)
               foreground: Commons.Color.urgent
               tooltipText: "Background captures · Open recordings"
-              focusable: root.auxiliaryView
+              focusable: true
+              hasCursor: root.virtualFocus && root.cursor === 58
+              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 58 } }
               onClicked: root.openRecordings(false)
             }
-            Radio.FocusButton {
-              id: settingsButton
-              iconName: root.settingsOpen ? "close" : "settings"
-              tooltipText: root.settingsOpen ? "Close settings" : "Open settings"
-              Accessible.role: Accessible.Button
-              Accessible.name: tooltipText
-              foreground: root.barForeground
-              selected: root.settingsOpen
-              focusable: root.auxiliaryView
-              hasCursor: root.virtualFocus && root.cursor === 4
-              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 4 } }
-              onClicked: root.settingsOpen ? root.closeSettings() : root.openSettings()
+            SettingsControl {
+              id: settingsCloseButton
+              iconName: "close"
+              tooltipText: "Close settings"
+              selected: true
+              focusable: true
+              onClicked: root.closeSettings()
             }
           }
           Row {
+            id: mainNavigation
             visible: !root.settingsOpen
             width: parent.width
-            spacing: Style.space(6)
+            spacing: Style.space(4)
             NavigationTab {
               id: listenButton
               cursorId: 20
@@ -568,6 +561,13 @@ Ui.Panel {
               hasCursor: root.virtualFocus && root.cursor === 14
               onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 14 } }
               onClicked: root.openRecordings(false)
+              Rectangle {
+                visible: Number(root.radio.recordings.activeCount) > 0
+                width: Style.space(5); height: width; radius: width / 2
+                anchors.right: parent.right; anchors.rightMargin: Style.space(5)
+                anchors.top: parent.top; anchors.topMargin: Style.space(6)
+                color: Commons.Color.urgent
+              }
             }
             NavigationTab {
               id: schedulesButton
@@ -582,6 +582,18 @@ Ui.Panel {
               hasCursor: root.virtualFocus && root.cursor === 21
               onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 21 } }
               onClicked: root.openSchedules()
+            }
+            Item {
+              width: Math.max(0, parent.width - listenButton.width - recordingsButton.width - schedulesButton.width - settingsButton.width - parent.spacing * 4)
+              height: 1
+            }
+            SettingsControl {
+              id: settingsButton
+              anchors.verticalCenter: parent.verticalCenter
+              iconName: "settings"
+              tooltipText: "Open settings"
+              focusable: root.auxiliaryView
+              onClicked: root.openSettings()
             }
           }
           Row {

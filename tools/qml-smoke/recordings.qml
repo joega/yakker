@@ -154,7 +154,7 @@ ShellRoot {
       }
       function checkPlaybackStates() {
         const radio = panel.radio
-        const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","sleepRemaining","duration"]
+        const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","sleepRemaining","duration","recordings"]
         const saved = keys.map(function(key) { return radio[key] })
         try {
           radio.station = radio.stations.find(function(station) { return station.id === "tsn-690" })
@@ -176,6 +176,14 @@ ShellRoot {
           compare(panel.testDockStatus.text, "Paused · buffering")
           verify(!panel.testDockStatus.truncated, "The compact player hides the buffering state")
           capture("paused-buffering-dock-small")
+          radio.recordings = Object.assign({}, radio.recordings, {activeCount:1})
+          panel.testCatcher.forceActiveFocus(); panel.cursor = 4
+          keyClick(Qt.Key_Backtab); compare(panel.cursor, 58)
+          keyClick(Qt.Key_Return)
+          verify(panel.recordingsOpen && !panel.settingsOpen, "Settings recording indicator did not open Library")
+          verify(radio.wanted && radio.paused, "Header navigation interrupted paused playback")
+          panel.openSettings(); wait(50)
+          capture("settings-capture-small")
           radio.bufferExpired = true
           verify(panel.testPlaybackHint.text.indexOf("Earlier audio expired") >= 0, "Expired replay still promises the original paused position")
           radio.bufferExpired = false
@@ -315,7 +323,7 @@ ShellRoot {
           keyClick(Qt.Key_Left)
           tryVerify(function() { return !panel.recordingsOpen && panel.testCatcher.activeFocus }, 2000)
           compare(panel.radio.volume, navigationVolume, "Tab arrows changed volume")
-          panel.cursor = -1; keyClick(Qt.Key_Tab); compare(panel.cursor, 4)
+          panel.cursor = -1; keyClick(Qt.Key_Tab); compare(panel.cursor, 20)
           panel.cursor = -1; keyClick(Qt.Key_Backtab); compare(panel.cursor, 2)
           const navigationMuted = panel.radio.muted
           keyClick(Qt.Key_M, Qt.ControlModifier)
@@ -409,7 +417,7 @@ ShellRoot {
           mouseMove(panel, panel.width - 2, panel.height - 2)
           tryVerify(function() { return !panel.testSchedulesButton.hot }, 2000, "The tab hover stuck after the pointer left")
           keyClick(Qt.Key_Tab)
-          compare(panel.cursor, 0); verify(panel.testStationPicker.hasCursor, "Keyboard focus did not return after mouse hover")
+          compare(panel.cursor, 4); verify(panel.testSettingsButton.hasCursor, "Keyboard focus did not return after mouse hover")
           panel.testListenButton.forceActiveFocus(); panel.cursor = 20
           keyClick(Qt.Key_Tab)
           verify(panel.testCatcher.activeFocus && panel.testRecordingsButton.hasCursor, "Tab left focus painted on the previous control")
@@ -750,9 +758,9 @@ ShellRoot {
           wait(100); keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen, "Second Escape did not return to player")
           panel.testSettingsButton.clicked()
           verify(panel.settingsOpen && panel.testSettings.visible && !panel.testPlayerView.visible)
-          compare(panel.testSectionTitle.text, "· Settings")
+          compare(panel.testSectionTitle.text, "Settings")
           compare(panel.testSettingsTabs.count, 4)
-          compare(panel.testSettingsButton.iconName, "close")
+          compare(panel.testSettingsClose.iconName, "close")
           const settingsVolume = panel.radio.volume
           panel.testSettingsTabs.itemAt(0).forceActiveFocus(); panel.cursor = 30
           keyClick(Qt.Key_Right)
@@ -849,7 +857,7 @@ ShellRoot {
           tryVerify(function() { var y = panel.testView.testStorageSave.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testStorageSave.height <= panel.testDock.mapToItem(panel, 0, 0).y }, 2000)
           capture("storage-small")
           window.height = 650; window.width = 420
-          panel.testSettingsButton.clicked(); verify(!panel.settingsOpen && !panel.recordingsOpen)
+          panel.testSettingsClose.clicked(); verify(!panel.settingsOpen && !panel.recordingsOpen)
           panel.openSchedules(); panel.openSettings(); panel.selectSettingsTab("alerts")
           panel.testSettingsButton.clicked()
           verify(panel.recordingsOpen && panel.testView.tab === "schedules", "X lost the previous main section")

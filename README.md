@@ -142,7 +142,7 @@ Short titles stay still; reduced-motion mode uses an ellipsis and a full-title
 tooltip instead. Preset and playback dock titles also stay on one line, without
 independent animations; playback status can wrap to keep paused/stopped states
 readable. The player includes up to six favorite presets in the order you added them. The **Listen**, **Library**,
-and **Schedules** tabs stay at the top. **Rewind · Play/Pause · Forward** form the
+and **Schedules** tabs form the first row, with Settings at the right edge. **Rewind · Play/Pause · Forward** form the
 main transport row, with a larger Play/Pause control; **Record**, **Stop**, and
 **Sleep** sit below it, with Stop centered beneath Play/Pause. Rewind and forward
 skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
@@ -309,7 +309,9 @@ captures and does not create a repeating schedule.
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
 playing a saved recording leaves those captures running. The bar dot turns red
-while capturing; a **REC** indicator in the player header shows the active count and opens the library. The machine must be awake
+while capturing; a recording dot on the **Library** tab marks active captures.
+The Library tooltip shows the count, and Settings keeps a **REC** count that opens
+the library. The machine must be awake
 with the plugin loaded in the bar. Disabling/removing the last widget, restarting
 the shell, or shutting down the helper interrupts captures. Recoverable output is
 retained as partial; when the plugin returns during the scheduled interval it can
@@ -493,7 +495,7 @@ This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
 
-The gear opens **YAKKER · Settings**, with four tabs: **Listening**, **Storage**,
+The gear opens **Settings**, with four tabs: **Listening**, **Storage**,
 **Alerts**, and **Stations**. Listening shows the Live only / 5 / 15 / 30 minute
 buffer choices directly, with an explanation of the selected mode and a compact
 two-column keyboard shortcut reference. Each tab replaces the content below it; the playback
