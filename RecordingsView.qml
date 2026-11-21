@@ -130,7 +130,7 @@ Column {
     textFormat: Text.PlainText
     color: root.foreground
     font.family: root.uiFontFamily
-    font.pixelSize: Style.fontPx(1)
+    font.pixelSize: Style.fontPx(1.083)
     font.weight: Font.DemiBold
   }
   component Hint: Text {
@@ -454,7 +454,7 @@ Column {
     iconName: "left"
     foreground: Qt.alpha(root.foreground, 0.8)
     fontSize: Style.fontPx(1)
-    horizontalPadding: 0
+    horizontalPadding: Style.space(6)
     focusable: true
     enabled: !root.pending
     onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
@@ -567,7 +567,7 @@ Column {
           id: scheduleEditButton
           text: "Edit schedule"
           fontSize: Style.fontPx(1)
-          horizontalPadding: 0
+          horizontalPadding: Style.space(6)
           foreground: Qt.alpha(root.foreground, 0.8)
           focusable: true
           enabled: root.available && !root.pending
@@ -626,7 +626,7 @@ Column {
       Row {
         width: parent.width; spacing: Style.space(8)
         Hint { width: Math.max(0, parent.width - changeZone.width - parent.spacing); anchors.verticalCenter: parent.verticalCenter; text: zoneField.text }
-        Radio.FocusButton { id: changeZone; text: root.timezoneEditing ? "Done" : "Change zone"; fontSize: Style.fontPx(1); horizontalPadding: 0; foreground: root.foreground; focusable: true; onClicked: { root.timezoneEditing = !root.timezoneEditing; if (root.timezoneEditing) root.focusItem(zoneField) } }
+        Radio.FocusButton { id: changeZone; text: root.timezoneEditing ? "Done" : "Change zone"; fontSize: Style.fontPx(1); horizontalPadding: Style.space(6); foreground: root.foreground; focusable: true; onClicked: { root.timezoneEditing = !root.timezoneEditing; if (root.timezoneEditing) root.focusItem(zoneField) } }
       }
       Ui.TextField { id: zoneField; visible: root.timezoneEditing; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "e.g. America/New_York"; Accessible.name: "Recording timezone"; foreground: root.foreground; maximumLength: 128; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
     }
@@ -664,7 +664,7 @@ Column {
       Radio.FocusButton { id: saveScheduleButton; width: (parent.width-parent.spacing)*0.65; text: root.pending && root.pendingKind === "schedule" ? "Saving…" : root.editingId ? "Save changes" : "Create schedule"; color: Qt.alpha(Commons.Color.accent, 0.16); foreground: root.foreground; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.save() }
       Radio.FocusButton { width: (parent.width-parent.spacing)*0.35; text: "Cancel"; foreground: root.foreground; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
     }
-    Radio.FocusButton { id: deleteScheduleButton; visible: !!root.editingId; text: root.confirmation === "deleteSchedule:" + root.editingId ? "Confirm delete schedule" : "Delete schedule"; fontSize: Style.fontPx(1); horizontalPadding: 0; foreground: Commons.Color.urgent; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.action("deleteSchedule", root.editingId, root.editRevision) }
+    Radio.FocusButton { id: deleteScheduleButton; visible: !!root.editingId; text: root.confirmation === "deleteSchedule:" + root.editingId ? "Confirm delete schedule" : "Delete schedule"; fontSize: Style.fontPx(1); horizontalPadding: Style.space(6); foreground: Commons.Color.urgent; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.action("deleteSchedule", root.editingId, root.editRevision) }
   }
   Column {
     width: parent.width
@@ -892,7 +892,7 @@ Column {
               text: "Delete this recording and its audio file?"
               color: Commons.Color.urgent
             }
-            Row {
+            Flow {
               width: parent.width
               spacing: Style.space(8)
               Radio.FocusButton {
@@ -901,7 +901,7 @@ Column {
                 text: "Play from start"
                 tooltipText: "Restart this recording from the beginning"
                 fontSize: Style.fontPx(1)
-                horizontalPadding: 0
+                horizontalPadding: Style.space(6)
                 foreground: Qt.alpha(root.foreground, 0.75)
                 focusable: true
                 enabled: root.radio.ready && !root.pending
@@ -909,13 +909,12 @@ Column {
                 onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
                 onClicked: { root.confirmation = ""; root.playItem(recordRow.rowData.id, true) }
               }
-              Item { width: Math.max(0, parent.width - (rowRestart.visible ? rowRestart.width + parent.spacing : 0) - rowDelete.width - (rowCancelDelete.visible ? rowCancelDelete.width + parent.spacing : 0) - parent.spacing); height: 1 }
               Radio.FocusButton {
                 id: rowDelete
                 text: root.confirmation === "deleteRecording:" + recordRow.rowData.id ? "Confirm delete" : "Delete"
                 tooltipText: "Delete this recording and its audio file"
                 fontSize: Style.fontPx(1)
-                horizontalPadding: 0
+                horizontalPadding: Style.space(6)
                 foreground: root.confirmation === "deleteRecording:" + recordRow.rowData.id ? Commons.Color.urgent : Qt.alpha(root.foreground, 0.65)
                 focusable: true
                 enabled: root.available && !root.pending && !recordRow.capturing
@@ -928,7 +927,7 @@ Column {
                 visible: root.confirmation === "deleteRecording:" + recordRow.rowData.id
                 text: "Cancel"
                 fontSize: Style.fontPx(1)
-                horizontalPadding: 0
+                horizontalPadding: Style.space(6)
                 foreground: Qt.alpha(root.foreground, 0.75)
                 focusable: true
                 enabled: !root.pending
@@ -1031,7 +1030,7 @@ Column {
           iconName: "folder"
           iconSize: Style.space(16)
           fontSize: Style.fontPx(1)
-          horizontalPadding: 0
+          horizontalPadding: Style.space(6)
           foreground: Qt.alpha(root.foreground, 0.8)
           focusable: true
           onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
@@ -1041,7 +1040,7 @@ Column {
           id: openFolderButton
           text: "Open folder"
           fontSize: Style.fontPx(1)
-          horizontalPadding: 0
+          horizontalPadding: Style.space(6)
           foreground: Qt.alpha(root.foreground, 0.8)
           focusable: true
           onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
@@ -1078,7 +1077,7 @@ Column {
       visible: root.storageRevision !== Number(root.snapshot.revision)
       text: "Refresh and keep these settings"
       fontSize: Style.fontPx(1)
-      horizontalPadding: 0
+      horizontalPadding: Style.space(6)
       foreground: root.foreground
       focusable: true
       onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)

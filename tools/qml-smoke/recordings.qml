@@ -217,8 +217,21 @@ ShellRoot {
           verify(backCenter.x < playCenter.x && playCenter.x < forwardCenter.x, "Time skips must flank the primary play control")
           verify(panel.testPlayButton.height > panel.testStopButton.height, "Play/Pause lost primary emphasis")
           capture("player")
-          panel.cursor = 21
+          panel.testCatcher.forceActiveFocus(); panel.keyboardNavigation = true; panel.cursor = 1
+          verify(panel.testPlayButton.hasCursor)
+          const tabWidth = panel.testSchedulesButton.width
+          mouseMove(panel.testSchedulesButton, 8, panel.testSchedulesButton.height / 2)
+          tryVerify(function() { return panel.testSchedulesButton.hot }, 2000)
+          verify(!panel.testPlayButton.hasCursor && !panel.testSchedulesButton.hasCursor, "Pointer hover left a second keyboard highlight")
+          compare(panel.testSchedulesButton.width, tabWidth)
           capture("tab-hover-padding")
+          mouseMove(panel, panel.width - 2, panel.height - 2)
+          tryVerify(function() { return !panel.testSchedulesButton.hot }, 2000, "The tab hover stuck after the pointer left")
+          keyClick(Qt.Key_Tab)
+          compare(panel.cursor, 0); verify(panel.testStationPicker.hasCursor, "Keyboard focus did not return after mouse hover")
+          panel.testListenButton.forceActiveFocus(); panel.cursor = 20
+          keyClick(Qt.Key_Tab)
+          verify(panel.testCatcher.activeFocus && panel.testRecordingsButton.hasCursor, "Tab left focus painted on the previous control")
           panel.cursor = 1
           panel.cursor = 14; panel.advanceCursor(1); compare(panel.cursor, 21)
           panel.advanceCursor(-1); compare(panel.cursor, 14)
@@ -478,6 +491,8 @@ ShellRoot {
           compare(panel.testPlayButton.tooltipText, "Pause")
           panel.cursor = 1; panel.activate(); tryVerify(function() { return panel.radio.paused }, 5000)
           compare(panel.testPlayButton.tooltipText, "Resume")
+          panel.testCatcher.forceActiveFocus(); panel.cursor = 0
+          keyClick(Qt.Key_Tab); compare(panel.cursor, 15, "Recording seek is out of visual tab order")
           console.log("QA: seek")
           verify(panel.testForwardButton.enabled)
           panel.cursor = 8; panel.activate(); tryVerify(function() { return panel.radio.position > 28 }, 5000)

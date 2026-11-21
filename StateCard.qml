@@ -82,7 +82,7 @@ Rectangle {
       visible: !!root.detailText
       text: root.detailsExpanded ? "Hide details" : "Show details"
       fontSize: Style.fontPx(1)
-      horizontalPadding: 0
+      horizontalPadding: Style.space(6)
       foreground: Qt.alpha(root.foreground, 0.7)
       focusable: true
       hasCursor: root.detailsCursor

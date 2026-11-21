@@ -162,12 +162,18 @@ reconnecting and errors also use it. The popup keeps the selected station's logo
 The bar status dot uses accent
 color while playing and the urgent theme color for errors. Hover it for station and status.
 
-Keyboard inside the popup: Tab or Up/Down moves between controls, including
+Keyboard inside the popup: Tab/Shift+Tab or Up/Down moves between controls, including
 Settings and the DVR controls when available;
 Space/Enter activates the selection. Inside the station selector, type to search,
 Down browses the matches, Enter selects, and Escape cancels and clears the search. Left/Right adjusts volume by 5%; M toggles
 mute; R retries a stopped stream; Escape dismisses the popup. Right-clicking the
 volume slider also toggles mute. Wheel over the slider adjusts volume.
+
+Left/Right on a navigation tab switches sections and keeps focus on the tab strip.
+Tab continues through the controls in visual order. Fields use normal text-editing
+keys, and Tab can leave the custom station editor for the persistent playback
+controls. Mouse hover clears when the pointer leaves; keyboard focus remains
+visible until you move it.
 
 For diagnostics or scripted controls:
 

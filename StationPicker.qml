@@ -75,14 +75,14 @@ Item {
     text: root.triggerLabel
     leftAlign: true
     fontSize: Style.fontPx(1)
-    horizontalPadding: Style.space(2)
+    horizontalPadding: Style.space(6)
     verticalPadding: Style.space(3)
     foreground: Commons.Color.accent
     hasCursor: root.hasCursor
     tooltipText: "Choose station · Search by station, city or country"
     onHovered: isHovered => root.hovered(isHovered)
     onClicked: root.toggle()
-    FocusIcon { name: "down"; foreground: Commons.Color.accent; width: Style.space(14); height: width; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
+    FocusIcon { name: "down"; foreground: Commons.Color.accent; width: Style.space(14); height: width; anchors.right: parent.right; anchors.rightMargin: Style.space(6); anchors.verticalCenter: parent.verticalCenter }
   }
   QQC.Popup {
     id: popup

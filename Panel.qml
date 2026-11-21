@@ -13,6 +13,7 @@ Ui.Panel {
   property var hostWidget: null
   property int cursor: 1
   property bool keyboardNavigation: true
+  readonly property bool virtualFocus: keyboardNavigation && keyCatcher.activeFocus
   property bool settingsOpen: false
   property string settingsReturnView: "listen"
   property real settingsReturnScroll: 0
@@ -48,6 +49,34 @@ Ui.Panel {
       ? (radio.paused ? "Paused · " : "") + radio.clock(radio.behindLive) + " behind live"
       : radio.statusText
 
+  component NavigationTab: Radio.FocusButton {
+    property int cursorId: -1
+    function traverse(direction, event) {
+      if (!root.recordingsOpen && (!root.settingsOpen || root.settingsTab === "listening")) {
+        root.cursor = cursorId
+        root.advanceCursor(direction)
+        event.accepted = true
+      } else event.accepted = false
+    }
+    Keys.onTabPressed: event => traverse(1, event)
+    Keys.onBacktabPressed: event => traverse(-1, event)
+    height: Style.space(38)
+    horizontalPadding: Style.space(8)
+    radius: 0
+    color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
+    borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent)
+      : hot ? Border.controlSpec("hover-cursor", root.barForeground, Commons.Color.accent) : Border.none()
+    foreground: root.barForeground
+    Accessible.role: Accessible.PageTab
+    Accessible.selected: selected
+    Rectangle {
+      anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+      anchors.bottomMargin: -Style.space(4)
+      height: Style.space(2)
+      color: Commons.Color.accent
+      visible: parent.selected
+    }
+  }
   component SettingLabel: Text {
     width: parent.width
     textFormat: Text.PlainText
@@ -86,6 +115,7 @@ Ui.Panel {
     stationPicker.close(); speedPicker.close(); sleepPopup.close()
     scroller.contentY = 0
     cursor = 4
+    keyboardNavigation = true
     keyCatcher.forceActiveFocus()
   }
   function closeSettings() {
@@ -142,6 +172,7 @@ Ui.Panel {
     recordingsOpen = false
     settingsOpen = false
     cursor = 1
+    keyboardNavigation = true
     scroller.contentY = 0
     keyCatcher.forceActiveFocus()
   }
@@ -201,6 +232,7 @@ Ui.Panel {
   }
   function advanceCursor(direction) {
     keyboardNavigation = true
+    keyCatcher.forceActiveFocus()
     let order = [4,20,14,21]
     if (settingsOpen) {
       order = [4,30,31,32,33]
@@ -394,7 +426,7 @@ Ui.Panel {
           else { root.cursor = 2; root.radio.commitVolume(root.radio.volume + dx * 5) }
         }
       }
-      onActivateRequested: root.activate()
+      onActivateRequested: { root.keyboardNavigation = true; root.activate() }
       onTextKey: (text, modifiers) => { if (modifiers === Qt.NoModifier) root.playbackShortcut(text) }
 
       Column {
@@ -454,8 +486,8 @@ Ui.Panel {
               foreground: root.barForeground
               selected: root.settingsOpen
               focusable: root.auxiliaryView
-              hasCursor: root.cursor === 4
-              onHovered: hovered => { if (hovered) root.cursor = 4 }
+              hasCursor: root.virtualFocus && root.cursor === 4
+              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 4 } }
               onClicked: root.settingsOpen ? root.closeSettings() : root.openSettings()
             }
           }
@@ -463,68 +495,49 @@ Ui.Panel {
             visible: !root.settingsOpen
             width: parent.width
             spacing: Style.space(6)
-            Radio.FocusButton {
+            NavigationTab {
               id: listenButton
+              cursorId: 20
               Keys.onLeftPressed: { root.cursor = 20; root.moveTab(-1) }
               Keys.onRightPressed: { root.cursor = 20; root.moveTab(1) }
               width: Style.space(72)
               text: "Listen"
-              height: Style.space(38)
               leftAlign: true
-              horizontalPadding: Style.space(8)
-              radius: 0
-              color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
-              borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-              foreground: root.barForeground
               selected: !root.recordingsOpen
               focusable: true
-              hasCursor: root.cursor === 20
-              onHovered: hovered => { if (hovered) root.cursor = 20 }
+              hasCursor: root.virtualFocus && root.cursor === 20
+              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 20 } }
               onClicked: root.showPlayer()
-              Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
-            Radio.FocusButton {
+            NavigationTab {
               id: recordingsButton
+              cursorId: 14
               Keys.onLeftPressed: { root.cursor = 14; root.moveTab(-1) }
               Keys.onRightPressed: { root.cursor = 14; root.moveTab(1) }
               width: Style.space(74)
               text: "Library"
               tooltipText: "Open recordings" + (Number(root.radio.recordings.activeCount) > 0 ? " · " + root.radio.recordings.activeCount + " active" : "")
-              Accessible.role: Accessible.Button
               Accessible.name: tooltipText
-              height: Style.space(38)
               leftAlign: true
-              horizontalPadding: Style.space(8)
-              radius: 0
-              color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
-              borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-              foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "library"
               focusable: true
-              hasCursor: root.cursor === 14
-              onHovered: hovered => { if (hovered) root.cursor = 14 }
+              hasCursor: root.virtualFocus && root.cursor === 14
+              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 14 } }
               onClicked: root.openRecordings(false)
-              Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
-            Radio.FocusButton {
+            NavigationTab {
               id: schedulesButton
+              cursorId: 21
               Keys.onLeftPressed: { root.cursor = 21; root.moveTab(-1) }
               Keys.onRightPressed: { root.cursor = 21; root.moveTab(1) }
               width: Style.space(90)
               text: "Schedules"
-              height: Style.space(38)
               leftAlign: true
-              horizontalPadding: Style.space(8)
-              radius: 0
-              color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
-              borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-              foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "schedules"
               focusable: true
-              hasCursor: root.cursor === 21
-              onHovered: hovered => { if (hovered) root.cursor = 21 }
+              hasCursor: root.virtualFocus && root.cursor === 21
+              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 21 } }
               onClicked: root.openSchedules()
-              Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
           }
           Row {
@@ -534,29 +547,22 @@ Ui.Panel {
             Repeater {
               id: settingsTabs
               model: [{key:"listening",label:"Listening"}, {key:"storage",label:"Storage"}, {key:"alerts",label:"Alerts"}, {key:"stations",label:"Stations"}]
-              Radio.FocusButton {
+              NavigationTab {
                 required property var modelData
                 required property int index
                 width: (parent.width - parent.spacing * 3) / 4
-                height: Style.space(38)
                 text: modelData.label
+                cursorId: 30 + index
                 fontSize: Style.fontPx(1)
-                horizontalPadding: Style.space(8)
-                radius: 0
-                color: hot ? Qt.alpha(root.barForeground, 0.04) : "transparent"
-                borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-                foreground: root.barForeground
                 selected: root.settingsTab === modelData.key
                 focusable: true
                 enabled: !root.stationMutationPending && !recordingsView.pending
-                hasCursor: root.cursor === 30 + index
+                hasCursor: root.virtualFocus && root.cursor === 30 + index
                 Keys.onLeftPressed: root.moveTab(-1, index)
                 Keys.onRightPressed: root.moveTab(1, index)
-                Accessible.role: Accessible.PageTab
                 Accessible.name: text
-                onHovered: hovered => { if (hovered) root.cursor = 30 + index }
+                onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 30 + index } }
                 onClicked: root.selectSettingsTab(modelData.key)
-                Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
               }
             }
           }
@@ -621,13 +627,13 @@ Ui.Panel {
                       horizontalPadding: Style.space(8)
                       foreground: root.barForeground
                       selected: root.radio.bufferMinutes === modelData
-                      hasCursor: root.cursor === 40 + index
+                      hasCursor: root.virtualFocus && root.cursor === 40 + index
                       focusable: true
                       Accessible.role: Accessible.RadioButton
                       Accessible.name: modelData ? modelData + " minutes of replay" : "Live only"
                       Accessible.checkable: true
                       Accessible.checked: selected
-                      onHovered: hovered => { if (hovered) root.cursor = 40 + index }
+                      onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 40 + index } }
                       onClicked: root.radio.setBufferMinutes(modelData)
                     }
                   }
@@ -664,7 +670,7 @@ Ui.Panel {
                     columnSpacing: Style.space(12)
                     rowSpacing: Style.space(6)
                     Repeater {
-                      model: [{key:"P",action:"Pause/resume"}, {key:"[  ]",action:"Skip 30 sec"}, {key:"G",action:"Go live"}, {key:"M",action:"Mute/unmute"}, {key:"←  →",action:"Volume"}, {key:"R",action:"Play"}]
+                      model: [{key:"P",action:"Pause/resume"}, {key:"[  ]",action:"Skip 30 sec"}, {key:"G",action:"Go live"}, {key:"M",action:"Mute/unmute"}, {key:"←  →",action:"Volume / tabs"}, {key:"R",action:"Play"}]
                       Row {
                         required property var modelData
                         width: (shortcutGrid.width - shortcutGrid.columnSpacing) / 2
@@ -728,7 +734,7 @@ Ui.Panel {
                       id: customStationEdit
                       text: "Edit station"
                       fontSize: Style.fontPx(1)
-                      horizontalPadding: 0
+                      horizontalPadding: Style.space(6)
                       foreground: Qt.alpha(root.barForeground, 0.8)
                       focusable: true
                       enabled: root.radio.ready && !root.stationMutationPending
@@ -852,7 +858,7 @@ Ui.Panel {
 
                   text: root.confirmStationDelete ? "Confirm delete station" : "Delete station"
                   fontSize: Style.fontPx(1)
-                  horizontalPadding: 0
+                  horizontalPadding: Style.space(6)
                   foreground: Commons.Color.urgent
                   focusable: true
                   onActiveFocusChanged: if (activeFocus) root.ensureItemVisible(this)
@@ -925,8 +931,8 @@ Ui.Panel {
                     options: root.radio.stationOptions
                     onFavoriteRequested: value => root.radio.toggleFavorite(value)
                     foreground: root.barForeground
-                    hasCursor: root.cursor === 0
-                    onHovered: hovered => { if (hovered) root.cursor = 0 }
+                    hasCursor: root.virtualFocus && root.cursor === 0
+                    onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 0 } }
                     onChanged: value => { root.radio.selectStation(value); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
                   }
                 }
@@ -934,7 +940,7 @@ Ui.Panel {
                   id: favoriteButton
                   visible: root.radio.playbackKind !== "recording"
                   width: visible ? implicitWidth : 0
-                  iconName: "heart"
+                  iconName: selected ? "heart-filled" : "heart"
                   selected: root.radio.favoriteIds.indexOf(root.radio.stationId) !== -1
                   tooltipText: selected ? "Remove from favorites" : "Add to favorites"
                   Accessible.role: Accessible.Button
@@ -944,8 +950,8 @@ Ui.Panel {
                   enabled: root.radio.hasStation
                   opacity: enabled ? 1 : 0.35
                   foreground: root.barForeground
-                  hasCursor: root.cursor === 13
-                  onHovered: hovered => { if (hovered) root.cursor = 13 }
+                  hasCursor: root.virtualFocus && root.cursor === 13
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 13 } }
                   onClicked: root.radio.toggleFavorite(root.radio.stationId)
                 }
               }
@@ -974,15 +980,15 @@ Ui.Panel {
                       Accessible.name: tooltipText
                       Accessible.checkable: true
                       Accessible.checked: selected
-                      hasCursor: root.cursor === 100 + index
-                      onHovered: hovered => { if (hovered) root.cursor = 100 + index }
+                      hasCursor: root.virtualFocus && root.cursor === 100 + index
+                      onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 100 + index } }
                       onClicked: root.radio.selectStation(modelData.id)
                       Column {
                         anchors.fill: parent
                         anchors.margins: Style.space(7)
                         spacing: Style.space(2)
                         Radio.MarqueeText { scrolling: false; width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                        Text { width: parent.width; text: modelData.city || modelData.country || ""; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.space(11); elide: Text.ElideRight }
+                        Text { width: parent.width; text: modelData.city || modelData.country || ""; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(0.917); elide: Text.ElideRight }
                       }
                     }
                   }
@@ -1028,8 +1034,8 @@ Ui.Panel {
                     foreground: Commons.Color.accent
                     background: Qt.alpha(Commons.Color.accent, 0.1)
                     enabled: root.radio.dvr
-                    hasCursor: root.cursor === 9
-                    onHovered: hovered => { if (hovered) root.cursor = 9 }
+                    hasCursor: root.virtualFocus && root.cursor === 9
+                    onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 9 } }
                     onClicked: root.radio.goLive()
                   }
                 }
@@ -1039,7 +1045,7 @@ Ui.Panel {
                   visible: root.radio.bufferActive && root.radio.playbackKind !== "recording"
                   color: "transparent"
                   radius: Style.cornerRadius
-                  borderSpec: root.cursor === 22 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
+                  borderSpec: root.virtualFocus && root.cursor === 22 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
                   Ui.PanelSlider {
                     id: timelineSlider
                     anchors.fill: parent
@@ -1060,7 +1066,7 @@ Ui.Panel {
                 Row {
                   width: parent.width
                   visible: timelineSlider.visible
-                  Text { width: parent.width / 2; text: "−" + root.radio.clock(root.radio.bufferEnd - root.radio.bufferStart); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: Style.font.family; font.pixelSize: Style.fontPx(1) }
+                  Text { width: parent.width / 2; text: "−" + root.radio.clock(root.radio.bufferEnd - root.radio.bufferStart); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                   Text { width: parent.width / 2; text: "LIVE"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; horizontalAlignment: Text.AlignRight; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 }
                 Ui.BorderSurface {
@@ -1069,7 +1075,7 @@ Ui.Panel {
                   visible: root.radio.playbackKind === "recording"
                   color: "transparent"
                   radius: Style.cornerRadius
-                  borderSpec: root.cursor === 15 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
+                  borderSpec: root.virtualFocus && root.cursor === 15 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
                   Ui.PanelSlider {
                     id: fileTimeline
                     anchors.fill: parent
@@ -1104,11 +1110,11 @@ Ui.Panel {
                 actionText: root.radio.hasStation ? (root.radio.playbackState === "retrying" ? "Retry now" : "Retry") : "Choose station"
                 secondaryText: root.radio.hasStation ? "Choose station" : ""
                 detailText: root.radio.error
-                primaryCursor: root.cursor === 50
-                secondaryCursor: root.cursor === 51
-                detailsCursor: root.cursor === 52
+                primaryCursor: root.virtualFocus && root.cursor === 50
+                secondaryCursor: root.virtualFocus && root.cursor === 51
+                detailsCursor: root.virtualFocus && root.cursor === 52
                 ensureVisible: root.ensureItemVisible
-                onControlHovered: index => { root.cursor = 50 + index }
+                onControlHovered: index => { root.keyboardNavigation = false; root.cursor = 50 + index }
                 onAction: { if (root.radio.hasStation) { root.radio.play(); root.cursor = 1; keyCatcher.forceActiveFocus() } else root.chooseStation() }
                 onSecondary: root.chooseStation()
               }
@@ -1131,8 +1137,8 @@ Ui.Panel {
                     foreground: root.barForeground
                     enabled: root.canRewind
                     opacity: enabled ? 1 : 0.35
-                    hasCursor: root.cursor === 7
-                    onHovered: hovered => { if (hovered) root.cursor = 7 }
+                    hasCursor: root.virtualFocus && root.cursor === 7
+                    onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 7 } }
                     onClicked: root.radio.skip(-30)
                   }
                   Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
@@ -1149,11 +1155,11 @@ Ui.Panel {
                   Accessible.name: tooltipText
                   foreground: Commons.Color.background
                   color: Commons.Color.accent
-                  borderSpec: hasCursor ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
+                  borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : hot ? Border.controlSpec("hover-cursor", root.barForeground, Commons.Color.accent) : Border.none()
                   enabled: root.canPlay
                   opacity: enabled ? 1 : 0.35
-                  hasCursor: root.cursor === 1
-                  onHovered: hovered => { if (hovered) root.cursor = 1 }
+                  hasCursor: root.virtualFocus && root.cursor === 1
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 1 } }
                   onClicked: root.togglePlayback()
                 }
                 Column {
@@ -1170,8 +1176,8 @@ Ui.Panel {
                     foreground: root.barForeground
                     enabled: root.canForward
                     opacity: enabled ? 1 : 0.35
-                    hasCursor: root.cursor === 8
-                    onHovered: hovered => { if (hovered) root.cursor = 8 }
+                    hasCursor: root.virtualFocus && root.cursor === 8
+                    onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 8 } }
                     onClicked: root.radio.skip(30)
                   }
                   Text { width: parent.width; text: "30 sec"; horizontalAlignment: Text.AlignHCenter; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
@@ -1189,8 +1195,8 @@ Ui.Panel {
                   foreground: root.barForeground
                   fontSize: Style.fontPx(1)
                   tooltipText: "Record a live stream starting now"
-                  hasCursor: root.cursor === 23
-                  onHovered: hovered => { if (hovered) root.cursor = 23 }
+                  hasCursor: root.virtualFocus && root.cursor === 23
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 23 } }
                   onClicked: root.recordNow()
                 }
                 Radio.FocusButton {
@@ -1206,8 +1212,8 @@ Ui.Panel {
                   enabled: root.radio.wanted || root.radio.sleepRemaining > 0
                   opacity: enabled ? 1 : 0.35
                   selected: root.radio.sleepRemaining > 0
-                  hasCursor: root.cursor === 19
-                  onHovered: hovered => { if (hovered) root.cursor = 19 }
+                  hasCursor: root.virtualFocus && root.cursor === 19
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 19 } }
                   onClicked: sleepPopup.opened ? sleepPopup.close() : sleepPopup.open()
                   QQC.Popup {
                     id: sleepPopup
@@ -1270,7 +1276,7 @@ Ui.Panel {
                       }
                       Text { width: parent.width; visible: !root.sleepError; text: "1–240 min · Applies immediately"; textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.65); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
                       Text { width: parent.width; text: root.sleepError; visible: text.length > 0; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                      Radio.FocusButton { id: sleepOff; visible: root.radio.sleepRemaining > 0; text: "Cancel timer"; fontSize: Style.fontPx(1); horizontalPadding: 0; foreground: Qt.alpha(root.barForeground, 0.8); focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
+                      Radio.FocusButton { id: sleepOff; visible: root.radio.sleepRemaining > 0; text: "Cancel timer"; fontSize: Style.fontPx(1); horizontalPadding: Style.space(6); foreground: Qt.alpha(root.barForeground, 0.8); focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
                     }
                   }
                 }
@@ -1287,8 +1293,8 @@ Ui.Panel {
                   foreground: root.barForeground
                   enabled: root.radio.wanted
                   opacity: enabled ? 1 : 0.35
-                  hasCursor: root.cursor === 6
-                  onHovered: hovered => { if (hovered) root.cursor = 6 }
+                  hasCursor: root.virtualFocus && root.cursor === 6
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 6 } }
                   onClicked: root.radio.stop()
                 }
               }
@@ -1304,8 +1310,8 @@ Ui.Panel {
                   value: String(root.radio.playbackSpeed)
                   options: [{value:"0.75",label:"Speed · 0.75×"}, {value:"1",label:"Speed · 1×"}, {value:"1.25",label:"Speed · 1.25×"}, {value:"1.5",label:"Speed · 1.5×"}, {value:"2",label:"Speed · 2×"}]
                   foreground: root.barForeground
-                  hasCursor: root.cursor === 18
-                  onHovered: hovered => { if (hovered) root.cursor = 18 }
+                  hasCursor: root.virtualFocus && root.cursor === 18
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 18 } }
                   onChanged: value => { root.radio.setPlaybackSpeed(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
                 }
                 Radio.FocusButton {
@@ -1313,8 +1319,8 @@ Ui.Panel {
                   width: speedPicker.width
                   text: root.radio.hasStation ? "Return to live" : "Choose live station"
                   foreground: root.barForeground
-                  hasCursor: root.cursor === 16
-                  onHovered: hovered => { if (hovered) root.cursor = 16 }
+                  hasCursor: root.virtualFocus && root.cursor === 16
+                  onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 16 } }
                   onClicked: root.radio.hasStation ? root.radio.goLive() : root.chooseStation()
                 }
               }
@@ -1344,17 +1350,17 @@ Ui.Panel {
               Radio.MarqueeText { scrolling: false; width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold }
               Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); elide: Text.ElideRight }
             }
-            Radio.FocusButton { id: dockBack; hasCursor: root.cursor === 54; onHovered: hovered => { if (hovered) root.cursor = 54 }; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
-            Radio.FocusButton { id: dockPlay; hasCursor: root.cursor === 55; onHovered: hovered => { if (hovered) root.cursor = 55 }; width: Style.space(34); horizontalPadding: 0; iconName: playButton.iconName; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
-            Radio.FocusButton { id: dockForward; hasCursor: root.cursor === 56; onHovered: hovered => { if (hovered) root.cursor = 56 }; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
-            Radio.FocusButton { id: dockStop; hasCursor: root.cursor === 57; onHovered: hovered => { if (hovered) root.cursor = 57 }; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
+            Radio.FocusButton { id: dockBack; hasCursor: root.virtualFocus && root.cursor === 54; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 54 } }; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }
+            Radio.FocusButton { id: dockPlay; hasCursor: root.virtualFocus && root.cursor === 55; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 55 } }; width: Style.space(34); horizontalPadding: 0; iconName: playButton.iconName; tooltipText: root.playTooltip; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; selected: true; enabled: root.canPlay; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.togglePlayback() }
+            Radio.FocusButton { id: dockForward; hasCursor: root.virtualFocus && root.cursor === 56; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 56 } }; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
+            Radio.FocusButton { id: dockStop; hasCursor: root.virtualFocus && root.cursor === 57; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 57 } }; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
           }
           Row {
             width: parent.width
             visible: root.auxiliaryView && root.connectionIssue
             spacing: Style.space(8)
             Text { width: parent.width - dockRetry.width - parent.spacing; anchors.verticalCenter: parent.verticalCenter; text: root.radio.playbackState === "retrying" ? "Reconnecting in " + root.retryCountdown : "Station connection unavailable"; textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.8); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-            Radio.FocusButton { id: dockRetry; text: "Retry"; fontSize: Style.fontPx(1); foreground: root.barForeground; color: Qt.alpha(Commons.Color.accent, 0.12); enabled: root.radio.hasStation; focusable: true; hasCursor: root.cursor === 53; onHovered: hovered => { if (hovered) root.cursor = 53 }; onClicked: root.radio.play() }
+            Radio.FocusButton { id: dockRetry; text: "Retry"; fontSize: Style.fontPx(1); foreground: root.barForeground; color: Qt.alpha(Commons.Color.accent, 0.12); enabled: root.radio.hasStation; focusable: true; hasCursor: root.virtualFocus && root.cursor === 53; onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 53 } }; onClicked: root.radio.play() }
           }
           Text { width: parent.width; visible: root.auxiliaryView && !root.connectionIssue && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
           Row {
@@ -1370,8 +1376,8 @@ Ui.Panel {
               Accessible.name: tooltipText
               foreground: root.barForeground
               focusable: root.auxiliaryView
-              hasCursor: root.cursor === 3
-              onHovered: hovered => { if (hovered) root.cursor = 3 }
+              hasCursor: root.virtualFocus && root.cursor === 3
+              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 3 } }
               onClicked: root.radio.toggleMute()
             }
             Ui.BorderSurface {
@@ -1379,7 +1385,7 @@ Ui.Panel {
               implicitHeight: volumeSlider.implicitHeight + Style.space(4)
               color: "transparent"
               radius: Style.cornerRadius
-              borderSpec: (root.cursor === 2) || volumeSlider.activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
+              borderSpec: (root.virtualFocus && root.cursor === 2) || volumeSlider.activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               Ui.PanelSlider {
                 id: volumeSlider
                 anchors.fill: parent
