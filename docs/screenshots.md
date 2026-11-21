@@ -36,4 +36,5 @@ recordings, or change the installed plugin or user settings.
 
 These images document appearance. For real controller, recording playback,
 keyboard, and lifecycle checks, use `tools/test-recordings-ui.py` and the checks
-described in [recordings validation](recordings-validation.md).
+described in the README’s Build checks section. Internal sprint plans and
+validation notes stay local under the ignored `build/planning/` directory.

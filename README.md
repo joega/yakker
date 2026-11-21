@@ -513,8 +513,9 @@ python3 tools/test-recordings-ui.py
 This uses isolated temporary settings/data and silent local audio. It verifies
 keyboard navigation, scheduling, preview, stale drafts, file playback/seek and
 helper recovery, and writes screenshots under `/tmp/yakker-recordings-ui-qa`.
-Its test container substitutes for the actual layer-shell popup; see
-[recordings validation](docs/recordings-validation.md) for the remaining manual checks.
+Its test container substitutes for the actual layer-shell popup. Audible quality,
+physical sleep/resume, and installed-shell focus/lifecycle behavior also need
+manual checks on the target desktop.
 
 ## Privacy and licensing
 

@@ -38,7 +38,6 @@ var bundleFiles = []string{
 	"assets/wscr.webp", "assets/wxyt-fm.webp", "assets/espn-new-york.png",
 	"assets/wfan.webp", "assets/wip-fm.webp", "assets/kdka-fm.png",
 	"assets/tsn-1050.png", "docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
-	"docs/recordings-plan.md", "docs/recordings-validation.md",
 }
 
 type entry struct {

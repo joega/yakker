@@ -28,7 +28,6 @@ var installFiles = []string{
 	"assets/off-the-ball.png", "assets/README.md", "yakker-controller",
 	"stations.json", "README.md", "LICENSE",
 	"docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
-	"docs/recordings-plan.md", "docs/recordings-validation.md",
 }
 
 type installMarker struct {

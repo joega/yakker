@@ -2,6 +2,13 @@
 /yakker
 /build/
 /dist/
+
+# Internal planning and validation belong in ignored build/planning/.
+/todo.md
+/docs/recordings-plan.md
+/docs/recordings-implementation.md
+/docs/recordings-validation.md
+/docs/sprint-*.md
 *.test
 *.pprof
 *.prof
