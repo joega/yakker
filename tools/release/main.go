@@ -27,7 +27,7 @@ import (
 
 var bundleFiles = []string{
 	"manifest.json", "qmldir", "BarWidget.qml",
-	"Panel.qml", "RadioService.qml", "StationLogo.qml", "RecordingsView.qml",
+	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml",
 	"stations.json", "README.md", "LICENSE",
 	"assets/wbns-fm.png", "assets/wkrk-fm.webp", "assets/kwfn-fm.webp",
 	"assets/wzgc-fm.webp", "assets/kkfn-fm.webp", "assets/klac.png",
@@ -38,6 +38,8 @@ var bundleFiles = []string{
 	"assets/wscr.webp", "assets/wxyt-fm.webp", "assets/espn-new-york.png",
 	"assets/wfan.webp", "assets/wip-fm.webp", "assets/kdka-fm.png",
 	"assets/tsn-1050.png", "docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
+	"docs/yakker-recordings.png", "docs/yakker-schedule.png", "docs/yakker-settings.png",
+	"docs/yakker-recording-player.png", "docs/yakker-storage.png", "docs/screenshots.md",
 }
 
 type entry struct {

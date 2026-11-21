@@ -43,7 +43,7 @@ def main():
         shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
         for name in ("Commons", "services"):
             (qs / name).symlink_to(shell / name, target_is_directory=True)
-        for name in ("Panel.qml", "RadioService.qml", "StationLogo.qml", "RecordingsView.qml", "qmldir"):
+        for name in ("Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "qmldir"):
             shutil.copy2(ROOT / name, plugin / name)
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
         panel = plugin / "Panel.qml"
@@ -56,11 +56,19 @@ def main():
   property alias testBackButton: backButton
   property alias testForwardButton: forwardButton
   property alias testFavoriteButton: favoriteButton
+  property alias testSpeedPicker: speedPicker
+  property alias testSleepPicker: sleepPicker
+  property alias testSleepMinutes: sleepMinutes
   property alias testStationPicker: stationPicker
   property alias testName: stationName
   property var anchorItem: null''', 1))
         view = plugin / "RecordingsView.qml"
-        view.write_text(view.read_text().replace('  required property var radio', '''  property alias testLabel: labelField
+        view.write_text(view.read_text().replace('  required property var radio', '''  property alias testDate: dateField
+  property alias testDuration: durationField
+  property alias testSearch: searchField
+  property alias testStatus: statusPicker
+  property alias testLibrary: libraryRepeater
+  property alias testLabel: labelField
   property alias testStart: startField
   property alias testEnd: endField
   property alias testFolder: folderField
@@ -78,10 +86,12 @@ def main():
         env.update(XDG_RUNTIME_DIR=str(runtime), XDG_DATA_HOME=str(data), XDG_CONFIG_HOME=str(config),
                    QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
                    QML_IMPORT_PATH=str(imports), GOCACHE=env.get("GOCACHE", str(cache)), CGO_ENABLED="0",
-                   PATH=str(bin_dir) + os.pathsep + env["PATH"])
+                   PATH=str(bin_dir) + os.pathsep + env["PATH"], YAKKER_NOTIFICATION_LOG=str(base / "notifications.log"))
         subprocess.run(["go", "build", "-o", str(plugin / "yakker-controller"), "./cmd/yakker-controller"], cwd=ROOT, env=env, check=True)
         (bin_dir / "mpv").write_text('#!/bin/sh\nexec /usr/bin/mpv --ao=null "$@"\n')
         (bin_dir / "mpv").chmod(0o755)
+        (bin_dir / "notify-send").write_text('#!/usr/bin/env python3\nimport json, os, sys\nwith open(os.environ["YAKKER_NOTIFICATION_LOG"], "a") as output:\n    output.write(json.dumps(sys.argv[1:]) + "\\n")\n')
+        (bin_dir / "notify-send").chmod(0o755)
         audio = media / "test-recording.opus"
         subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=60", "-c:a", "libopus", "-b:a", "24k", "-y", str(audio)], check=True)
         now = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
@@ -96,6 +106,9 @@ def main():
         print(run.stdout)
         if run.returncode or "YAKKER_FULL_RECORDINGS_REAL_CONTROLLER_PASS" not in run.stdout or "YAKKER_FULL_RECORDINGS_REAL_CONTROLLER_FAIL" in run.stdout:
             raise SystemExit("Native recordings UI smoke test failed")
+        notices = [json.loads(line) for line in (base / "notifications.log").read_text().splitlines()]
+        assert sum(args[-2] == "Recordings need attention" for args in notices) == 1, notices
+        print("Notification delivery: unexpected helper exit reported once")
         print("Screenshots:", output)
 
 

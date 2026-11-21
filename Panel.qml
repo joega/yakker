@@ -22,6 +22,19 @@ Ui.Panel {
   property string editingStationId: ""
   readonly property var radio: Radio.RadioService
   property var scrollTarget: null
+  property bool customSleepOpen: false
+  property string sleepError: ""
+
+  function applySleepTimer() {
+    const minutes = Number(sleepMinutes.text)
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) {
+      sleepError = "Choose 1 to 240 minutes."
+      return
+    }
+    radio.setSleepTimer(minutes)
+    customSleepOpen = false; sleepError = ""
+    keyCatcher.forceActiveFocus()
+  }
 
   function chooseStation() {
     root.open()
@@ -45,6 +58,8 @@ Ui.Panel {
     if (stopButton.enabled) order.push(6)
     if (playButton.enabled) order.push(1)
     if (forwardButton.enabled) order.push(8)
+    if (speedPicker.visible) order.push(18)
+    if (sleepPicker.visible) order.push(19)
     if (radio.playbackKind === "recording") {
       if (radio.wanted && radio.duration > 0 && (radio.playbackState === "playing" || radio.paused)) order.push(15)
       if (radio.wanted || radio.bufferActive) order.push(16)
@@ -58,7 +73,7 @@ Ui.Panel {
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
-                     addStationButton, editStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, storageButton]
+                     addStationButton, editStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, storageButton, speedPicker, sleepPicker]
     ensureItemVisible(targets[cursor])
   }
   function ensureItemVisible(item) {
@@ -94,6 +109,8 @@ Ui.Panel {
     else if (cursor === 14) openRecordings(false)
     else if (cursor === 16) returnLiveButton.clicked()
     else if (cursor === 17 && settingsOpen) openRecordings(true)
+    else if (cursor === 18 && speedPicker.visible) speedPicker.toggle()
+    else if (cursor === 19 && sleepPicker.visible) sleepPicker.toggle()
   }
   function openRecordings(storage) {
     recordingsOpen = true
@@ -130,11 +147,12 @@ Ui.Panel {
     keyCatcher.forceActiveFocus()
   }
   onOpenedChanged: {
-    if (!opened) { stationPicker.close(); bufferPicker.close(); stationEditorOpen = false; confirmStationDelete = false }
+    if (!opened) { stationPicker.close(); bufferPicker.close(); speedPicker.close(); sleepPicker.close(); customSleepOpen = false; stationEditorOpen = false; confirmStationDelete = false }
     else if (!radio.hasStation && radio.playbackKind !== "recording") cursor = 0
   }
   Connections {
     target: root.radio
+    function onWantedChanged() { if (!root.radio.wanted) root.customSleepOpen = false }
     function onStationIdChanged() { stationPicker.value = root.radio.stationId; root.confirmStationDelete = false }
     function onBufferMinutesChanged() { bufferPicker.value = String(root.radio.bufferMinutes) }
     function onReadyChanged() {
@@ -160,14 +178,14 @@ Ui.Panel {
     owner: root.hostWidget || root
     bar: root.bar
     open: root.opened
-    focusTarget: (stationPicker.popupOpen || bufferPicker.popupOpen || stationEditorOpen || recordingsOpen) ? null : keyCatcher
+    focusTarget: (stationPicker.popupOpen || bufferPicker.popupOpen || speedPicker.popupOpen || sleepPicker.popupOpen || customSleepOpen || stationEditorOpen || recordingsOpen) ? null : keyCatcher
     contentWidth: panel.fittedContentWidth(Style.space(380))
     contentHeight: panel.fittedContentHeight(panelContent.implicitHeight)
 
     Ui.PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
-      blocked: root.recordingsOpen || stationPicker.popupOpen || bufferPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
+      blocked: root.recordingsOpen || root.customSleepOpen || speedPicker.popupOpen || sleepPicker.popupOpen || stationPicker.popupOpen || bufferPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
       onCloseRequested: root.close()
       onTabRequested: direction => root.advanceCursor(direction)
       onMoveRequested: (dx, dy) => {
@@ -509,7 +527,7 @@ Ui.Panel {
           width: parent.width
           visible: text.length > 0
           textFormat: Text.PlainText
-          text: root.radio.error
+          text: root.radio.error || root.radio.playbackProgressError
           color: Commons.Color.urgent
           font.family: Style.font.family
           font.pixelSize: Style.font.caption
@@ -594,6 +612,66 @@ Ui.Panel {
             onHovered: hovered => { if (hovered) root.cursor = 8 }
             onClicked: root.radio.skip(30)
           }
+        }
+        Row {
+          width: parent.width
+          spacing: Style.space(8)
+          visible: root.radio.wanted || root.radio.sleepRemaining > 0
+          Ui.Dropdown {
+            id: speedPicker
+            width: (parent.width - parent.spacing) / 2
+            visible: root.radio.playbackKind === "recording" && root.radio.wanted
+            showLabel: false
+            value: String(root.radio.playbackSpeed)
+            options: [{value:"0.75",label:"Speed · 0.75×"}, {value:"1",label:"Speed · 1×"}, {value:"1.25",label:"Speed · 1.25×"}, {value:"1.5",label:"Speed · 1.5×"}, {value:"2",label:"Speed · 2×"}]
+            foreground: root.barForeground
+            hasCursor: root.cursor === 18
+            onHovered: hovered => { if (hovered) root.cursor = 18 }
+            onChanged: value => { root.radio.setPlaybackSpeed(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
+          }
+          Ui.Dropdown {
+            id: sleepPicker
+            width: speedPicker.visible ? (parent.width - parent.spacing) / 2 : parent.width
+            showLabel: false
+            value: root.radio.sleepRemaining > 0 ? "active" : "0"
+            options: (root.radio.sleepRemaining > 0 ? [{value:"active",label:"Sleep in " + root.radio.clock(root.radio.sleepRemaining)}] : []).concat([
+              {value:"0",label:"Sleep timer · Off"}, {value:"15",label:"Sleep in 15 minutes"}, {value:"30",label:"Sleep in 30 minutes"}, {value:"60",label:"Sleep in 60 minutes"}, {value:"custom",label:"Custom sleep timer…"}])
+            foreground: root.barForeground
+            hasCursor: root.cursor === 19
+            onHovered: hovered => { if (hovered) root.cursor = 19 }
+            onChanged: value => {
+              if (value === "custom") {
+                root.customSleepOpen = true; root.sleepError = ""
+                Qt.callLater(function() { sleepMinutes.forceActiveFocus(); root.ensureItemVisible(sleepMinutes) })
+              } else if (value !== "active") root.radio.setSleepTimer(Number(value))
+              if (value !== "custom") Qt.callLater(function() { keyCatcher.forceActiveFocus() })
+            }
+          }
+        }
+        Column {
+          width: parent.width
+          spacing: Style.space(6)
+          visible: root.customSleepOpen && root.radio.wanted
+          Row {
+            width: parent.width
+            spacing: Style.space(6)
+            Ui.TextField {
+              id: sleepMinutes
+              width: parent.width - sleepApply.width - sleepCancel.width - parent.spacing * 2
+              text: "30"
+              maximumLength: 3
+              placeholderText: "Minutes (1–240)"
+              Accessible.name: placeholderText
+              foreground: root.barForeground
+              inputMethodHints: Qt.ImhDigitsOnly
+              KeyNavigation.tab: sleepApply
+              onAccepted: root.applySleepTimer()
+              Keys.onEscapePressed: { root.customSleepOpen = false; keyCatcher.forceActiveFocus() }
+            }
+            Ui.Button { id: sleepApply; text: "Set"; foreground: root.barForeground; bordered: true; focusable: true; KeyNavigation.tab: sleepCancel; onClicked: root.applySleepTimer() }
+            Ui.Button { id: sleepCancel; text: "Cancel"; foreground: root.barForeground; bordered: true; focusable: true; KeyNavigation.tab: sleepMinutes; onClicked: { root.customSleepOpen = false; keyCatcher.forceActiveFocus() } }
+          }
+          Text { width: parent.width; text: root.sleepError; visible: text.length > 0; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: Style.font.family; font.pixelSize: Style.font.caption }
         }
         Column {
           width: parent.width

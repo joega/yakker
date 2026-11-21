@@ -32,12 +32,16 @@ Ui.BarWidget {
     const entry = {id: root.moduleName}
     for (let key in root.settings) if (key !== "id") entry[key] = root.settings[key]
     const favorites = Radio.RadioService.favoriteIds
-    if (entry.volume === volume && entry.muted === muted && entry.stationId === stationId && entry.bufferMinutes === bufferMinutes && JSON.stringify(entry.favorites || []) === JSON.stringify(favorites)) return
+    const notifications = Radio.RadioService.recordingNotifications
+    const startNotifications = Radio.RadioService.recordingStartNotifications
+    if (entry.volume === volume && entry.muted === muted && entry.stationId === stationId && entry.bufferMinutes === bufferMinutes && JSON.stringify(entry.favorites || []) === JSON.stringify(favorites) && entry.recordingNotifications === notifications && entry.recordingStartNotifications === startNotifications) return
     entry.volume = volume
     entry.muted = muted
     entry.stationId = stationId
     entry.bufferMinutes = bufferMinutes
     entry.favorites = favorites.slice()
+    entry.recordingNotifications = notifications
+    entry.recordingStartNotifications = startNotifications
     root.bar.shell.updateEntryInline(root.moduleName, entry)
   }
 

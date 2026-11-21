@@ -16,7 +16,7 @@ import (
 
 var installFiles = []string{
 	"manifest.json", "qmldir", "BarWidget.qml",
-	"Panel.qml", "RadioService.qml", "StationLogo.qml", "RecordingsView.qml",
+	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml",
 	"assets/sports-hub.png", "assets/weei-fm.png", "assets/wscr.webp",
 	"assets/wxyt-fm.webp", "assets/espn-new-york.png", "assets/wfan.webp",
 	"assets/wip-fm.webp", "assets/kdka-fm.png", "assets/tsn-1050.png",
@@ -28,6 +28,8 @@ var installFiles = []string{
 	"assets/off-the-ball.png", "assets/README.md", "yakker-controller",
 	"stations.json", "README.md", "LICENSE",
 	"docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
+	"docs/yakker-recordings.png", "docs/yakker-schedule.png", "docs/yakker-settings.png",
+	"docs/yakker-recording-player.png", "docs/yakker-storage.png", "docs/screenshots.md",
 }
 
 type installMarker struct {

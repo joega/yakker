@@ -12,6 +12,7 @@
 *.test
 *.pprof
 *.prof
+__pycache__/
 /.agents/
 /.codex/
 /.aws/

@@ -1,6 +1,7 @@
 pragma Singleton
 import QtQuick
 import Quickshell.Io
+import "RecordingNotices.js" as RecordingNotices
 
 // One controller per shell engine, shared by every monitor and popup.
 Item {
@@ -44,6 +45,13 @@ Item {
   property string recordingId: ""
   property string recordingTitle: ""
   property real duration: 0
+  property real playbackSpeed: 1
+  property string playbackProgressError: ""
+  property int sleepRemaining: 0
+  property bool recordingNotifications: true
+  property bool recordingStartNotifications: false
+  property var noticeState: ({initialized: false, rows: {}, error: ""})
+  property var noticeQueue: []
   property string customStationError: ""
   property string customCatalogError: ""
   property int customMutationSerial: 0
@@ -130,7 +138,7 @@ Item {
   function send(command) {
     if (!ready || !helper.running) return 0
     command.serial = ++serial
-    if (["play", "stop", "pause", "seek", "skip", "live", "playRecording", "seekRecording"].indexOf(command.action) >= 0) latestIntent = serial
+    if (["play", "stop", "pause", "seek", "skip", "live", "playRecording", "seekRecording", "speed", "sleepTimer"].indexOf(command.action) >= 0) latestIntent = serial
     if (command.action === "configure") latestStationIntent = serial
     if (command.action === "volume") latestVolumeIntent = serial
     if (command.action === "mute") latestMuteIntent = serial
@@ -139,6 +147,10 @@ Item {
   }
   function configureSettings(settings) {
     favoriteIds = normalizeFavorites(settings.favorites)
+    recordingNotifications = settings.recordingNotifications !== false
+    recordingStartNotifications = settings.recordingStartNotifications === true
+    if (!recordingNotifications) noticeQueue = []
+    else if (!recordingStartNotifications) noticeQueue = noticeQueue.filter(function(notice) { return notice.kind !== "start" })
     const selected = String(settings.stationId || "")
     const mpris = String(settings.mprisPlugin || "")
     const minutes = [0,5,15,30].indexOf(Number(settings.bufferMinutes)) >= 0 ? Number(settings.bufferMinutes) : 0
@@ -215,8 +227,46 @@ Item {
   function deleteSchedule(revision, id) { return send({action: "deleteSchedule", revision: revision, id: id}) }
   function stopRecording(revision, id) { return send({action: "stopRecording", revision: revision, id: id}) }
   function deleteRecording(revision, id) { return send({action: "deleteRecording", revision: revision, id: id}) }
-  function playRecording(id) { return send({action: "playRecording", id: id}) }
+  function startRecording(revision, stationId, durationMinutes) { return send({action: "startRecording", revision: revision, stationId: stationId, durationMinutes: durationMinutes}) }
+  function playRecording(id, fromStart) { return send({action: "playRecording", id: id, fromStart: fromStart === true}) }
   function seekRecording(value) { return send({action: "seekRecording", value: value}) }
+  function setPlaybackSpeed(value) { return send({action: "speed", value: value}) }
+  function setSleepTimer(minutes) { return send({action: "sleepTimer", minutes: minutes}) }
+  function setRecordingNotifications(value) {
+    recordingNotifications = value === true
+    if (!recordingNotifications) noticeQueue = []
+    preferencesChanged(volume, muted, stationId, bufferMinutes)
+  }
+  function setRecordingStartNotifications(value) {
+    recordingStartNotifications = value === true
+    if (!recordingStartNotifications) noticeQueue = noticeQueue.filter(function(notice) { return notice.kind !== "start" })
+    preferencesChanged(volume, muted, stationId, bufferMinutes)
+  }
+  function observeRecordings(snapshot) {
+    const result = RecordingNotices.update(noticeState, snapshot, recordingNotifications, recordingStartNotifications)
+    noticeState = result.state
+    noticeQueue = noticeQueue.concat(result.notices).slice(-20)
+    pumpNotice()
+  }
+  function pumpNotice() {
+    if (!recordingNotifications) { noticeQueue = []; return }
+    if (notifier.running || !noticeQueue.length) return
+    const queue = noticeQueue.slice(), notice = queue.shift()
+    noticeQueue = queue
+    notifier.command = ["notify-send", "--app-name=Yakker", "--icon=audio-radio", "--",
+                        notice.title, RecordingNotices.escapeMarkup(notice.body)]
+    notifier.running = true
+    noticeTimeout.restart()
+  }
+  Process {
+    id: notifier
+    onExited: { noticeTimeout.stop(); Qt.callLater(root.pumpNotice) }
+  }
+  Timer {
+    id: noticeTimeout
+    interval: 5000
+    onTriggered: { notifier.running = false; Qt.callLater(root.pumpNotice) }
+  }
   function saveCustomStation(station) {
     if (!ready || !helper.running) { customStationError = "Station manager is unavailable. Try again when Yakker reconnects."; return 0 }
     customStationError = ""
@@ -281,7 +331,10 @@ Item {
       onRead: data => {
         try {
           const next = JSON.parse(data)
-          if (next.recordings && typeof next.recordings === "object") root.recordings = next.recordings
+          if (next.recordings && typeof next.recordings === "object") {
+            root.recordings = next.recordings
+            root.observeRecordings(next.recordings)
+          }
           if (typeof next.schedulePreviewSerial === "number" && next.schedulePreviewSerial > root.schedulePreviewSerial) {
             root.schedulePreview = next.schedulePreview || ({})
             root.schedulePreviewError = next.schedulePreviewError || ""
@@ -309,6 +362,9 @@ Item {
             root.recordingId = next.recordingId || ""
             root.recordingTitle = next.recordingTitle || ""
             root.duration = Number(next.duration) || 0
+            root.playbackSpeed = Number(next.playbackSpeed) || 1
+            root.playbackProgressError = String(next.playbackProgressError || "")
+            root.sleepRemaining = Math.max(0, Number(next.sleepRemaining) || 0)
             root.position = Number(next.position) || 0
             root.bufferStart = Number(next.bufferStart) || 0
             root.bufferEnd = Number(next.bufferEnd) || 0
@@ -340,7 +396,10 @@ Item {
       root.temporaryBuffer = false
       root.dvr = false
       root.recordings = Object.assign({}, root.recordings, {available: false, activeCount: 0, error: "Recording manager disconnected."})
+      if (!root.retiring && root.clients > 0) root.observeRecordings(root.recordings)
       root.playerPid = 0
+      root.sleepRemaining = 0
+      root.playbackSpeed = 1
       root.playbackState = root.clients ? "error" : "stopped"
       if (root.clients && !root.error) root.error = "Yakker controller exited (" + exitCode + "). Press Retry."
       shutdownGuard.stop()

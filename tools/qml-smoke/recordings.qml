@@ -4,6 +4,7 @@ import QtTest
 import Quickshell
 import qs.Commons as Commons
 import "plugin" as Plugin
+import "plugin/RecordingNotices.js" as Notices
 ShellRoot {
   Window { id: window; visible: true; width: 380; height: 650
     color: Commons.Color.popups.background
@@ -19,6 +20,32 @@ ShellRoot {
       }
       function runChecks() {
         try {
+          let state = Notices.update(null, {recordings:[{id:"old",status:"complete"}]}, true, false)
+          compare(state.notices.length, 0, "Historic recording triggered a notification")
+          state = Notices.update(state.state, {recordings:[{id:"new",status:"recording"}]}, true, false)
+          compare(state.notices.length, 0)
+          state = Notices.update(state.state, {recordings:[{id:"new",status:"complete",label:"<img src='remote'>"}]}, true, false)
+          compare(state.notices.length, 1)
+          verify(Notices.escapeMarkup(state.notices[0].body).indexOf("&lt;img") === 0)
+          state = Notices.update(state.state, {recordings:[{id:"new",status:"complete"}]}, true, false)
+          compare(state.notices.length, 0, "Duplicate completion notice")
+          state = Notices.update(state.state, {recordings:[],error:"Storage full"}, true, false)
+          compare(state.notices.length, 1)
+          state = Notices.update(state.state, {recordings:[],error:"Storage full"}, true, false)
+          compare(state.notices.length, 0)
+          state = Notices.update(state.state, {recordings:[{id:"off",status:"recording"}]}, false, true)
+          compare(state.notices.length, 0)
+          state = Notices.update(state.state, {recordings:[{id:"off",status:"complete"}]}, false, true)
+          compare(state.notices.length, 0)
+          state = Notices.update(state.state, {recordings:[{id:"on",status:"recording"}]}, true, true)
+          compare(state.notices.length, 1)
+          panel.radio.noticeQueue = [{kind:"start",title:"queued start",body:"test"}, {title:"queued completion",body:"test"}]
+          panel.radio.setRecordingStartNotifications(false)
+          compare(panel.radio.noticeQueue.length, 1)
+          compare(panel.radio.noticeQueue[0].title, "queued completion")
+          panel.radio.configureSettings({recordingNotifications:false})
+          compare(panel.radio.noticeQueue.length, 0)
+          panel.radio.configureSettings({})
           panel.open(); panel.radio.acquire({})
           tryVerify(function() { return panel.radio.ready && panel.radio.recordings.available && panel.radio.stations.length > 0 }, 5000)
           wait(300)
@@ -29,6 +56,10 @@ ShellRoot {
           compare(panel.testView.dateText("2026-03-08T02:30:00+09:00", true), "Sun Mar 8 2026 02:30AM")
           compare(panel.testView.scheduleTimeText("23:59"), "11:59PM")
           compare(panel.testView.dateText(""), "")
+          compare(panel.testView.folderUrl("/tmp/Music #1?"), "file:///tmp/Music%20%231%3F")
+          compare(panel.testView.pathFromFolderUrl("file:///tmp/Music%20%231%3F"), "/tmp/Music #1?")
+          compare(panel.testView.pathFromFolderUrl("file://remote/tmp"), "")
+          compare(panel.testView.pathFromFolderUrl("file:///tmp/%00bad"), "")
           verify(panel.testRecordingsButton.visible, "navigation absent")
           compare(panel.radio.stationId, "")
           verify(!panel.radio.hasStation && !panel.radio.wanted)
@@ -76,6 +107,8 @@ ShellRoot {
           panel.cursor = 14; panel.advanceCursor(1); compare(panel.cursor, 4)
           panel.advanceCursor(-1); compare(panel.cursor, 14)
           panel.activate(); verify(panel.recordingsOpen); verify(panel.testCatcher.blocked)
+          compare(panel.testView.libraryPage, 0)
+          tryVerify(function() { return panel.testView.testLibrary.count === 1 }, 2000)
           capture("recordings")
           panel.testView.beginEdit(null)
           tryVerify(function() { return panel.testView.testLabel.activeFocus }, 2000)
@@ -111,6 +144,36 @@ ShellRoot {
           compare(panel.radio.recordings.schedules[0].label, "pmr")
           verify(peer.testView.editing); compare(peer.testView.testLabel.text, "Other monitor's draft"); compare(peer.testView.localError, "")
           compare(panel.testView.sizeText(4000000), "3.8 MiB")
+          panel.testView.beginEdit(null)
+          panel.testView.scheduleKind = "once"
+          panel.testView.testDate.text = "2030-01-02"
+          panel.testView.testLabel.text = "One-time fixture"
+          panel.testView.scheduleEnabled = false
+          panel.testView.save()
+          tryVerify(function() { return !panel.testView.pending }, 5000)
+          verify(panel.radio.recordingMutationOK, panel.testView.localError)
+          compare(panel.radio.recordings.schedules.length, 2)
+          verify(panel.radio.recordings.schedules.some(function(s) { return s.kind === "once" && s.date === "2030-01-02" }))
+          const realSnapshot = panel.radio.recordings
+          const many = []
+          for (let i = 0; i < 26; i++) many.push({id:"search-"+i,label:i===25?"Needle":"Other",stationName:"Station",status:i===25?"error":"complete"})
+          panel.radio.recordings = Object.assign({}, realSnapshot, {recordings:many})
+          panel.testView.libraryPage = 1
+          panel.testView.searchText = "needle"
+          compare(panel.testView.filteredRecordings.length, 1)
+          compare(panel.testView.filteredRecordings[0].id, "search-25")
+          tryCompare(panel.testView.testLibrary, "count", 1)
+          compare(panel.testView.libraryPage, 0)
+          panel.testView.statusFilter = "complete"
+          compare(panel.testView.filteredRecordings.length, 0)
+          tryCompare(panel.testView.testLibrary, "count", 0)
+          panel.testView.searchText = ""; panel.testView.statusFilter = "all"
+          panel.radio.recordings = realSnapshot
+          panel.testView.beginNow()
+          compare(panel.testView.viewMode, "now")
+          panel.testView.testDuration.text = "0"; panel.testView.startNow()
+          verify(panel.testView.localError.length > 0 && !panel.testView.pending)
+          panel.testView.goBack()
           console.log("QA: missing recording")
           panel.testView.playItem("missing-id")
           tryVerify(function() { return panel.testView.localError.length > 0 }, 5000)
@@ -137,15 +200,30 @@ ShellRoot {
           panel.cursor = 8; panel.activate(); tryVerify(function() { return panel.radio.position > 28 }, 5000)
           console.log("QA: resume")
           panel.cursor = 1; panel.activate(); tryVerify(function() { return !panel.radio.paused }, 5000)
+          panel.radio.setPlaybackSpeed(1.5)
+          tryVerify(function() { return panel.radio.playbackSpeed === 1.5 }, 5000)
+          verify(panel.testSpeedPicker.visible)
+          panel.radio.setSleepTimer(15)
+          tryVerify(function() { return panel.radio.sleepRemaining > 0 }, 5000)
+          verify(panel.testSleepPicker.visible)
           capture("file-player")
           panel.cursor = 6; panel.activate(); tryVerify(function() { return !panel.radio.wanted && panel.radio.playbackState === "stopped" }, 5000)
           verify(!panel.testStopButton.enabled && !panel.testBackButton.enabled && !panel.testForwardButton.enabled)
           compare(panel.testPlayButton.tooltipText, "Play")
+          compare(panel.radio.sleepRemaining, 0)
+          tryVerify(function() { return panel.radio.recordings.recordings[0].resumePosition > 20 }, 3000)
+          panel.radio.playRecording("test-recording")
+          tryVerify(function() { return panel.radio.playbackState === "playing" && panel.radio.position > 20 }, 8000)
+          panel.radio.playRecording("test-recording", true)
+          tryVerify(function() { return panel.radio.playbackState === "playing" && panel.radio.position < 5 }, 8000)
+          panel.radio.stop()
+          tryVerify(function() { return panel.radio.playbackState === "stopped" }, 5000)
           panel.radio.goLive(); tryVerify(function() { return panel.radio.playbackKind === "live" }, 5000)
           panel.radio.stop()
           panel.cursor = 14; panel.activate(); verify(panel.recordingsOpen)
           panel.testView.beginEdit(null); tryVerify(function() { return panel.testView.testLabel.activeFocus }, 2000)
-          keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen, "Escape did not return to player")
+          keyClick(Qt.Key_Escape); verify(panel.recordingsOpen && panel.testView.viewMode === "schedules", "Escape did not return to schedules")
+          wait(100); keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen, "Second Escape did not return to player")
           panel.settingsOpen = true; verify(panel.testStorageButton.visible)
           panel.cursor = 17; panel.activate(); verify(panel.recordingsOpen); verify(panel.testView.storageEditing)
           tryVerify(function() { return panel.testView.testFolder.activeFocus }, 2000)
@@ -154,14 +232,15 @@ ShellRoot {
           window.height = 300
           tryVerify(function() { var y = panel.testView.testFolder.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testFolder.height <= window.height }, 2000)
           capture("storage-small")
-          keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen)
+          keyClick(Qt.Key_Escape); verify(panel.recordingsOpen && !panel.testView.storageEditing)
+          wait(100); keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen)
           panel.radio.testHelper.running = false
           tryVerify(function() { return !panel.radio.ready }, 3000)
           tryVerify(function() { return panel.radio.ready && panel.radio.recordings.available }, 10000)
           verify(!panel.radio.wanted, "helper recovery started foreground playback")
           compare(panel.radio.stationId, "wfan")
           verify(panel.radio.hasStation, "helper recovery lost the last station choice")
-          compare(panel.radio.recordings.schedules.length, 1)
+          compare(panel.radio.recordings.schedules.length, 2)
           panel.settingsOpen = false; panel.cursor = 13
           var was = panel.radio.favoriteIds.indexOf(panel.radio.stationId) >= 0
           panel.activate(); compare(panel.radio.favoriteIds.indexOf(panel.radio.stationId) >= 0, !was)
