@@ -57,7 +57,9 @@ def main():
   property alias testForwardButton: forwardButton
   property alias testFavoriteButton: favoriteButton
   property alias testSpeedPicker: speedPicker
-  property alias testSleepPicker: sleepPicker
+  property alias testSleepButton: sleepButton
+  property alias testSleepPopup: sleepPopup
+  property alias testSleepPresets: sleepPresets
   property alias testSleepMinutes: sleepMinutes
   property alias testStationPicker: stationPicker
   property alias testName: stationName

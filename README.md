@@ -26,7 +26,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, Recordings and Settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Compact recording library with title and station search, status filter, and saved shows" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, Recordings, Sleep timer and Settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Compact recording library with title and station search, status filter, and saved shows" width="240">](docs/yakker-recordings.png) |
 
 | Favorites and search | Recording schedules | Settings and custom stations |
 | :---: | :---: | :---: |
@@ -172,7 +172,7 @@ omarchy-shell shell hide io.github.joega.yakker
 
 ## Pause and rewind
 
-The player also has a session-only **Sleep timer**: choose Off, 15, 30, or 60
+The timer icon beside Recordings and Settings opens the session-only **Sleep timer**: choose Off, 15, 30, or 60
 minutes, or set a custom duration from 1 to 240 minutes. It stops foreground
 listening when it expires; captures continue. Changing stations keeps the
 deadline, and pressing **Stop** cancels the timer.
