@@ -14,9 +14,9 @@ minutes of history** in Settings; use the timeline, skip back or forward
 30 seconds, or select **Go live** to catch up. **Live only** remains the default,
 and buffered audio stays in RAM without creating recording files.
 
-**Save a show for later.** Schedule recordings by weekday and timezone, keep
-compact Opus files in `~/Music/Yakker`, and play them inside Yakker. Choose your
-recording folder and storage cap. Favorite stations stay at the top of search,
+**Save a show for later.** Record now or schedule a show once or weekly, keep
+compact Opus files in `~/Music/Yakker`, and resume them inside Yakker. Choose your recording folder
+and storage cap. Favorite stations stay at the top of search,
 and you can add your own stream URLs.
 
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
@@ -26,11 +26,11 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, Recordings and Settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with a weekday schedule, an active capture, and a saved show ready to play" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, Recordings and Settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Compact recording library with title and station search, status filter, and saved shows" width="240">](docs/yakker-recordings.png) |
 
-| Favorites and search | Weekly schedules | Settings and custom stations |
+| Favorites and search | Recording schedules | Settings and custom stations |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with weekdays, start and end times, timezone, and next-occurrence preview control" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
+| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with weekly or one-time choices, date, start and end times, timezone, and preview" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
 
 Yakker follows your active Omarchy theme. Screenshots use Catppuccin Latte.
 
@@ -73,7 +73,7 @@ illustrative playback and recording data; see [how to refresh them](docs/screens
 - Go 1.26+ and Make to build from source. Go is only needed at build time.
 - Linux with working audio. The bar widget also needs a desktop session with a private `XDG_RUNTIME_DIR`.
 - Optional: the distribution's `mpv-mpris` package for media keys.
-- Scheduled recordings need `ffmpeg` with the `libopus` encoder and `ffprobe`.
+- Recordings need `ffmpeg` with the `libopus` encoder and `ffprobe`.
   Listening and playing retained recordings use mpv.
 
 These are tested versions; older shells must provide the same native UI components.
@@ -172,6 +172,11 @@ omarchy-shell shell hide io.github.joega.yakker
 
 ## Pause and rewind
 
+The player also has a session-only **Sleep timer**: choose Off, 15, 30, or 60
+minutes, or set a custom duration from 1 to 240 minutes. It stops foreground
+listening when it expires; captures continue. Changing stations keeps the
+deadline, and pressing **Stop** cancels the timer.
+
 The optional DVR-style buffer lets you pause a live station and listen from that
 point later. Open **Settings** in the radio popup and choose a **Listening buffer**:
 
@@ -220,17 +225,24 @@ independent of the desktop widget.
 
 ## Scheduled recordings
 
-Open the **Recordings icon → New schedule**, choose a bundled or custom station, select
-weekdays, enter start/end times in 24-hour format, and choose the timezone. Use
-**Preview next time** to check the resolved occurrence before saving. For example,
-WBZ-FM can record Fridays from `14:00` to `14:20` in `America/New_York`. A time
-before the start ends the next day; schedules can last up to 12 hours. Daylight
-saving follows the saved timezone. Schedules start empty; create and enable the
-ones you want.
+Open **Recordings** for focused **Library**, **Schedules**, **Record now**, and
+**Storage** views. In Schedules, choose **New schedule**, select a bundled or
+custom station, then choose weekly weekdays or a one-time date. Enter start and
+end times in 24-hour format and choose an IANA timezone. **Preview next time**
+checks the resolved occurrence before saving. For example, WBZ-FM can record
+Fridays from `14:00` to `14:20` in `America/New_York`. An end time before the
+start ends the next day; recordings can last up to 12 hours. Daylight saving
+follows the saved timezone. Schedules start empty; create and enable the ones
+you want.
+
+For an immediate capture, choose **Record now**, a station, and a duration. It
+defaults to 30 minutes, with 15, 30, and 60 minute presets and a custom range of
+1 to 720 minutes. It uses the same storage and concurrency limits as scheduled
+captures and does not create a repeating schedule.
 
 | Saved-show playback | Recording storage |
 | :---: | :---: |
-| [<img src="docs/yakker-recording-player.png" alt="Saved recording playing with the compact transport row, duration-based timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Recording storage settings with an editable folder, library cap, free-space reserve, and concurrency limit" width="300">](docs/yakker-storage.png) |
+| [<img src="docs/yakker-recording-player.png" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Recording storage with folder picker, notification preferences, library cap, and free-space reserve" width="300">](docs/yakker-storage.png) |
 
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
@@ -245,10 +257,15 @@ the remaining interval, retaining separate segments. There is no wake timer or s
 Recordings use **mono Opus at 24 kbit/s VBR** in `.opus` files: roughly **3.6 MB
 per 20 minutes** or **10.8 MB per hour**, plus container overhead, with sizes
 varying by content. The bitrate is an internal encoder parameter; raising it later
-affects future captures. The library shows complete, partial, missed, error and
-missing-file states with their reasons. **Play** opens a retained file in the
-foreground player, with pause/resume, a duration-based seek bar and **Return to
-live**. Missing files become available again when their retained folder returns.
+affects future captures. The Library shows compact rows for each recording. Search
+by title or station and filter by status across the full library before moving between pages. Open
+**Details** for times, size, reason, deletion, and **Restart from beginning**.
+**Play** or **Resume** opens a retained file in the foreground player, with
+pause/resume, a duration-based seek bar and **Return to live**. Position is saved
+at most every 10 seconds and when pausing, stopping, switching, or shutting down;
+finishing or reaching the end resets it. Saved recordings support 0.75×, 1×,
+1.25×, 1.5×, and 2× playback with pitch correction; live listening returns to
+1×. Missing files become available again when their retained folder returns.
 Audio quality and exact broadcast boundaries depend on the source; connection
 startup, broadcaster buffering and network interruptions can affect the segment.
 
@@ -256,12 +273,18 @@ Dates use a consistent format such as **Fri Nov 20 2026 02:30PM**. Library dates
 use local time; upcoming schedule times and previews use the schedule's timezone.
 
 Open **Settings → Recording storage**, or the storage controls in Recordings, to
-choose a folder and total library cap. Defaults:
+choose a folder and total library cap. Enter a path or use **Choose folder**;
+**Open folder** opens it in your file manager. Defaults:
 
 - **Folder:** `~/Music/Yakker`, created when the first capture needs it.
 - **Library cap:** 5 GiB, editable in Settings.
 - **Free-space reserve:** 1 GiB on the destination disk.
 - **Cleanup:** manual deletion; existing recordings are preserved when full.
+
+Recording notifications are on by default for completed, partial, failed, and
+missed captures and storage or manager failures. In Storage, turn them off or
+enable optional start notifications, which default to off. Yakker suppresses
+duplicate notices and does not announce old recordings again at startup.
 
 A folder change applies to future recordings. Older files remain listed at their
 saved locations and count toward the cap. An unavailable/unwritable destination
@@ -395,7 +418,11 @@ The selected station, favorites, volume, mute and listening buffer length are sa
   "stationId": "",
   "favorites": [],
   "bufferMinutes": 0,
+  "recordingNotifications": true,
+  "recordingStartNotifications": false,
   "showName": false,
+  "recordingNotifications": true,
+  "recordingStartNotifications": false,
   "mprisPlugin": ""
 }
 ```
@@ -415,9 +442,7 @@ optional local `artwork` path, optional `artworkBackground` color for logo contr
 and an optional fallback Nerd Font `icon`. Both the bar and terminal player read
 this catalogue. After editing station data, rebuild/reinstall and restart the shell.
 New artwork must also be included in the installer and release file lists; tests
-check the bundled catalogue's coverage. The default stream is
-`https://playerservices.streamtheworld.com/api/livestream-redirect/WBZFMAAC.aac`.
-No network configuration fetch is needed.
+check the bundled catalogue's coverage. No network configuration fetch is needed.
 
 ## Media keys and metadata
 

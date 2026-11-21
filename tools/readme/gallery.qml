@@ -86,7 +86,7 @@ ShellRoot {
           panel.screenshotPicker.close()
 
           const complete = {id: "saved", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "complete", bytes: 3600000, durationSeconds: 1200,
-            plannedStart: "2026-11-19T14:00:00-05:00", plannedEnd: "2026-11-19T14:20:00-05:00", startedAt: "2026-11-19T14:00:01-05:00", endedAt: "2026-11-19T14:20:00-05:00", playable: true}
+            plannedStart: "2026-11-19T14:00:00-05:00", plannedEnd: "2026-11-19T14:20:00-05:00", startedAt: "2026-11-19T14:00:01-05:00", endedAt: "2026-11-19T14:20:00-05:00", playable: true, resumePosition: 486}
           const active = {id: "capturing", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "recording", bytes: 1800000,
             plannedStart: "2026-11-20T14:00:00-05:00", plannedEnd: "2026-11-20T14:20:00-05:00", startedAt: "2026-11-20T14:00:01-05:00", playable: false}
           radio.recordings = snapshot([schedule], [active, complete], 1)
@@ -94,13 +94,14 @@ ShellRoot {
           capture("recordings")
 
           radio.recordings = snapshot([], [], 0)
-          panel.screenshotView.beginEdit(Object.assign({}, schedule, {id: ""}))
+          panel.screenshotView.beginEdit(Object.assign({}, schedule, {id: "", kind: "once", date: "2026-11-23"}))
           capture("schedule")
           panel.screenshotView.editing = false
 
           panel.recordingsOpen = false
           radio.playbackKind = "recording"; radio.recordingTitle = "Afternoon sports"
           radio.duration = 1200; radio.position = 486
+          radio.playbackSpeed = 1.25; radio.sleepRemaining = 900
           capture("recording-player")
 
           radio.playbackKind = "live"; radio.position = 0
