@@ -1,6 +1,6 @@
 # Yakker
 
-A lightweight sports-radio player for your desktop, with **pause, rewind, and scheduled recordings**.
+A native sports-radio player with **pause, rewind, scheduled recordings, and a polished Focus interface**.
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
 Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
@@ -14,6 +14,11 @@ minutes of history** in Settings; use the timeline, skip back or forward
 30 seconds, or select **Go live** to catch up. **Live only** remains the default,
 and buffered audio stays in RAM without creating recording files.
 
+**Keep listening while you browse.** Favorite station presets, clear Pause and
+Stop controls, and a persistent playback dock connect Listen, Library, Schedules,
+and Settings. The compact bar shows playback state and any active recordings;
+its tooltip gives the full status.
+
 **Save a show for later.** Record now or schedule a show once or weekly, keep
 compact Opus files in `~/Music/Yakker`, and resume them inside Yakker. Choose your recording folder
 and storage cap. Favorite stations stay at the top of search,
@@ -22,20 +27,43 @@ and you can add your own stream URLs.
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
 
-[Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+[What’s new in 1.6](#whats-new-in-16) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
 | [<img src="docs/yakker-popup.png" alt="Focus player with full station title, favorite presets, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Clean recording rows with station artwork, listening progress, timed Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
 
-| Favorites and search | Recording schedules | Settings and custom stations |
+| Station picker | Upcoming recordings | Listening settings |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with grouped fields, automatic next-recording preview, and clear save actions" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
+| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedules.png" alt="Upcoming recordings with Next up highlighted and paused schedules grouped below" width="240">](docs/yakker-schedules.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
 
 Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
 _Select any screenshot to enlarge it. Screens show the current native UI with
 illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
+
+## What’s new in 1.6
+
+The **Focus interface** puts listening first, with a compact tab row, favorite
+presets, proportional typography, and a clear **Record · Stop · Sleep** row.
+
+- **Playback stays within reach.** Library, Schedules, and Settings keep a
+  persistent player with the same Pause/Stop hierarchy as Listen.
+- **A clearer library and schedule flow.** Listening progress, timed Resume
+  actions, grouped recording details, upcoming order, and next-recording previews
+  make saved shows and schedules easier to manage.
+- **Settings has four focused tabs.** Listening, Storage, Alerts, and Stations
+  share a compact header. Storage has its own Save/Reset controls; notification
+  switches apply immediately.
+- **Consistent controls at smaller sizes.** Search, dropdowns, sliders, hover,
+  focus, and keyboard navigation share one treatment. Controls reflow when needed,
+  focused fields scroll into view, and Settings restores your browsing position.
+- **A quieter bar with clearer status.** Smaller station artwork and state icons
+  keep it compact; the tooltip explains playback, buffering, and active captures.
+  New widgets start in `centerEnd`; existing widgets keep their position.
+
+See the [1.6.0 release notes](docs/releases/1.6.0.md) for upgrade details and
+validation coverage.
 
 ## Stations
 
@@ -103,8 +131,7 @@ The build produces `yakker-controller` (the runtime controller) and `yakker`
 and enables a new widget in `centerEnd`, beside the center island. Existing
 widgets keep their saved section, order, and preferences. The manifest's
 `barWidget.defaultSection` sets the default for new widgets; dragging a widget saves its section and order in
-`~/.config/omarchy/shell.json`. For example, `centerEnd` places it beside the
-center island. It uses Omarchy's documented drop-in workflow; `omarchy dev link` is
+`~/.config/omarchy/shell.json`. It uses Omarchy's documented drop-in workflow; `omarchy dev link` is
 for developing the shell itself. No second Quickshell instance is launched.
 Run the installer again after editing this checkout. For helper/controller code
 updates, stop playback and run `omarchy restart shell` after reinstalling so the
@@ -188,7 +215,9 @@ bounded and displayed as plain text.
 
 ![Bar tooltip examples for live, paused buffering, stopped listening with captures, and saved-show playback](docs/yakker-bar-tooltips.png)
 
-![Native bar widget states: live, paused buffering, stopped with a background recording, offline, and paused saved recording](docs/yakker-bar-states.png)
+![Native bar widget states: live, paused buffering, stopped with background recordings, offline, and paused saved recording](docs/yakker-bar-states.png)
+
+_Captions explain these examples; the bar itself uses state icons and a separate REC count._
 
 Keyboard inside the popup: Tab/Shift+Tab or Up/Down moves between controls, including
 Settings and the DVR controls when available;
@@ -309,9 +338,9 @@ schedules grouped at the bottom. **Edit schedule** opens the saved values;
 use the enabled switch to pause a schedule or the confirmed delete action to
 remove it. Existing recordings stay in Library.
 
-| Upcoming recordings | Record now |
+| Schedule editor | Record now |
 | --- | --- |
-| [<img src="docs/yakker-schedules.png" alt="Chronological schedule list with next recording highlighted and paused schedules grouped below" width="300">](docs/yakker-schedules.png) | [<img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300">](docs/yakker-record-now.png) |
+| [<img src="docs/yakker-schedule.png" alt="Schedule editor with labeled fields, weekly or one-time timing, an enabled switch, and a next-recording preview" width="300">](docs/yakker-schedule.png) | [<img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300">](docs/yakker-record-now.png) |
 
 For an immediate capture, choose **Record now**, a station, and a duration. It
 defaults to 30 minutes, with 15, 30, and 60 minute presets and a custom range of
@@ -324,8 +353,7 @@ captures and does not create a repeating schedule.
 
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
-playing a saved recording leaves those captures running. The bar dot turns red
-while capturing; a recording dot on the **Library** tab marks active captures.
+playing a saved recording leaves those captures running. The bar’s separate **REC** count marks active captures; a recording dot on the **Library** tab marks active captures.
 The Library tooltip shows the count, and the persistent player in Settings
 keeps a **REC** count that opens the library. The machine must be awake
 with the plugin loaded in the bar. Disabling/removing the last widget, restarting
@@ -338,7 +366,7 @@ Recordings use **mono Opus at 24 kbit/s VBR** in `.opus` files: roughly **3.6 MB
 per 20 minutes** or **10.8 MB per hour**, plus container overhead, with sizes
 varying by content. The bitrate is an internal encoder parameter; raising it later
 affects future captures. The Library shows station artwork, show titles and
-compact dates in each row. In-progress shows display a listening bar, elapsed
+compact dates in each row. Partly listened-to saved shows display a progress bar, elapsed
 and remaining audio time, and a **Resume** action labeled with the saved position.
 The current show updates live and its row can pause/resume the same player.
 Unknown durations never show an invented percentage. **Details**, restart,

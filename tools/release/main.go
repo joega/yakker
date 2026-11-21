@@ -29,7 +29,7 @@ var bundleFiles = []string{
 	"docs/yakker-bar-states.png", "docs/yakker-bar-tooltips.png",
 	"manifest.json", "qmldir", "BarWidget.qml",
 	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "FocusTextField.qml", "FocusDropdown.qml", "FocusSlider.qml",
-	"stations.json", "README.md", "LICENSE",
+	"stations.json", "README.md", "LICENSE", "docs/releases/1.6.0.md",
 	"assets/wbns-fm.png", "assets/wkrk-fm.webp", "assets/kwfn-fm.webp",
 	"assets/wzgc-fm.webp", "assets/kkfn-fm.webp", "assets/klac.png",
 	"assets/krld-fm.webp", "assets/kfan.png", "assets/kiro-am.webp",

@@ -111,7 +111,7 @@ ShellRoot {
           panel.screenshotView.toggleDetails("detailed")
 
           selectExample("talksport")
-          const later = Object.assign({}, schedule, {id: "later", label: "Afternoon drive", stationId: "wscr", stationName: "670 The Score", startTime: "16:00", endTime: "17:00", nextStart: "2026-11-23T16:00:00-05:00", nextEnd: "2026-11-23T17:00:00-05:00"})
+          const later = Object.assign({}, schedule, {id: "later", label: "Afternoon drive", stationId: "wscr", stationName: "104.3 The Score", startTime: "16:00", endTime: "17:00", nextStart: "2026-11-23T16:00:00-05:00", nextEnd: "2026-11-23T17:00:00-05:00"})
           const paused = Object.assign({}, schedule, {id: "paused", label: "Weekend catch-up", stationId: "bbc-radio-5-live", stationName: "BBC Radio 5 Live", weekdays: [0,6], enabled: false, nextStart: "", nextEnd: ""})
           radio.recordings = snapshot([paused, later, schedule], [], 0)
           panel.openSchedules()

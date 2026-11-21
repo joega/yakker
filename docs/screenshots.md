@@ -1,15 +1,18 @@
 # README screenshots
 
-Refresh all eighteen screenshots from the repository root:
+Refresh the eighteen player/settings screenshots and the two bar previews from
+the repository root:
 
 ```sh
 bash tools/capture-readme.sh
+bash tools/capture-bar-readme.sh
 ```
 
 Pass another destination to review captures before replacing the README assets:
 
 ```sh
 bash tools/capture-readme.sh /tmp/yakker-readme-preview
+bash tools/capture-bar-readme.sh /tmp/yakker-readme-preview
 ```
 
 The renderer needs jq, Quickshell, Qt Quick / QtTest, the installed Omarchy `qs.Ui`
@@ -22,7 +25,9 @@ desktop theme or modify desktop configuration. Images use a two-times display
 scale for sharpness. Review every image after a capture, especially dropdown
 placement, text wrapping, and long editor screens.
 
-All eighteen screenshots use **Catppuccin Latte** for a consistent presentation.
+The eighteen player/settings screenshots use **Catppuccin Latte** and varied
+stations for a consistent presentation. Player text uses Adwaita Sans; shell
+labels use JetBrainsMono Nerd Font.
 Yakker follows the user's active Omarchy theme; the screenshots are a shared
 visual reference, not a separate theme setting in Yakker.
 
@@ -33,6 +38,21 @@ The screenshot process supplies illustrative station, playback, schedule, and
 library state. Show labels, dates, file sizes, and the `/home/demo` storage path
 are examples. It does not start the controller, connect to broadcasters, create
 recordings, or change the installed plugin or user settings.
+
+The two bar previews come from the native UI regression fixtures, using their
+isolated dark palette. `capture-bar-readme.sh` needs the native test dependencies
+listed in the README plus ImageMagick (`magick`) and Fontconfig (`fc-match`). It
+runs the full native UI test with local audio and no audible output, then arranges
+the captured widgets and tooltips into two sheets. Widget pixels keep their native
+size; captions explain states without adding text to the bar itself. The tooltip
+sheet uses the production plain-text string and matching native tooltip surface.
+No desktop screenshots or private listening/recording data are used.
+
+Review all twenty images after capture. Keep the selected station and recording
+source artwork consistent within each example, and vary stations across examples.
+Schedule names must match the bundled catalogue. Dates, durations, and recording
+states should be internally consistent; avoid retaining a previous example's
+buffering or timer state in an unrelated view.
 
 These images document appearance. For real controller, recording playback,
 keyboard, and lifecycle checks, use `tools/test-recordings-ui.py` and the checks
