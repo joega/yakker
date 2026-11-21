@@ -203,6 +203,8 @@ hover/focus feedback without changing size. Recording elapsed and total times
 sit at opposite ends of the track; the elapsed time previews a drag before seeking.
 
 Left/Right on a navigation tab switches sections and keeps focus on the tab strip.
+Closing Settings restores the previous view and scroll position, with focus on
+its gear button. Manual scrolling takes over until the next focus move.
 Tab continues through the controls in visual order. Fields use normal text-editing
 keys, and Tab can leave the custom station editor for the persistent playback
 controls. Mouse hover clears when the pointer leaves; keyboard focus remains
@@ -663,11 +665,15 @@ Optional native UI checks (installed Omarchy controls required):
 
 ```sh
 python3 tools/test-recordings-ui.py
+python3 tools/test-recordings-ui.py --compact --output /tmp/yakker-compact-ui-qa
 ```
 
 This uses isolated temporary settings/data and silent local audio. It verifies
 keyboard navigation, scheduling, preview, stale drafts, file playback/seek and
 helper recovery, and writes screenshots under `/tmp/yakker-recordings-ui-qa`.
+The compact audit includes native card padding, 68 view/size/font combinations,
+Tab traversal and focus visibility, manual scrolling and Settings return, and
+station, filter and timer popover bounds and cancellation.
 Its test container substitutes for the actual layer-shell popup. Audible quality,
 physical sleep/resume, and installed-shell focus/lifecycle behavior also need
 manual checks on the target desktop.

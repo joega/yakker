@@ -21,6 +21,7 @@ SMOKE = ROOT / "tools/qml-smoke"
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("/tmp/yakker-recordings-ui-qa"))
+    parser.add_argument("--compact", action="store_true", help="Audit all views with native popup padding, narrow widths, and short heights")
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -40,7 +41,15 @@ def main():
         qs = imports / "qs"
         qs.mkdir()
         shutil.copytree(shell / "Ui", qs / "Ui", symlinks=False)
-        shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
+        if args.compact:
+            wrapper = (ROOT / "tools/readme/KeyboardPanel.qml").read_text()
+            wrapper = wrapper.replace("width: contentWidth", "width: Math.min(contentWidth, owner.width)")
+            wrapper = wrapper.replace("height: contentHeight", "height: Math.min(contentHeight, owner.height)")
+            wrapper = wrapper.replace("return Math.ceil(value + card.contentTopInset + card.contentBottomInset)", "return Math.min(owner.height, Math.ceil(value + card.contentTopInset + card.contentBottomInset))")
+            wrapper = wrapper.replace("function fittedContentWidth(value) { return value }", "function fittedContentWidth(value) { return Math.min(value, owner.width) }")
+            (qs / "Ui/KeyboardPanel.qml").write_text(wrapper)
+        else:
+            shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
         for name in ("Commons", "services"):
             (qs / name).symlink_to(shell / name, target_is_directory=True)
         for name in ("BarWidget.qml", "Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "FocusTextField.qml", "FocusDropdown.qml", "FocusSlider.qml", "qmldir"):
@@ -62,7 +71,8 @@ def main():
         field = plugin / "FocusTextField.qml"
         field.write_text(field.read_text().replace('  id: root', '  id: root\n  property alias testClear: clearButton', 1))
         panel = plugin / "Panel.qml"
-        panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testPlayerStatus: playerStatus
+        panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testBody: panelContent
+  property alias testPlayerStatus: playerStatus
   property alias testDockStatus: dockStatus
   property alias testPlaybackHint: playbackHintText
   property alias testTimeline: timelineSlider
@@ -177,7 +187,7 @@ def main():
         env = os.environ.copy()
         env.pop("QT_QPA_PLATFORMTHEME", None)
         env.update(XDG_RUNTIME_DIR=str(runtime), XDG_DATA_HOME=str(data), XDG_CONFIG_HOME=str(config),
-                   QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
+                   QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software", QML_XHR_ALLOW_FILE_READ="1",
                    QML_IMPORT_PATH=str(imports), GOCACHE=env.get("GOCACHE", str(cache)), CGO_ENABLED="0",
                    PATH=str(bin_dir) + os.pathsep + env["PATH"], YAKKER_NOTIFICATION_LOG=str(base / "notifications.log"))
         subprocess.run(["go", "build", "-o", str(plugin / "yakker-controller"), "./cmd/yakker-controller"], cwd=ROOT, env=env, check=True)
@@ -193,12 +203,16 @@ def main():
         (data / "yakker").mkdir()
         (data / "yakker/recordings.json").write_text(json.dumps(state))
         # JSON string escaping is also correct for a QML string literal.
-        qml = (SMOKE / "recordings.qml").read_text().replace('"__OUTPUT__/"', json.dumps(str(output) + "/"))
+        qml = (SMOKE / ("compact.qml" if args.compact else "recordings.qml")).read_text().replace('"__OUTPUT__/"', json.dumps(str(output) + "/"))
         (base / "shell.qml").write_text(qml)
-        run = subprocess.run(["quickshell", "-p", str(base / "shell.qml")], env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
+        run = subprocess.run(["quickshell", "-p", str(base / "shell.qml")], env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=120 if args.compact else 60)
         print(run.stdout)
-        if run.returncode or "YAKKER_FULL_RECORDINGS_REAL_CONTROLLER_PASS" not in run.stdout or "YAKKER_FULL_RECORDINGS_REAL_CONTROLLER_FAIL" in run.stdout:
+        marker = "YAKKER_COMPACT_VIEWS" if args.compact else "YAKKER_FULL_RECORDINGS_REAL_CONTROLLER"
+        if run.returncode or marker + "_PASS" not in run.stdout or marker + "_FAIL" in run.stdout:
             raise SystemExit("Native recordings UI smoke test failed")
+        if args.compact:
+            print("Compact audit screenshots:", output)
+            return
         notices = [json.loads(line) for line in (base / "notifications.log").read_text().splitlines()]
         assert sum(args[-2] == "Recordings need attention" for args in notices) == 1, notices
         print("Notification delivery: unexpected helper exit reported once")

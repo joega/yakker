@@ -189,6 +189,7 @@ Ui.Panel {
     if (text.toLowerCase() === "r" && !radio.wanted) radio.play()
   }
   function openSettings() {
+    settingsScrollRestore.stop()
     if (settingsOpen) { closeSettings(); return }
     settingsReturnView = recordingsOpen ? recordingsView.tab : "listen"
     settingsReturnScroll = scroller.contentY
@@ -204,6 +205,7 @@ Ui.Panel {
   }
   function closeSettings() {
     if (stationMutationPending || recordingsView.pending) return
+    scrollTarget = null
     settingsOpen = false
     recordingsOpen = settingsReturnView !== "listen"
     if (recordingsOpen) {
@@ -211,9 +213,24 @@ Ui.Panel {
       recordingsView.editing = false
       recordingsView.nowEditing = false
       recordingsView.storageEditing = false
-      recordingsView.activate()
     } else { cursor = 4; keyCatcher.forceActiveFocus() }
-    Qt.callLater(function() { scroller.contentY = Math.min(settingsReturnScroll, Math.max(0, scroller.contentHeight - scroller.height)) })
+    Qt.callLater(function() {
+      settingsScrollRestore.restart()
+      // Return to the control that opened Settings without refocusing a body
+      // field that would scroll the restored library back to the top.
+      root.cursor = 4
+      settingsButton.forceActiveFocus()
+    })
+  }
+  Timer {
+    id: settingsScrollRestore
+    interval: 16
+    onTriggered: {
+      if (root.settingsOpen || (root.recordingsOpen ? recordingsView.tab : "listen") !== root.settingsReturnView) return
+      // Wait for the restored view to complete its native layout before
+      // clamping; the outgoing Settings content may have a shorter range.
+      scroller.contentY = Math.min(root.settingsReturnScroll, Math.max(0, scroller.contentHeight - scroller.height))
+    }
   }
   function backFromSettings() {
     if (stationMutationPending || recordingsView.pending) return
@@ -657,6 +674,8 @@ Ui.Panel {
           contentWidth: width
           contentHeight: panelContent.implicitHeight
           boundsBehavior: Flickable.StopAtBounds
+          // A deliberate mouse/touch scroll takes over from focus following.
+          onMovementStarted: { root.scrollTarget = null; scrollEnsure.stop() }
           clip: true
           QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
           Column {
