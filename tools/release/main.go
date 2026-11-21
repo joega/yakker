@@ -40,6 +40,8 @@ var bundleFiles = []string{
 	"assets/tsn-1050.png", "docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
 	"docs/yakker-recordings.png", "docs/yakker-schedule.png", "docs/yakker-settings.png",
 	"docs/yakker-recording-player.png", "docs/yakker-storage.png", "docs/screenshots.md",
+	"docs/yakker-schedules.png", "docs/yakker-record-now.png", "docs/yakker-notifications.png",
+	"docs/yakker-custom-station.png", "docs/yakker-sleep-timer.png",
 }
 
 type entry struct {

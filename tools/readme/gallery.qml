@@ -68,7 +68,7 @@ ShellRoot {
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
-          compare(Object.keys(themes).length, 12)
+          compare(Object.keys(themes).length, 13)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
@@ -130,6 +130,12 @@ ShellRoot {
           radio.duration = 1200; radio.position = 486
           radio.playbackSpeed = 1.25; radio.sleepRemaining = 900
           capture("recording-player")
+          panel.showPlayer()
+          radio.playbackKind = "live"; radio.position = 0
+          selectExample("bbc-radio-5-live")
+          panel.screenshotSleep.open()
+          capture("sleep-timer")
+          panel.screenshotSleep.close()
 
           radio.playbackKind = "live"; radio.position = 0
           selectExample("tsn-1050")

@@ -1137,6 +1137,7 @@ Ui.Panel {
                     y: sleepButton.height + Style.space(4)
                     width: Math.min(Style.space(260), panelContent.width)
                     padding: Style.space(12)
+                    margins: Style.space(8)
                     focus: true
                     closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
                     onOpened: { root.sleepError = ""; Qt.callLater(function() { sleepPresets.itemAt(0).forceActiveFocus() }) }
@@ -1147,8 +1148,10 @@ Ui.Panel {
                       borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Style.normalBorderWidth)
                     }
                     contentItem: Column {
-                      spacing: Style.space(8)
-                      Text { width: parent.width; text: root.radio.sleepRemaining > 0 ? "Sleep in " + root.radio.clock(root.radio.sleepRemaining) : "Sleep timer"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167) }
+                      spacing: Style.space(10)
+                      Text { width: parent.width; text: "Sleep timer"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
+                      Text { width: parent.width; text: "Stops listening; recordings continue."; textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.7); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+                      Text { id: sleepCountdown; width: parent.width; visible: root.radio.sleepRemaining > 0; text: "Stops in " + root.radio.clock(root.radio.sleepRemaining); textFormat: Text.PlainText; color: Commons.Color.accent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); font.weight: Font.Medium }
                       Row {
                         width: parent.width
                         spacing: Style.space(6)
@@ -1160,13 +1163,14 @@ Ui.Panel {
                             width: (parent.width - parent.spacing * 2) / 3
                             text: modelData + " min"
                             foreground: root.barForeground
-                            bordered: true
+                            fontSize: Style.fontPx(1)
+                            horizontalPadding: Style.space(8)
                             focusable: true
                             onClicked: { root.radio.setSleepTimer(modelData); sleepPopup.close() }
                           }
                         }
                       }
-                      Text { width: parent.width; text: "Custom minutes (1–240)"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                      Text { width: parent.width; text: "Custom duration · minutes"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold }
                       Row {
                         width: parent.width
                         spacing: Style.space(6)
@@ -1174,17 +1178,21 @@ Ui.Panel {
                           id: sleepMinutes
                           width: parent.width - sleepApply.width - parent.spacing
                           text: "30"
+                          font.family: root.uiFontFamily
+                          font.pixelSize: Style.fontPx(1.167)
                           maximumLength: 3
                           Accessible.name: "Sleep timer minutes"
                           foreground: root.barForeground
                           inputMethodHints: Qt.ImhDigitsOnly
                           KeyNavigation.tab: sleepApply
+                          onTextEdited: root.sleepError = ""
                           onAccepted: root.applySleepTimer()
                         }
-                        Radio.FocusButton { id: sleepApply; text: "Set"; foreground: root.barForeground; bordered: true; focusable: true; onClicked: root.applySleepTimer() }
+                        Radio.FocusButton { id: sleepApply; text: "Set timer"; fontSize: Style.fontPx(1); color: Qt.alpha(Commons.Color.accent, 0.16); foreground: root.barForeground; focusable: true; onClicked: root.applySleepTimer() }
                       }
+                      Text { width: parent.width; visible: !root.sleepError; text: "1–240 min · Applies immediately"; textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.65); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
                       Text { width: parent.width; text: root.sleepError; visible: text.length > 0; wrapMode: Text.Wrap; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                      Radio.FocusButton { width: parent.width; text: "Turn timer off"; enabled: root.radio.sleepRemaining > 0; opacity: enabled ? 1 : 0.35; foreground: root.barForeground; bordered: true; focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
+                      Radio.FocusButton { id: sleepOff; visible: root.radio.sleepRemaining > 0; text: "Cancel timer"; fontSize: Style.fontPx(1); horizontalPadding: 0; foreground: Qt.alpha(root.barForeground, 0.8); focusable: true; onClicked: { root.radio.setSleepTimer(0); sleepPopup.close() } }
                     }
                   }
                 }
@@ -1212,6 +1220,7 @@ Ui.Panel {
                 visible: root.radio.playbackKind === "recording"
                 Ui.Dropdown {
                   id: speedPicker
+                  fontFamily: root.uiFontFamily
                   width: (parent.width - parent.spacing) / 2
                   showLabel: false
                   value: String(root.radio.playbackSpeed)

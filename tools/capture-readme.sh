@@ -55,6 +55,7 @@ awk '
     print "  property alias screenshotScroller: scroller"
     print "  property alias screenshotPicker: stationPicker"
     print "  property alias screenshotView: recordingsView"
+    print "  property alias screenshotSleep: sleepPopup"
   }
   { print }
 ' "$project_dir/Panel.qml" > "$capture_dir/plugin/Panel.qml"
@@ -71,4 +72,4 @@ if ! rg -q 'YAKKER_README_SCREENSHOTS_PASS' "$capture_dir/render.log"; then
   cat "$capture_dir/render.log"
   exit 1
 fi
-printf 'Rendered twelve README screenshots in %s\n' "$output_dir"
+printf 'Rendered thirteen README screenshots in %s\n' "$output_dir"

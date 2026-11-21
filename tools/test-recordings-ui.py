@@ -78,6 +78,8 @@ def main():
   property alias testSleepButton: sleepButton
   property alias testSleepPopup: sleepPopup
   property alias testSleepPresets: sleepPresets
+  property alias testSleepCountdown: sleepCountdown
+  property alias testSleepOff: sleepOff
   property alias testSleepMinutes: sleepMinutes
   property alias testStationPicker: stationPicker
   property alias testStationURL: stationURL

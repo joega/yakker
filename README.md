@@ -183,9 +183,15 @@ omarchy-shell io.github.joega.yakker status
 omarchy-shell shell hide io.github.joega.yakker
 ```
 
+The Sleep menu shows the active countdown, quick duration choices, and a custom
+minute field with a clear **Set timer** action. **Cancel timer** removes an active
+timer without stopping listening. Recording captures continue when the timer ends.
+
+[<img src="docs/yakker-sleep-timer.png" alt="Sleep timer with a clear active countdown, duration presets, custom minutes, and a quiet cancel action" width="300">](docs/yakker-sleep-timer.png)
+
 ## Pause and rewind
 
-The **Sleep** button below Play/Pause opens the session-only **Sleep timer**: choose Off, 15, 30, or 60
+The **Sleep** button below Play/Pause opens the session-only **Sleep timer**: choose 15, 30, or 60
 minutes, or set a custom duration from 1 to 240 minutes. It stops foreground
 listening when it expires; captures continue. Changing stations keeps the
 deadline, and pressing **Stop** cancels the timer.
