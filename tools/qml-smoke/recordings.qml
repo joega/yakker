@@ -424,10 +424,48 @@ ShellRoot {
           panel.cursor = 17; panel.activate(); verify(panel.recordingsOpen); verify(panel.testView.storageEditing); compare(panel.testView.tab, "library")
           tryVerify(function() { return panel.testView.testFolder.activeFocus }, 2000)
           tryVerify(function() { var y = panel.testView.testFolder.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testFolder.height <= window.height }, 2000)
+          console.log("QA: storage switches and drafts")
+          const storedFolder = panel.testView.testFolder.text, storedCap = panel.testView.testCap.text
+          const storedAlerts = panel.radio.recordingNotifications, storedStarts = panel.radio.recordingStartNotifications
+          verify(panel.testView.testRecordingAlerts.checked && !panel.testView.testRecordingStarts.checked)
+          panel.testView.testRecordingStarts.forceActiveFocus(); keyClick(Qt.Key_Space)
+          verify(panel.radio.recordingStartNotifications && panel.testView.testRecordingStarts.checked)
+          panel.testView.testRecordingAlerts.forceActiveFocus(); keyClick(Qt.Key_Return)
+          verify(!panel.radio.recordingNotifications && !panel.testView.testRecordingStarts.enabled)
+          verify(panel.testView.testRecordingStarts.checked, "Disabling alerts erased the start notification preference")
+          panel.testView.testRecordingAlerts.forceActiveFocus(); keyClick(Qt.Key_Space)
+          verify(panel.radio.recordingNotifications && panel.testView.testRecordingStarts.enabled)
+          panel.testView.testFolder.text = storedFolder + "/draft"
+          panel.testView.testCap.text = "7"
+          panel.testView.testStorageCancel.clicked()
+          verify(panel.settingsOpen && !panel.recordingsOpen)
+          verify(panel.radio.recordingStartNotifications, "Cancel incorrectly rolled back immediate notification settings")
+          panel.openSettingsStorage()
+          tryVerify(function() { return panel.testView.testFolder.activeFocus }, 2000)
+          compare(panel.testView.testFolder.text, storedFolder); compare(panel.testView.testCap.text, storedCap)
+          panel.testView.testRecordingStarts.forceActiveFocus(); keyClick(Qt.Key_Return)
+          compare(panel.radio.recordingNotifications, storedAlerts); compare(panel.radio.recordingStartNotifications, storedStarts)
+          const storageSnapshot = panel.radio.recordings
+          panel.radio.recordings = Object.assign({}, storageSnapshot, {usedBytes:storageSnapshot.settings.storageCapBytes*2})
+          compare(panel.testView.testStorageUsage.visualPosition, 1, "Storage usage overflowed its track")
+          panel.radio.recordings = Object.assign({}, storageSnapshot, {usedBytes:-1})
+          compare(panel.testView.testStorageUsage.visualPosition, 0)
+          panel.radio.recordings = storageSnapshot
+          panel.testView.testFolder.text = "relative-folder"
+          panel.testView.testOpenFolder.clicked()
+          verify(panel.testView.localError.indexOf("absolute folder") >= 0)
+          panel.testView.testFolder.text = storedFolder; panel.testView.localError = ""
+          wait(100) // Let the error scroll finish before testing focus navigation.
+          panel.testView.testFolder.forceActiveFocus()
           capture("storage")
-          window.height = 300
-          tryVerify(function() { var y = panel.testView.testFolder.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testFolder.height <= window.height }, 2000)
+          window.height = 300; window.width = 320
+          tryVerify(function() { var y = panel.testView.testFolder.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testFolder.height <= panel.testDock.mapToItem(panel, 0, 0).y }, 2000)
+          panel.testView.testRecordingStarts.forceActiveFocus()
+          tryVerify(function() { var y = panel.testView.testRecordingStarts.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testRecordingStarts.height <= panel.testDock.mapToItem(panel, 0, 0).y }, 2000, "Notification switch hidden behind playback dock")
+          panel.testView.testStorageSave.forceActiveFocus()
+          tryVerify(function() { var y = panel.testView.testStorageSave.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testStorageSave.height <= panel.testDock.mapToItem(panel, 0, 0).y }, 2000, "Save storage hidden behind playback dock")
           capture("storage-small")
+          window.height = 650; window.width = 420
           panel.testSettingsBack.clicked()
           tryVerify(function() { return panel.settingsOpen && !panel.recordingsOpen && panel.testSettings.visible }, 2000)
           verify(!panel.testView.storageEditing, "Storage did not return to Settings")
@@ -442,8 +480,23 @@ ShellRoot {
           panel.testSettingsButton.clicked()
           verify(!panel.settingsOpen && panel.recordingsOpen && panel.testView.tab === "schedules", "X did not return from nested settings to the previous section")
           panel.openSettings(); panel.openSettingsStorage()
-          panel.testView.saveStorage()
+          tryVerify(function() { return panel.testView.testFolder.activeFocus }, 2000)
+          const previousLimit = panel.radio.recordings.settings.storageCapBytes
+          panel.testView.testCap.text = String((previousLimit + 1073741824) / 1073741824)
+          const storageDraft = panel.testView.testCap.text, previousRevision = panel.radio.recordings.revision
+          const previousSettings = panel.radio.recordings.settings
+          panel.radio.recordingSettings(previousRevision, {folder:previousSettings.folder, storageCapBytes:previousLimit+1, freeSpaceReserveBytes:previousSettings.freeSpaceReserveBytes, concurrency:previousSettings.concurrency})
+          tryVerify(function() { return panel.radio.recordings.revision > previousRevision }, 5000)
+          panel.testView.testStorageSave.clicked()
+          tryVerify(function() { return !panel.testView.pending }, 5000)
+          verify(!panel.radio.recordingMutationOK && panel.testView.storageEditing, "Stale storage draft was silently applied")
+          compare(panel.testView.testCap.text, storageDraft)
+          verify(panel.testView.testStorageRefresh.visible)
+          panel.testView.testStorageRefresh.clicked()
+          compare(panel.testView.testCap.text, storageDraft)
+          panel.testView.testStorageSave.clicked()
           tryVerify(function() { return !panel.testView.pending && panel.settingsOpen && !panel.recordingsOpen }, 5000)
+          compare(panel.radio.recordings.settings.storageCapBytes, previousLimit + 1073741824)
           panel.closeSettings(); panel.showPlayer()
           panel.radio.testHelper.running = false
           tryVerify(function() { return !panel.radio.ready }, 3000)

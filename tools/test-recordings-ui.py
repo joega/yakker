@@ -91,6 +91,14 @@ def main():
   property alias testLabel: labelField
   property alias testStart: startField
   property alias testEnd: endField
+  property alias testRecordingAlerts: recordingAlertsToggle
+  property alias testRecordingStarts: recordingStartToggle
+  property alias testStorageUsage: storageUsage
+  property alias testCap: capField
+  property alias testStorageSave: saveStorageButton
+  property alias testStorageCancel: cancelStorageButton
+  property alias testStorageRefresh: refreshStorageButton
+  property alias testOpenFolder: openFolderButton
   property alias testFolder: folderField
   property alias testRefreshDraft: refreshDraftButton
   required property var radio''', 1))

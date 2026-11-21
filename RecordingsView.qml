@@ -134,6 +134,22 @@ Column {
     wrapMode: Text.Wrap
   }
 
+  component StorageToggle: Ui.Toggle {
+    width: parent.width
+    foreground: root.foreground
+    fontFamily: root.uiFontFamily
+    titleSize: Style.fontPx(1.083)
+    descriptionSize: Style.fontPx(1)
+    borderSpec: activeFocus ? Border.controlSpec("focus", foreground, accent) : Border.none()
+    opacity: enabled ? 1 : 0.45
+    Accessible.role: Accessible.CheckBox
+    Accessible.name: label
+    Accessible.description: description
+    Accessible.checkable: true
+    Accessible.checked: checked
+    onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+  }
+
   function activate() { focusItem(backButton.visible ? backButton : tab === "schedules" ? newScheduleButton : searchField) }
   function goBack() {
     if (pending) return
@@ -832,22 +848,158 @@ Column {
     Radio.FocusButton { width: parent.width; visible: root.nowRevision !== Number(root.snapshot.revision); text: "Refresh and keep this draft"; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: !root.pending; onClicked: { root.nowRevision = Number(root.snapshot.revision) || 0; root.localError = "" } }
   }
   FolderDialog { id: folderDialog; title: "Choose recording folder"; onAccepted: { const path = root.pathFromFolderUrl(selectedFolder); if (path) { folderField.text = path; root.localError = "" } else root.localError = "Choose a local folder." } }
-  Column { width: parent.width; spacing: Style.space(6); visible: root.storageEditing
-    Text { width: parent.width; text: "Storage · " + root.sizeText(root.snapshot.usedBytes) + " of " + root.sizeText((root.snapshot.settings || {}).storageCapBytes) + " used"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); font.bold: true }
-    Radio.FocusButton { width: parent.width; text: root.radio.recordingNotifications ? "Recording notifications: On" : "Recording notifications: Off"; selected: root.radio.recordingNotifications; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.radio.setRecordingNotifications(!root.radio.recordingNotifications) }
-    Radio.FocusButton { width: parent.width; text: root.radio.recordingStartNotifications ? "Start notifications: On" : "Start notifications: Off"; selected: root.radio.recordingStartNotifications; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.radio.recordingNotifications; onClicked: root.radio.setRecordingStartNotifications(!root.radio.recordingStartNotifications) }
-    Text { width: parent.width; text: "Recording folder (absolute path)"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: folderField; width: parent.width; placeholderText: "Absolute folder path"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 4096; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Row { width: parent.width; spacing: Style.space(4)
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Choose folder"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const url = root.folderUrl(folderField.text); if (url) folderDialog.currentFolder = url; folderDialog.open() } }
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Open folder"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const url = root.folderUrl(folderField.text); if (!url || !Qt.openUrlExternally(url)) root.localError = "Enter a local absolute folder path to open." } }
+  Column {
+    width: parent.width
+    spacing: Style.space(18)
+    visible: root.storageEditing
+    enabled: !root.pending
+    Column {
+      width: parent.width
+      spacing: Style.space(8)
+      FieldLabel { text: "Storage"; font.pixelSize: Style.fontPx(1.25) }
+      Row {
+        width: parent.width
+        spacing: Style.space(8)
+        Hint { width: (parent.width - parent.spacing) / 2; text: root.sizeText(root.snapshot.usedBytes) + " used"; color: root.foreground }
+        Hint { width: (parent.width - parent.spacing) / 2; text: root.sizeText((root.snapshot.settings || {}).storageCapBytes) + " limit"; horizontalAlignment: Text.AlignRight }
+      }
+      QQC.ProgressBar {
+        id: storageUsage
+        width: parent.width
+        height: Style.space(4)
+        visible: root.available && Number((root.snapshot.settings || {}).storageCapBytes) > 0
+        from: 0
+        to: Math.max(1, Number((root.snapshot.settings || {}).storageCapBytes) || 0)
+        value: Math.min(to, Math.max(0, Number(root.snapshot.usedBytes) || 0))
+        Accessible.name: "Recording storage usage"
+        Accessible.description: root.sizeText(root.snapshot.usedBytes) + " of " + root.sizeText((root.snapshot.settings || {}).storageCapBytes)
+        background: Rectangle { radius: height / 2; color: Qt.alpha(root.foreground, 0.14) }
+        contentItem: Item { Rectangle { width: parent.width * storageUsage.visualPosition; height: parent.height; radius: height / 2; color: Commons.Color.accent } }
+      }
     }
-    Text { width: parent.width; text: "Library cap (GiB)"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: capField; width: parent.width; placeholderText: "Library cap (GiB)"; Accessible.name: placeholderText; foreground: root.foreground; inputMethodHints: Qt.ImhFormattedNumbersOnly; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Text { width: parent.width; text: "Keeps " + root.sizeText((root.snapshot.settings || {}).freeSpaceReserveBytes) + " free on disk · up to " + ((root.snapshot.settings || {}).concurrency || 3) + " simultaneous recordings"; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-    Text { width: parent.width; text: "Folder changes apply to future recordings. Existing files remain in place."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-    Radio.FocusButton { width: parent.width; text: root.pending && root.pendingKind === "settings" ? "Saving…" : "Save storage settings"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.saveStorage() }
-    Radio.FocusButton { width: parent.width; visible: root.storageRevision !== Number(root.snapshot.revision); text: "Refresh and keep these settings"; foreground: root.foreground; bordered: true; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { root.storageRevision = Number(root.snapshot.revision) || 0; root.localError = "" } }
-    Radio.FocusButton { width: parent.width; text: "Cancel"; foreground: root.foreground; bordered: true; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
+    Column {
+      width: parent.width
+      spacing: Style.space(6)
+      FieldLabel { text: "Save recordings to" }
+      Ui.TextField {
+        id: folderField
+        width: parent.width
+        font.family: root.uiFontFamily
+        font.pixelSize: Style.fontPx(1.167)
+        placeholderText: "Absolute folder path"
+        Accessible.name: "Recording folder (absolute path)"
+        foreground: root.foreground
+        maximumLength: 4096
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+      }
+      Row {
+        width: parent.width
+        spacing: Style.space(18)
+        Radio.FocusButton {
+          id: chooseFolderButton
+          text: "Choose folder"
+          iconName: "folder"
+          iconSize: Style.space(16)
+          fontSize: Style.fontPx(1)
+          horizontalPadding: 0
+          foreground: Qt.alpha(root.foreground, 0.8)
+          focusable: true
+          onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+          onClicked: { const url = root.folderUrl(folderField.text); if (url) folderDialog.currentFolder = url; folderDialog.open() }
+        }
+        Radio.FocusButton {
+          id: openFolderButton
+          text: "Open folder"
+          fontSize: Style.fontPx(1)
+          horizontalPadding: 0
+          foreground: Qt.alpha(root.foreground, 0.8)
+          focusable: true
+          onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+          onClicked: { const url = root.folderUrl(folderField.text); if (!url || !Qt.openUrlExternally(url)) root.localError = "Enter a local absolute folder path to open." }
+        }
+      }
+      Hint { text: "Applies to future recordings. Existing files stay in place." }
+    }
+    Column {
+      width: parent.width
+      spacing: Style.space(6)
+      FieldLabel { text: "Library limit" }
+      Row {
+        width: parent.width
+        spacing: Style.space(10)
+        Ui.TextField {
+          id: capField
+          width: Style.space(100)
+          font.family: root.uiFontFamily
+          font.pixelSize: Style.fontPx(1.167)
+          placeholderText: "5"
+          Accessible.name: "Library limit in GiB"
+          foreground: root.foreground
+          inputMethodHints: Qt.ImhFormattedNumbersOnly
+          onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        }
+        Hint { width: parent.width - capField.width - parent.spacing; text: "GiB"; anchors.verticalCenter: parent.verticalCenter }
+      }
+      Hint { text: "Saved shows are kept when the library is full." }
+      Hint { text: "Keeps " + root.sizeText((root.snapshot.settings || {}).freeSpaceReserveBytes) + " free on disk · up to " + ((root.snapshot.settings || {}).concurrency || 3) + " recordings at once" }
+    }
+    Ui.PanelSeparator { width: parent.width }
+    Column {
+      width: parent.width
+      spacing: Style.space(6)
+      FieldLabel { text: "Notifications"; font.pixelSize: Style.fontPx(1.25) }
+      Hint { text: "Changes apply immediately." }
+      StorageToggle {
+        id: recordingAlertsToggle
+        label: "Recording alerts"
+        description: "Completed shows, missed recordings and problems"
+        checked: root.radio.recordingNotifications
+        onClicked: root.radio.setRecordingNotifications(!checked)
+      }
+      StorageToggle {
+        id: recordingStartToggle
+        label: "When recording starts"
+        description: enabled ? "Also notify when a capture begins" : "Turn on recording alerts to enable"
+        checked: root.radio.recordingStartNotifications
+        enabled: root.radio.recordingNotifications
+        onClicked: if (enabled) root.radio.setRecordingStartNotifications(!checked)
+      }
+    }
+    Radio.FocusButton {
+      id: refreshStorageButton
+      visible: root.storageRevision !== Number(root.snapshot.revision)
+      text: "Refresh and keep these settings"
+      fontSize: Style.fontPx(1)
+      horizontalPadding: 0
+      foreground: root.foreground
+      focusable: true
+      onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+      onClicked: { root.storageRevision = Number(root.snapshot.revision) || 0; root.localError = "" }
+    }
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
+      Radio.FocusButton {
+        id: saveStorageButton
+        width: (parent.width - parent.spacing) * 0.65
+        text: root.pending && root.pendingKind === "settings" ? "Saving…" : "Save storage"
+        color: Qt.alpha(Commons.Color.accent, 0.16)
+        foreground: root.foreground
+        focusable: true
+        enabled: root.available && !root.pending
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        onClicked: root.saveStorage()
+      }
+      Radio.FocusButton {
+        id: cancelStorageButton
+        width: (parent.width - parent.spacing) * 0.35
+        text: "Cancel"
+        foreground: root.foreground
+        focusable: true
+        enabled: !root.pending
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        onClicked: root.goBack()
+      }
+    }
   }
 }

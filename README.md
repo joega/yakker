@@ -301,7 +301,9 @@ use local time; upcoming schedule times and previews use the schedule's timezone
 
 Open **Settings → Recording storage**, or the storage controls in Recordings, to
 choose a folder and total library cap. Enter a path or use **Choose folder**;
-**Open folder** opens it in your file manager. Defaults:
+**Open folder** opens it in your file manager. A usage bar shows the saved library
+limit; **Save storage** applies folder and limit edits. Cancel discards those
+edits. Folder actions remain quiet secondary controls. Defaults:
 
 - **Folder:** `~/Music/Yakker`, created when the first capture needs it.
 - **Library cap:** 5 GiB, editable in Settings.
@@ -309,8 +311,10 @@ choose a folder and total library cap. Enter a path or use **Choose folder**;
 - **Cleanup:** manual deletion; existing recordings are preserved when full.
 
 Recording notifications are on by default for completed, partial, failed, and
-missed captures and storage or manager failures. In Storage, turn them off or
-enable optional start notifications, which default to off. Yakker suppresses
+missed captures and storage or manager failures. The **Notifications** section
+uses switches for **Recording alerts** and **When recording starts**, which is
+off by default. Notification changes apply immediately. Turning alerts off
+disables the start switch without erasing its saved preference. Yakker suppresses
 duplicate notices and does not announce old recordings again at startup.
 
 A folder change applies to future recordings. Older files remain listed at their

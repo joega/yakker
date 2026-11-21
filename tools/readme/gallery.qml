@@ -136,7 +136,8 @@ ShellRoot {
           panel.settingsOpen = true
           capture("settings")
           panel.settingsOpen = false
-          selectExample("sportsnet-590")
+          selectExample("kkfn-fm")
+          radio.sleepRemaining = 0
           panel.openSettings()
           panel.openSettingsStorage()
           capture("storage")
