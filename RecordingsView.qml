@@ -13,11 +13,18 @@ Column {
   property var bar
   property bool embedded: false
   property bool externalBack: false
+  property bool settingsTabbed: false
+  property string storageSection: "storage"
+  property string storageFeedback: ""
+  property string storageDraftFolder: ""
+  property string storageDraftCap: ""
+  readonly property bool storageDirty: folderField.text !== storageDraftFolder || capField.text !== storageDraftCap
   readonly property string uiFontFamily: "Adwaita Sans"
   property var ensureVisible: function(item) {}
   signal back()
   signal playbackShortcut(string text)
   signal storageClosed()
+  signal requestStorage()
   spacing: Style.space(8)
   readonly property var snapshot: radio.recordings || ({})
   readonly property bool available: radio.ready && snapshot.available === true
@@ -45,7 +52,7 @@ Column {
   property string previewText: ""
   property string tab: "library"
   property bool nowEditing: false
-  readonly property string viewMode: editing ? "editor" : storageEditing ? "storage" : nowEditing ? "now" : tab
+  readonly property string viewMode: settingsTabbed ? "storage" : editing ? "editor" : storageEditing ? "storage" : nowEditing ? "now" : tab
   property string scheduleKind: "weekly"
   property string nowStation: ""
   property int nowRevision: 0
@@ -155,7 +162,7 @@ Column {
     if (pending) return
     localError = ""; confirmation = ""
     if (editing) { editing = false; tab = "schedules" }
-    else if (storageEditing) { storageEditing = false; storageClosed() }
+    else if (storageEditing) { if (settingsTabbed) { back(); return }; storageEditing = false; storageClosed() }
     else if (nowEditing) nowEditing = false
     else { back(); return }
     if (visible) activate()
@@ -168,7 +175,7 @@ Column {
     root.playbackShortcut(event.text)
     event.accepted = true
   }
-  function focusItem(item) { Qt.callLater(function() { item.forceActiveFocus(); root.ensureVisible(item) }) }
+  function focusItem(item) { Qt.callLater(function() { if (!root.visible || !item.visible) return; item.forceActiveFocus(); root.ensureVisible(item) }) }
   function beginEdit(s) {
     if (pending) return
     storageEditing = false; nowEditing = false; tab = "schedules"
@@ -239,8 +246,12 @@ Column {
     storageRevision = Number(snapshot.revision) || 0
     folderField.text = snapshot.settings.folder || ""
     capField.text = String((Number(snapshot.settings.storageCapBytes) || 0) / 1073741824)
-    storageEditing = true; localError = ""; focusItem(folderField)
+    storageDraftFolder = folderField.text; storageDraftCap = capField.text
+    storageFeedback = ""
+    storageEditing = true; localError = ""; focusItem(storageSection === "alerts" ? recordingAlertsToggle : folderField)
   }
+  function focusStorage() { focusItem(folderField) }
+  function focusNotifications() { focusItem(recordingAlertsToggle) }
   function beginNow() {
     if (pending || !available) return
     editing = false; storageEditing = false; nowEditing = true; tab = "library"
@@ -374,7 +385,10 @@ Column {
           root.editing = false
           if (root.visible) root.activate()
         }
-        if (kind === "settings") { root.storageEditing = false; root.storageClosed() }
+        if (kind === "settings") {
+          if (root.settingsTabbed) { root.beginStorage(); root.storageFeedback = "Storage saved." }
+          else { root.storageEditing = false; root.storageClosed() }
+        }
         if (kind === "now") { root.nowEditing = false; root.tab = "library" }
         if (kind === "deleteRecording" && root.visible && root.viewMode === "library") root.activate()
       }
@@ -629,7 +643,7 @@ Column {
         focusable: true
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
         enabled: root.available && !root.pending
-        onClicked: root.beginStorage()
+        onClicked: root.embedded ? root.requestStorage() : root.beginStorage()
       }
     }
     Row {
@@ -849,9 +863,10 @@ Column {
   }
   FolderDialog { id: folderDialog; title: "Choose recording folder"; onAccepted: { const path = root.pathFromFolderUrl(selectedFolder); if (path) { folderField.text = path; root.localError = "" } else root.localError = "Choose a local folder." } }
   Column {
+    id: storageSettings
     width: parent.width
     spacing: Style.space(18)
-    visible: root.storageEditing
+    visible: (root.storageEditing || root.settingsTabbed) && root.storageSection === "storage"
     enabled: !root.pending
     Column {
       width: parent.width
@@ -943,28 +958,6 @@ Column {
       Hint { text: "Saved shows are kept when the library is full." }
       Hint { text: "Keeps " + root.sizeText((root.snapshot.settings || {}).freeSpaceReserveBytes) + " free on disk · up to " + ((root.snapshot.settings || {}).concurrency || 3) + " recordings at once" }
     }
-    Ui.PanelSeparator { width: parent.width }
-    Column {
-      width: parent.width
-      spacing: Style.space(6)
-      FieldLabel { text: "Notifications"; font.pixelSize: Style.fontPx(1.25) }
-      Hint { text: "Changes apply immediately." }
-      StorageToggle {
-        id: recordingAlertsToggle
-        label: "Recording alerts"
-        description: "Completed shows, missed recordings and problems"
-        checked: root.radio.recordingNotifications
-        onClicked: root.radio.setRecordingNotifications(!checked)
-      }
-      StorageToggle {
-        id: recordingStartToggle
-        label: "When recording starts"
-        description: enabled ? "Also notify when a capture begins" : "Turn on recording alerts to enable"
-        checked: root.radio.recordingStartNotifications
-        enabled: root.radio.recordingNotifications
-        onClicked: if (enabled) root.radio.setRecordingStartNotifications(!checked)
-      }
-    }
     Radio.FocusButton {
       id: refreshStorageButton
       visible: root.storageRevision !== Number(root.snapshot.revision)
@@ -976,6 +969,7 @@ Column {
       onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
       onClicked: { root.storageRevision = Number(root.snapshot.revision) || 0; root.localError = "" }
     }
+    Hint { visible: !!root.storageFeedback && !root.storageDirty; text: root.storageFeedback; color: Commons.Color.accent }
     Row {
       width: parent.width
       spacing: Style.space(8)
@@ -986,20 +980,45 @@ Column {
         color: Qt.alpha(Commons.Color.accent, 0.16)
         foreground: root.foreground
         focusable: true
-        enabled: root.available && !root.pending
+        opacity: enabled ? 1 : 0.45
+        enabled: root.available && !root.pending && (!root.settingsTabbed || root.storageDirty)
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
         onClicked: root.saveStorage()
       }
       Radio.FocusButton {
         id: cancelStorageButton
         width: (parent.width - parent.spacing) * 0.35
-        text: "Cancel"
+        text: root.settingsTabbed ? "Reset" : "Cancel"
         foreground: root.foreground
         focusable: true
-        enabled: !root.pending
+        opacity: enabled ? 1 : 0.45
+        enabled: !root.pending && (!root.settingsTabbed || root.storageDirty)
         onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
-        onClicked: root.goBack()
+        onClicked: root.settingsTabbed ? root.beginStorage() : root.goBack()
       }
+    }
+  }
+  Column {
+    id: notificationSettings
+    visible: (root.storageEditing || root.settingsTabbed) && root.storageSection === "alerts"
+    width: parent.width
+    spacing: Style.space(6)
+    FieldLabel { text: "Notifications"; font.pixelSize: Style.fontPx(1.25) }
+    Hint { text: "Changes apply immediately." }
+    StorageToggle {
+      id: recordingAlertsToggle
+      label: "Recording alerts"
+      description: "Completed shows, missed recordings and problems"
+      checked: root.radio.recordingNotifications
+      onClicked: root.radio.setRecordingNotifications(!checked)
+    }
+    StorageToggle {
+      id: recordingStartToggle
+      label: "When recording starts"
+      description: enabled ? "Also notify when a capture begins" : "Turn on recording alerts to enable"
+      checked: root.radio.recordingStartNotifications
+      enabled: root.radio.recordingNotifications
+      onClicked: if (enabled) root.radio.setRecordingStartNotifications(!checked)
     }
   }
 }

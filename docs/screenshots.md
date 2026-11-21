@@ -1,6 +1,6 @@
 # README screenshots
 
-Refresh all ten screenshots from the repository root:
+Refresh all twelve screenshots from the repository root:
 
 ```sh
 bash tools/capture-readme.sh
@@ -22,7 +22,7 @@ desktop theme or modify desktop configuration. Images use a two-times display
 scale for sharpness. Review every image after a capture, especially dropdown
 placement, text wrapping, and long editor screens.
 
-All ten screenshots use **Catppuccin Latte** for a consistent presentation.
+All twelve screenshots use **Catppuccin Latte** for a consistent presentation.
 Yakker follows the user's active Omarchy theme; the screenshots are a shared
 visual reference, not a separate theme setting in Yakker.
 

@@ -8,5 +8,7 @@
   "recording-player": "catppuccin-latte",
   "storage": "catppuccin-latte",
   "schedules": "catppuccin-latte",
-  "record-now": "catppuccin-latte"
+  "record-now": "catppuccin-latte",
+  "notifications": "catppuccin-latte",
+  "custom-station": "catppuccin-latte"
 }

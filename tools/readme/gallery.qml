@@ -68,7 +68,7 @@ ShellRoot {
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
-          compare(Object.keys(themes).length, 10)
+          compare(Object.keys(themes).length, 12)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
@@ -141,6 +141,13 @@ ShellRoot {
           panel.openSettings()
           panel.openSettingsStorage()
           capture("storage")
+          selectExample("wkrk-fm")
+          panel.selectSettingsTab("alerts")
+          capture("notifications")
+          selectExample("wbns-fm")
+          panel.selectSettingsTab("stations")
+          panel.openStationEditor({name:"Community Radio", streamUrl:"https://radio.example/stream", city:"Boston", country:"US", website:"https://radio.example"})
+          capture("custom-station")
           console.log("YAKKER_README_SCREENSHOTS_PASS")
         } catch (error) {
           console.error("YAKKER_README_SCREENSHOTS_FAIL", error, error.stack)

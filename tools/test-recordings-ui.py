@@ -50,12 +50,12 @@ def main():
         panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testView: recordingsView
   property alias testCatcher: keyCatcher
   property alias testRecordingsButton: recordingsButton
-  property alias testStorageButton: storageButton
+  property alias testSettingsTabs: settingsTabs
+  property alias testStationList: customStations
   property alias testSettings: settingsView
   property alias testPlayerView: playerView
   property alias testSectionTitle: settingsSectionTitle
   property alias testSettingsButton: settingsButton
-  property alias testSettingsBack: settingsBackButton
   property alias testDock: playbackDock
   property alias testDockPlay: dockPlay
   property alias testDockBack: dockBack
@@ -74,8 +74,16 @@ def main():
   property alias testSleepPresets: sleepPresets
   property alias testSleepMinutes: sleepMinutes
   property alias testStationPicker: stationPicker
+  property alias testStationURL: stationURL
+  property alias testStationCity: stationCity
+  property alias testStationCountry: stationCountry
+  property alias testStationWebsite: stationWebsite
+  property alias testStationSave: saveStationButton
+  property alias testStationCancel: cancelStationButton
+  property alias testStationDelete: deleteStationButton
   property alias testName: stationName
   property var anchorItem: null''', 1))
+        panel.write_text(panel.read_text().replace('                    id: customStationRow', '                    id: customStationRow\n                    property alias testTitle: customStationTitle\n                    property alias testEdit: customStationEdit', 1))
         view = plugin / "RecordingsView.qml"
         view.write_text(view.read_text().replace('  required property var radio', '''  property alias testSchedules: scheduleRepeater
   property alias testEnabled: scheduleEnabledToggle
@@ -91,6 +99,8 @@ def main():
   property alias testLabel: labelField
   property alias testStart: startField
   property alias testEnd: endField
+  property alias testStorageContent: storageSettings
+  property alias testAlertsContent: notificationSettings
   property alias testRecordingAlerts: recordingAlertsToggle
   property alias testRecordingStarts: recordingStartToggle
   property alias testStorageUsage: storageUsage

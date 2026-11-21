@@ -30,7 +30,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Favorites and search | Recording schedules | Settings and custom stations |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with grouped fields, automatic next-recording preview, and clear save actions" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
+| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with grouped fields, automatic next-recording preview, and clear save actions" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
 
 Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
@@ -260,7 +260,7 @@ captures and does not create a repeating schedule.
 
 | Saved-show playback | Recording storage |
 | :---: | :---: |
-| [<img src="docs/yakker-recording-player.png" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Recording storage with folder picker, notification preferences, library cap, and free-space reserve" width="300">](docs/yakker-storage.png) |
+| [<img src="docs/yakker-recording-player.png" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Storage settings tab with folder picker, library cap, and dedicated save controls" width="300">](docs/yakker-storage.png) |
 
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
@@ -299,11 +299,11 @@ startup, broadcaster buffering and network interruptions can affect the segment.
 Dates use a consistent format such as **Fri Nov 20 2026 02:30PM**. Library dates
 use local time; upcoming schedule times and previews use the schedule's timezone.
 
-Open **Settings → Recording storage**, or the storage controls in Recordings, to
+Open **Settings → Storage**, or the storage controls in Library, to
 choose a folder and total library cap. Enter a path or use **Choose folder**;
 **Open folder** opens it in your file manager. A usage bar shows the saved library
-limit; **Save storage** applies folder and limit edits. Cancel discards those
-edits. Folder actions remain quiet secondary controls. Defaults:
+limit; **Save storage** applies folder and limit edits and confirms the save
+on the same tab. **Reset** discards unsaved storage edits. Folder actions remain quiet secondary controls. Defaults:
 
 - **Folder:** `~/Music/Yakker`, created when the first capture needs it.
 - **Library cap:** 5 GiB, editable in Settings.
@@ -311,7 +311,7 @@ edits. Folder actions remain quiet secondary controls. Defaults:
 - **Cleanup:** manual deletion; existing recordings are preserved when full.
 
 Recording notifications are on by default for completed, partial, failed, and
-missed captures and storage or manager failures. The **Notifications** section
+missed captures and storage or manager failures. The **Alerts** tab
 uses switches for **Recording alerts** and **When recording starts**, which is
 off by default. Notification changes apply immediately. Turning alerts off
 disables the start switch without erasing its saved preference. Yakker suppresses
@@ -432,14 +432,26 @@ This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
 
-The gear opens a dedicated Settings page, replacing the main player while keeping
-a compact playback dock available. The title row reads **YAKKER · Settings**, with an **X** on the right to return
-to the section you came from. Settings groups listening preferences, recording storage and alerts,
-custom stations, and keyboard shortcuts. Storage and the station editor open
-as separate pages with a back link to Settings; saving or cancelling storage
-returns there too. Escape goes back one level, while X closes settings.
+The gear opens **YAKKER · Settings**, with four tabs: **Listening**, **Storage**,
+**Alerts**, and **Stations**. Each tab replaces the content below it; the playback
+dock and top-right X stay available. X returns to your previous player section.
+Storage has its own Save and Reset controls. Alerts apply immediately and have
+no save buttons. Switching tabs preserves unfinished storage and station drafts;
+closing settings discards unsaved drafts.
 
-In Settings, use **Add custom station** to save a name and HTTP(S) audio stream URL; city, country, and website are optional. Select a saved custom station in the station picker to edit or delete it. Deleting the selected station stops playback and clears the selection so you can choose another. Editing its stream URL reconnects if it was playing. Yakker does not fetch or test a URL until you play it.
+In **Stations**, choose **Add station** and enter a name and direct HTTP(S) audio
+stream URL. City, country, and website are optional, with persistent labels above
+each field. Saved custom stations appear here with a quiet **Edit station**
+action, so you can edit any custom station without changing your listening
+selection. Delete lives in the editor and requires confirmation. Escape or Cancel
+returns from the editor to the station list; Escape from a settings tab closes
+settings. Deleting the selected station stops playback and clears its selection.
+Editing its stream URL reconnects if it was playing. Yakker does not fetch or
+test a URL until you play it.
+
+| Notification settings | Custom station editor |
+| --- | --- |
+| [<img src="docs/yakker-notifications.png" alt="Separate Alerts settings tab with immediate notification switches and no storage save actions" width="300">](docs/yakker-notifications.png) | [<img src="docs/yakker-custom-station.png" alt="Custom station editor with permanent labels, required stream fields, and a quieter Cancel action" width="300">](docs/yakker-custom-station.png) |
 
 Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
 
