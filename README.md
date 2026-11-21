@@ -144,7 +144,11 @@ independent animations; playback status can wrap to keep paused/stopped states
 readable. The player includes up to six favorite presets in the order you added them. The **Listen**, **Library**,
 and **Schedules** tabs form the first row, with Settings at the right edge. Both
 navigation rows use the same label alignment, hover/focus treatment, and compact
-spacing on narrow panels. Search fields, editors, and dropdowns share proportional
+spacing on narrow panels. Smaller artwork leaves room for station labels; replay
+presets use two rows and saved-playback options stack when space is tight. Short
+popups keep transport and volume visible while omitting the secondary playback
+hint from the dock. Keyboard focus scrolls fields and actions into view.
+Search fields, editors, and dropdowns share proportional
 text, stable focus/hover insets, and a common minimum height. Library search and
 status filters stack vertically on narrow panels; station dropdowns keep keyboard
 search, selection, cancellation, and focus return. **Rewind · Play/Pause · Forward** form the

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import QtQuick.Controls as QQC
 import qs.Commons
 import qs.Commons as Commons
@@ -33,7 +34,8 @@ Ui.Panel {
   property string sleepError: ""
   readonly property string uiFontFamily: "Adwaita Sans"
   readonly property bool compactNavigation: header.width < Style.space(340)
-  readonly property real navigationFontSize: Style.fontPx(compactNavigation ? 1 : 1.083)
+  readonly property bool compactDock: auxiliaryView && panel.contentHeight < Style.space(400)
+  readonly property real navigationFontSize: compactNavigation ? Math.min(13, Style.fontPx(1)) : Style.fontPx(1.083)
   readonly property real navigationPadding: Style.space(compactNavigation ? 3 : 8)
   readonly property var favoritePresets: radio.favoriteIds.map(function(id) {
     return root.radio.stations.find(function(station) { return station.id === id })
@@ -359,6 +361,15 @@ Ui.Panel {
                      addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
     ensureItemVisible(cursor === 58 ? captureIndicator : cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
+  Connections {
+    target: keyCatcher.Window.window
+    function onActiveFocusItemChanged() {
+      // Native Tab traversal can focus inner fields and controls without
+      // changing the panel cursor. Always reveal the actual focused item.
+      const item = keyCatcher.Window.window.activeFocusItem
+      if (item) root.ensureItemVisible(item)
+    }
+  }
   function ensureItemVisible(item) {
     scrollTarget = item
     if (item) scrollEnsure.restart()
@@ -680,8 +691,9 @@ Ui.Panel {
                 visible: root.settingsTab === "listening"
                 SettingTitle { text: "Replay buffer" }
                 SettingHint { text: "Choose how much live radio to keep for rewinding." }
-                Row {
+                Grid {
                   id: bufferPicker
+                  columns: width < Style.space(340) ? 2 : 4
                   width: parent.width
                   spacing: Style.space(4)
                   Repeater {
@@ -690,7 +702,7 @@ Ui.Panel {
                     Radio.FocusButton {
                       required property int modelData
                       required property int index
-                      width: (parent.width - parent.spacing * 3) / 4
+                      width: (parent.width - parent.spacing * (parent.columns - 1)) / parent.columns
                       text: modelData ? modelData + " min" : "Live only"
                       fontSize: Style.fontPx(1)
                       horizontalPadding: Style.space(8)
@@ -958,14 +970,15 @@ Ui.Panel {
                 width: parent.width
                 spacing: Style.space(14)
                 Rectangle {
-                  width: Style.space(88)
+                  id: stationArtwork
+                  width: Style.space(root.compactNavigation ? 64 : 88)
                   height: width
                   radius: Style.cornerRadius
                   color: Qt.alpha(root.barForeground, 0.05)
                   Radio.StationLogo { anchors.fill: parent; anchors.margins: Style.space(8); station: root.radio.playbackStation; fallbackColor: Commons.Color.accent }
                 }
                 Column {
-                  width: parent.width - Style.space(102) - favoriteButton.width - parent.spacing
+                  width: parent.width - stationArtwork.width - favoriteButton.width - parent.spacing * 2
                   spacing: Style.space(5)
                   Text {
                     width: parent.width
@@ -1240,6 +1253,7 @@ Ui.Panel {
                 spacing: Style.space(6)
                 Radio.FocusButton {
                   id: recordNowButton
+                  horizontalPadding: Style.space(root.compactNavigation ? 5 : 10)
                   width: Math.max(implicitWidth, sleepButton.implicitWidth)
                   anchors.verticalCenter: parent.verticalCenter
                   iconSize: Style.space(16)
@@ -1254,6 +1268,7 @@ Ui.Panel {
                 }
                 Radio.FocusButton {
                   id: stopButton
+                  horizontalPadding: Style.space(root.compactNavigation ? 5 : 10)
                   iconSize: Style.space(18)
                   iconName: "stop"
                   text: "Stop"
@@ -1271,6 +1286,7 @@ Ui.Panel {
                 }
                 Radio.FocusButton {
                   id: sleepButton
+                  horizontalPadding: Style.space(root.compactNavigation ? 5 : 10)
                   width: Math.max(recordNowButton.implicitWidth, implicitWidth)
                   anchors.verticalCenter: parent.verticalCenter
                   iconSize: Style.space(16)
@@ -1353,15 +1369,16 @@ Ui.Panel {
                   }
                 }
               }
-              Row {
+              Grid {
                 width: parent.width
+                columns: width < Style.space(340) ? 1 : 2
                 spacing: Style.space(8)
                 visible: root.radio.playbackKind === "recording"
                 Radio.FocusDropdown {
                   id: speedPicker
                   label: "Playback speed"
                   fontFamily: root.uiFontFamily
-                  width: (parent.width - parent.spacing) / 2
+                  width: (parent.width - parent.spacing * (parent.columns - 1)) / parent.columns
                   showLabel: false
                   value: String(root.radio.playbackSpeed)
                   options: [{value:"0.75",label:"Speed · 0.75×"}, {value:"1",label:"Speed · 1×"}, {value:"1.25",label:"Speed · 1.25×"}, {value:"1.5",label:"Speed · 1.5×"}, {value:"2",label:"Speed · 2×"}]
@@ -1387,7 +1404,7 @@ Ui.Panel {
         Column {
           id: playbackDock
           width: parent.width
-          spacing: Style.space(8)
+          spacing: Style.space(root.compactDock ? 4 : 8)
           Keys.onPressed: event => {
             if (event.modifiers === Qt.NoModifier && event.text && "p[]gmr".indexOf(event.text.toLowerCase()) >= 0) {
               root.playbackShortcut(event.text)
@@ -1500,7 +1517,7 @@ Ui.Panel {
                 text: "Stop"
                 fontSize: Style.fontPx(1)
                 horizontalPadding: Style.space(6)
-                verticalPadding: Style.space(4)
+                verticalPadding: Style.space(root.compactDock ? 2 : 4)
                 tooltipText: stopButton.tooltipText
                 foreground: Qt.alpha(root.barForeground, 0.85)
                 enabled: root.radio.wanted
@@ -1566,7 +1583,7 @@ Ui.Panel {
           Text {
             width: parent.width
             id: playbackHintText
-            visible: text.length > 0
+            visible: text.length > 0 && !root.compactDock
             text: root.playbackHint + (root.radio.wanted && root.radio.sleepRemaining > 0 ? " · Sleep in " + root.radio.clock(root.radio.sleepRemaining) : "")
             textFormat: Text.PlainText
             color: root.barForeground
