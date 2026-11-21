@@ -53,6 +53,7 @@ def main():
   property alias testStorageButton: storageButton
   property alias testSettings: settingsView
   property alias testPlayerView: playerView
+  property alias testSectionTitle: settingsSectionTitle
   property alias testSettingsButton: settingsButton
   property alias testSettingsBack: settingsBackButton
   property alias testDock: playbackDock

@@ -61,7 +61,7 @@ Ui.Panel {
     settingsOpen = true
     stationPicker.close(); speedPicker.close(); sleepPopup.close()
     scroller.contentY = 0
-    cursor = 24
+    cursor = 4
     keyCatcher.forceActiveFocus()
   }
   function closeSettings() {
@@ -143,7 +143,9 @@ Ui.Panel {
   function advanceCursor(direction) {
     let order = [4,20,14,21]
     if (settingsOpen) {
-      order = [24,5,17,10]
+      order = [4]
+      if (settingsStorage || stationEditorOpen) order.push(24)
+      order = order.concat([5,17,10])
       if (radio.station.custom) order = order.concat([11,12])
       order = order.concat([2,3])
       const index = Math.max(0, order.indexOf(cursor))
@@ -332,16 +334,32 @@ Ui.Panel {
           Row {
             width: parent.width
             spacing: Style.space(8)
-            Text {
+            Row {
               width: parent.width - captureIndicator.width - settingsButton.width - parent.spacing * 2
               anchors.verticalCenter: parent.verticalCenter
-              text: "YAKKER"
-              font.letterSpacing: Style.space(2)
-              textFormat: Text.PlainText
-              color: root.barForeground
-              font.family: root.uiFontFamily
-              font.pixelSize: Style.fontPx(1.167)
-              font.weight: Font.DemiBold
+              spacing: Style.space(10)
+              Text {
+                id: appTitle
+                text: "YAKKER"
+                font.letterSpacing: Style.space(2)
+                textFormat: Text.PlainText
+                color: root.barForeground
+                font.family: root.uiFontFamily
+                font.pixelSize: Style.fontPx(1.167)
+                font.weight: Font.DemiBold
+              }
+              Text {
+                id: settingsSectionTitle
+                visible: root.settingsOpen
+                width: Math.max(0, parent.width - appTitle.width - parent.spacing)
+                text: "· " + (root.stationEditorOpen ? (root.editingStationId ? "Edit station" : "Add station") : root.settingsStorage ? "Recording storage" : "Settings")
+                textFormat: Text.PlainText
+                color: Qt.alpha(root.barForeground, 0.8)
+                font.family: root.uiFontFamily
+                font.pixelSize: Style.fontPx(1.167)
+                font.weight: Font.Medium
+                elide: Text.ElideRight
+              }
             }
             Radio.FocusButton {
               id: captureIndicator
@@ -356,10 +374,8 @@ Ui.Panel {
             }
             Radio.FocusButton {
               id: settingsButton
-              visible: !root.settingsOpen
-              width: visible ? implicitWidth : 0
-              iconName: "settings"
-              tooltipText: "Open settings"
+              iconName: root.settingsOpen ? "close" : "settings"
+              tooltipText: root.settingsOpen ? "Close settings" : "Open settings"
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
               foreground: root.barForeground
@@ -367,7 +383,7 @@ Ui.Panel {
               focusable: root.auxiliaryView
               hasCursor: root.cursor === 4
               onHovered: hovered => { if (hovered) root.cursor = 4 }
-              onClicked: root.openSettings()
+              onClicked: root.settingsOpen ? root.closeSettings() : root.openSettings()
             }
           }
           Row {
@@ -434,19 +450,20 @@ Ui.Panel {
           }
           Row {
             width: parent.width
-            visible: root.settingsOpen
+            visible: root.settingsOpen && (root.settingsStorage || root.stationEditorOpen)
             spacing: Style.space(8)
             Radio.FocusButton {
               id: settingsBackButton
               iconName: "left"
-              text: "Back"
+              text: "Settings"
+              fontSize: Style.fontPx(1)
+              horizontalPadding: 0
               foreground: root.barForeground
               hasCursor: root.cursor === 24
               focusable: root.auxiliaryView
               onHovered: hovered => { if (hovered) root.cursor = 24 }
               onClicked: root.backFromSettings()
             }
-            Text { anchors.verticalCenter: parent.verticalCenter; text: root.stationEditorOpen ? (root.editingStationId ? "Edit station" : "Add station") : root.settingsStorage ? "Recording storage" : "Settings"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.5); font.weight: Font.DemiBold }
           }
           Ui.PanelSeparator { width: parent.width }
         }

@@ -429,10 +429,11 @@ This is a plain line-oriented CLI; each command requires Enter.
 ## Settings and stations
 
 The gear opens a dedicated Settings page, replacing the main player while keeping
-a compact playback dock available. The single **Back** control or Escape returns to the section you
-came from. Settings groups listening preferences, recording storage and alerts,
+a compact playback dock available. The title row reads **YAKKER · Settings**, with an **X** on the right to return
+to the section you came from. Settings groups listening preferences, recording storage and alerts,
 custom stations, and keyboard shortcuts. Storage and the station editor open
-as separate pages; saving or cancelling storage returns to Settings.
+as separate pages with a back link to Settings; saving or cancelling storage
+returns there too. Escape goes back one level, while X closes settings.
 
 In Settings, use **Add custom station** to save a name and HTTP(S) audio stream URL; city, country, and website are optional. Select a saved custom station in the station picker to edit or delete it. Deleting the selected station stops playback and clears the selection so you can choose another. Editing its stream URL reconnects if it was playing. Yakker does not fetch or test a URL until you play it.
 
