@@ -26,6 +26,7 @@ import (
 )
 
 var bundleFiles = []string{
+	"docs/yakker-bar-states.png",
 	"manifest.json", "qmldir", "BarWidget.qml",
 	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml",
 	"stations.json", "README.md", "LICENSE",

@@ -14,6 +14,22 @@ Ui.BarWidget {
   readonly property real openPanelIndicatorWidth: Style.bar.iconSlot
   readonly property real openPanelIndicatorHeight: Style.bar.iconSlot
 
+  readonly property var radio: Radio.RadioService
+  readonly property bool recordingActive: Number(radio.recordings.activeCount) > 0
+  readonly property string playbackLabel: radio.playbackState === "error" ? "Offline"
+    : radio.playbackState === "retrying" ? "Reconnecting"
+    : radio.playbackState === "connecting" ? "Connecting"
+    : radio.playbackPaused ? (radio.playbackKind === "live" ? "Paused · buffering" : "Paused")
+    : radio.wanted && radio.playbackState === "playing" ? (radio.playbackKind === "recording" ? "Playing"
+      : radio.dvr && radio.behindLive > 3 ? "Behind live" : "Live") : "Stopped"
+  readonly property string playbackIcon: radio.playbackState === "error" ? "warning"
+    : radio.playbackState === "connecting" || radio.playbackState === "retrying" ? "radio"
+    : radio.playbackPaused ? "pause"
+    : radio.wanted && radio.playbackState === "playing" ? (radio.playbackKind === "live" && radio.dvr && radio.behindLive > 3 ? "back" : "play") : "stop"
+  readonly property color playbackColor: radio.playbackState === "error" ? Commons.Color.urgent
+    : radio.wanted && (radio.playbackState === "playing" || radio.playbackPaused && radio.playbackKind === "live") ? Commons.Color.accent
+    : root.bar ? root.bar.barForeground : Commons.Color.foreground
+
   function open() { if (panelLoader.item) panelLoader.item.open() }
   function close() { if (panelLoader.item) panelLoader.item.close() }
   function toggle() { if (panelLoader.item) panelLoader.item.toggle() }
@@ -104,12 +120,15 @@ Ui.BarWidget {
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : branding.implicitWidth + button.scaledHorizontalMargin * 2
+    fixedHeight: root.vertical ? Style.bar.iconSlot : -1
     fontSize: Style.font.icon
-    foreground: Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
-      : Radio.RadioService.playbackState === "playing" ? Commons.Color.accent
-      : root.bar ? root.bar.barForeground : Commons.Color.foreground
-    tooltipText: (Radio.RadioService.playbackKind === "recording" ? Radio.RadioService.recordingTitle : Radio.RadioService.station.name) + " · " + Radio.RadioService.statusText
-      + (Number(Radio.RadioService.recordings.activeCount) > 0 ? "\nRecording " + Radio.RadioService.recordings.activeCount + " stream(s)" : "")
+    foreground: root.playbackColor
+    Accessible.role: Accessible.Button
+    Accessible.name: "Yakker · " + (root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name) + " · " + root.radio.statusText
+    Accessible.description: root.radio.playbackDetail + (root.recordingActive ? " · Recording " + root.radio.recordings.activeCount + " stream(s)" : "")
+    tooltipText: (root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name) + " · " + root.radio.statusText
+      + (root.radio.playbackDetail ? "\n" + root.radio.playbackDetail : "")
+      + (root.recordingActive ? "\nRecording " + root.radio.recordings.activeCount + " stream(s)" : "")
       + "\nClick for controls · Right-click for stations"
     onPressed: buttonCode => {
       if (buttonCode === Qt.LeftButton) root.toggle()
@@ -120,35 +139,82 @@ Ui.BarWidget {
       id: branding
       anchors.centerIn: parent
       spacing: Style.space(6)
-      Radio.StationLogo {
+      Item {
         width: Style.space(24)
-        height: Math.min(Style.space(22), button.height - Style.space(4))
+        height: Math.max(Style.space(12), Math.min(Style.space(22), button.height - Style.space(4)))
         anchors.verticalCenter: parent.verticalCenter
-        // An idle selection is not a live station; use the neutral radio fallback.
-        station: Radio.RadioService.wanted && Radio.RadioService.playbackState === "playing"
-          ? Radio.RadioService.playbackStation : ({})
-        fallbackColor: button.foreground
+        Radio.StationLogo {
+          id: stationLogo
+          anchors.fill: parent
+          // A paused stream still owns its station and keeps receiving audio.
+          station: root.radio.wanted && (root.radio.playbackState === "playing" || root.radio.playbackPaused)
+            ? root.radio.playbackStation : ({})
+          fallbackColor: button.foreground
+        }
+        Rectangle {
+          visible: root.vertical
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          width: Style.space(13); height: width
+          radius: Style.space(3)
+          color: root.bar ? root.bar.background : Commons.Color.background
+          Radio.FocusIcon { anchors.fill: parent; anchors.margins: Style.space(1); name: root.playbackIcon; foreground: root.playbackColor }
+        }
+        Rectangle {
+          visible: root.vertical && root.recordingActive
+          anchors.top: parent.top; anchors.right: parent.right
+          width: Style.space(5); height: width; radius: width / 2
+          color: Commons.Color.urgent
+        }
       }
       Text {
         visible: !root.vertical && root.setting("showName", false)
         text: "Yakker"
+        textFormat: Text.PlainText
         color: button.foreground
         font.family: button.fontFamily
         font.pixelSize: Style.font.body
         anchors.verticalCenter: parent.verticalCenter
       }
-    }
-
-    Rectangle {
-      width: Style.space(4)
-      height: width
-      radius: width / 2
-      anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      anchors.margins: Style.space(3)
-      visible: Radio.RadioService.playbackState !== "stopped" || Number(Radio.RadioService.recordings.activeCount) > 0
-      color: Number(Radio.RadioService.recordings.activeCount) > 0 || Radio.RadioService.playbackState === "error" ? Commons.Color.urgent
-        : Radio.RadioService.playbackState === "playing" ? Commons.Color.accent : button.foreground
+      Row {
+        visible: !root.vertical
+        spacing: Style.space(4)
+        anchors.verticalCenter: parent.verticalCenter
+        Radio.FocusIcon {
+          id: stateIcon
+          width: Style.space(12); height: width
+          anchors.verticalCenter: parent.verticalCenter
+          name: root.playbackIcon
+          foreground: root.playbackColor
+        }
+        Text {
+          id: playbackStateLabel
+          text: root.playbackLabel
+          textFormat: Text.PlainText
+          color: root.playbackColor
+          font.family: button.fontFamily
+          font.pixelSize: Style.fontPx(1)
+          anchors.verticalCenter: parent.verticalCenter
+        }
+      }
+      Row {
+        id: recordingIndicator
+        visible: !root.vertical && root.recordingActive
+        spacing: Style.space(3)
+        anchors.verticalCenter: parent.verticalCenter
+        Rectangle {
+          width: Style.space(5); height: width; radius: width / 2
+          anchors.verticalCenter: parent.verticalCenter
+          color: Commons.Color.urgent
+        }
+        Text {
+          text: "REC " + (Number(root.radio.recordings.activeCount) || 0)
+          textFormat: Text.PlainText
+          color: Commons.Color.urgent
+          font.family: button.fontFamily
+          font.pixelSize: Style.fontPx(0.917)
+        }
+      }
     }
   }
 }

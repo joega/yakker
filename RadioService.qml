@@ -97,6 +97,10 @@ Item {
     : playbackState === "connecting" ? "Connecting…"
     : playbackState === "retrying" ? "Reconnecting in " + retryDelay + "s · attempt " + retry + "/5"
     : playbackState === "error" ? "Unable to play" : playbackKind === "recording" ? "Recording stopped" : !hasStation ? "Choose a station to start listening" : "Listening stopped"
+  readonly property string playbackDetail: playbackStopped ? (playbackKind === "recording" ? "Position saved · Resume from Library"
+      : hasStation ? "Stream disconnected · Replay cleared" : "Choose a station, then press Play")
+    : playbackPaused ? (playbackKind === "recording" ? "Position saved · Resume when ready"
+      : bufferExpired ? "Stream stays connected · Earlier audio expired" : "Stream stays connected · Resume keeps your place") : ""
   signal preferencesChanged(int volume, bool muted, string stationId, int bufferMinutes)
   signal favoritesUpdated()
   signal statusReceived(int serial)

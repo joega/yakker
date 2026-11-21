@@ -12,12 +12,84 @@ ShellRoot {
     Plugin.Panel { id: panel; width: window.width; height: window.height }
     Plugin.Panel { id: peer; visible: false; width: window.width; height: window.height }
     Plugin.MarqueeText { id: marqueeFixture; visible: false; z: 100; width: 100; text: "98.5 The Sports Hub"; font.family: "Adwaita Sans"; font.pixelSize: 24; color: Commons.Color.foreground }
+    QtObject {
+      id: barConfig
+      property bool vertical: false
+      property int barSize: 32
+      property string fontFamily: "Adwaita Sans"
+      property color barForeground: Commons.Color.foreground
+      property color background: Commons.Color.background
+      property color urgent: Commons.Color.urgent
+      property bool foregroundAnimationEnabled: false
+      property var shell: null
+      function registerClickTarget(item) {}
+      function unregisterClickTarget(item) {}
+      function hideTooltip(item) {}
+      function showTooltip(item, text) {}
+    }
+    Plugin.BarWidget { id: barFixture; visible: false; z: 200; bar: barConfig; width: implicitWidth; height: implicitHeight; anchors.centerIn: parent }
     Timer { interval: 300; running: true; onTriggered: tests.runChecks() }
     TestCase { id: tests; name: "FullRecordings"; when: false
       function capture(name) {
         var done = false, saved = false
         window.contentItem.grabToImage(function(result) { saved = result.saveToFile("__OUTPUT__/" + name + ".png"); done = true })
         tryVerify(function() { return done }, 5000); verify(saved, "screenshot failed: " + name)
+      }
+      function captureBar(name) {
+        wait(80)
+        var done = false, saved = false
+        barFixture.grabToImage(function(result) { saved = result.saveToFile("__OUTPUT__/" + name + ".png"); done = true })
+        tryVerify(function() { return done }, 5000); verify(saved, "bar screenshot failed: " + name)
+      }
+      function checkBarStates() {
+        const radio = panel.radio
+        const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","recordingId","recordingTitle","recordings"]
+        const saved = keys.map(function(key) { return radio[key] })
+        try {
+          barFixture.visible = true
+          radio.station = radio.stations.find(function(station) { return station.id === "wip-fm" }); radio.stationId = "wip-fm"
+          radio.playbackKind = "live"; radio.wanted = true; radio.paused = false; radio.playbackState = "playing"
+          radio.dvr = false; radio.temporaryBuffer = false
+          compare(barFixture.testStatus.text, "Live"); compare(barFixture.testStateIcon.name, "play")
+          compare(barFixture.testLogo.station.id, "wip-fm")
+          captureBar("bar-live")
+          radio.station = radio.stations.find(function(station) { return station.id === "weei-fm" }); radio.stationId = "weei-fm"
+          radio.paused = true; radio.playbackState = "paused"; radio.temporaryBuffer = true
+          compare(barFixture.testStatus.text, "Paused · buffering"); compare(barFixture.testStateIcon.name, "pause")
+          verify(barFixture.testLogo.station.id === "weei-fm", "Pausing removed the source artwork")
+          verify(barFixture.testButton.tooltipText.indexOf("Stream stays connected") >= 0)
+          captureBar("bar-paused-buffering")
+          radio.station = radio.stations.find(function(station) { return station.id === "bbc-radio-5-live" }); radio.stationId = "bbc-radio-5-live"
+          barConfig.vertical = true
+          captureBar("bar-vertical-paused")
+          verify(barFixture.width <= barConfig.barSize, "The vertical bar expanded to fit the horizontal state label")
+          barConfig.vertical = false
+          radio.wanted = false; radio.paused = false; radio.playbackState = "stopped"
+          compare(barFixture.testStatus.text, "Stopped"); compare(barFixture.testStateIcon.name, "stop")
+          verify(!barFixture.testLogo.station.id)
+          verify(barFixture.testButton.tooltipText.indexOf("Stream disconnected · Replay cleared") >= 0)
+          radio.recordings = Object.assign({}, radio.recordings, {activeCount:1})
+          verify(barFixture.testRecordingIndicator.visible && barFixture.testStateIcon.name === "stop", "Recording activity hid the stopped listening state")
+          captureBar("bar-stopped-recording")
+          radio.recordings = saved[keys.indexOf("recordings")]
+          radio.wanted = true; radio.paused = true; radio.playbackState = "retrying"
+          compare(barFixture.testStatus.text, "Reconnecting")
+          verify(barFixture.testButton.tooltipText.indexOf("Stream stays connected") < 0, "Reconnect claims to preserve paused audio")
+          radio.playbackState = "error"
+          compare(barFixture.testStateIcon.name, "warning"); compare(barFixture.testStatus.text, "Offline")
+          captureBar("bar-error")
+          radio.playbackKind = "recording"; radio.recordingId = "test-recording"; radio.recordingTitle = "Saved show"
+          radio.playbackState = "paused"
+          compare(barFixture.testStatus.text, "Paused")
+          verify(barFixture.testButton.tooltipText.indexOf("buffering") < 0, "A saved recording is labeled as buffering")
+          captureBar("bar-paused-recording")
+          radio.paused = false; radio.playbackState = "playing"
+          compare(barFixture.testStatus.text, "Playing")
+          verify(barFixture.testStatus.text !== "Recording", "Playback looks like a recording capture")
+        } finally {
+          keys.forEach(function(key,index) { radio[key] = saved[index] })
+          barConfig.vertical = false; barFixture.visible = false
+        }
       }
       function checkPlaybackStates() {
         const radio = panel.radio
@@ -139,6 +211,7 @@ ShellRoot {
           compare(panel.testStationPicker.placeholderText, "Choose a station")
           capture("first-launch")
           checkPlaybackStates()
+          checkBarStates()
           panel.radio.play(); verify(!panel.radio.wanted, "Play started without a station choice")
           panel.radio.configureSettings({stationId: "tsn-690"})
           tryVerify(function() { return panel.radio.hasStation && panel.radio.stationId === "tsn-690" }, 3000)

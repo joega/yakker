@@ -43,9 +43,16 @@ def main():
         shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
         for name in ("Commons", "services"):
             (qs / name).symlink_to(shell / name, target_is_directory=True)
-        for name in ("Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "qmldir"):
+        for name in ("BarWidget.qml", "Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "qmldir"):
             shutil.copy2(ROOT / name, plugin / name)
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
+        bar_widget = plugin / "BarWidget.qml"
+        bar_widget.write_text(bar_widget.read_text().replace('  property bool attached: false', '''  property alias testButton: button
+  property alias testStatus: playbackStateLabel
+  property alias testStateIcon: stateIcon
+  property alias testLogo: stationLogo
+  property alias testRecordingIndicator: recordingIndicator
+  property bool attached: false''', 1))
         panel = plugin / "Panel.qml"
         panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testPlayerStatus: playerStatus
   property alias testDockStatus: dockStatus

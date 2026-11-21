@@ -163,11 +163,16 @@ Enter selects, F toggles the highlighted favorite, and Escape closes.
 Changing stations while playing makes a fresh live connection; while stopped it
 selects the next station without starting playback. The last station, volume,
 mute setting and listening buffer length are remembered across shell restarts.
-The bar shows a neutral radio icon until playback is live, then switches to the
-playing station's bundled logo. Stop restores the neutral icon; connecting,
-reconnecting and errors also use it. The popup keeps the selected station's logo.
-The bar status dot uses accent
-color while playing and the urgent theme color for errors. Hover it for station and status.
+The bar keeps station artwork visible while playing or paused. A compact icon
+and label show **Live**, **Behind live**, **Paused · buffering**, or **Stopped**;
+saved recordings show **Playing** or **Paused** without suggesting live buffering.
+Connecting, reconnecting, and offline states have their own labels. Stop restores
+the neutral radio icon. A separate **REC** count shows background recordings even
+when listening is stopped. Vertical bars use a compact state marker over the
+artwork and a separate recording dot. Hover for the source, connection/replay
+status, and active recording count.
+
+![Native bar widget states: live, paused buffering, stopped with a background recording, offline, and paused saved recording](docs/yakker-bar-states.png)
 
 Keyboard inside the popup: Tab/Shift+Tab or Up/Down moves between controls, including
 Settings and the DVR controls when available;

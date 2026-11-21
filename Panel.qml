@@ -49,10 +49,7 @@ Ui.Panel {
     ? (pausedLive ? "Paused · buffering · " : "") + radio.clock(radio.behindLive) + " behind live"
     : radio.statusText
   readonly property string playbackHint: connectionIssue ? ""
-    : radio.playbackStopped ? (radio.playbackKind === "recording" ? "Position saved · Resume from Library"
-      : radio.hasStation ? "Stream disconnected · Replay cleared" : "Choose a station, then press Play")
-    : radio.playbackPaused ? (pausedLive ? (radio.bufferExpired ? "Stream stays connected · Earlier audio expired" : "Stream stays connected · Resume keeps your place")
-      : "Position saved · Resume when ready")
+    : radio.playbackStopped || radio.playbackPaused ? radio.playbackDetail
     : radio.playbackKind === "recording" ? "Saved recording · Position saved as you listen"
     : radio.playbackState === "connecting" ? "Connecting to the station"
     : radio.temporaryBuffer ? "Temporary 15 min replay · In memory"
