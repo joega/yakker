@@ -100,9 +100,9 @@ make build
 The build produces `yakker-controller` (the runtime controller) and `yakker`
 (standalone playback and local installation). Run the installer from this checkout. It validates and copies the compiled controller, QML, and assets to
 `~/.config/omarchy/plugins/io.github.joega.yakker`, rescans the existing shell,
-and enables a new widget in its default right section. Existing widgets remain
-in place. The manifest's `barWidget.defaultSection` sets the default for new
-widgets; dragging a widget saves its section and order in
+and enables a new widget in `centerEnd`, beside the center island. Existing
+widgets keep their saved section, order, and preferences. The manifest's
+`barWidget.defaultSection` sets the default for new widgets; dragging a widget saves its section and order in
 `~/.config/omarchy/shell.json`. For example, `centerEnd` places it beside the
 center island. It uses Omarchy's documented drop-in workflow; `omarchy dev link` is
 for developing the shell itself. No second Quickshell instance is launched.
