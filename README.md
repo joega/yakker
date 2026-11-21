@@ -133,7 +133,11 @@ packaging builds locally and does not publish or install anything.
 Click the radio icon in the bar, select a station, then press the **Play** icon.
 Your last chosen station is restored on later launches. If it is no longer in
 the catalogue, choose another station; Yakker never substitutes a broadcaster.
-The Focus player shows the full station name above **Change station**, with
+The Focus player keeps the station title on one line above **Change station**.
+Titles that overflow scroll slowly to the end and back, pausing at both ends.
+Short titles stay still; reduced-motion mode uses an ellipsis and a full-title
+tooltip instead. Presets and the playback dock also stay on one line, without
+independent animations. The player includes
 up to six favorite presets in the order you added them. The **Listen**, **Library**,
 and **Schedules** tabs stay at the top. **Rewind · Play/Pause · Forward** form the
 main transport row, with a larger Play/Pause control; **Record**, **Sleep**, and

@@ -4,3 +4,4 @@ RecordingsView 1.0 RecordingsView.qml
 FocusButton 1.0 FocusButton.qml
 FocusIcon 1.0 FocusIcon.qml
 StationPicker 1.0 StationPicker.qml
+MarqueeText 1.0 MarqueeText.qml

@@ -711,8 +711,9 @@ Ui.Panel {
                     font.pixelSize: Style.fontPx(1)
                     wrapMode: Text.Wrap
                   }
-                  Text {
+                  Radio.MarqueeText {
                     id: stationHeading
+                    scrolling: root.opened
                     width: parent.width
                     text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name
                     textFormat: Text.PlainText
@@ -720,7 +721,6 @@ Ui.Panel {
                     font.family: root.uiFontFamily
                     font.pixelSize: Style.fontPx(2)
                     font.weight: Font.DemiBold
-                    wrapMode: Text.Wrap
                   }
                   Radio.StationPicker {
                     id: stationPicker
@@ -774,7 +774,7 @@ Ui.Panel {
                       required property var modelData
                       required property int index
                       width: (presetGrid.width - presetGrid.spacing * (presetGrid.columns - 1)) / presetGrid.columns
-                      height: Style.space(54)
+                      height: Style.space(46)
                       selected: root.radio.stationId === modelData.id
                       foreground: root.barForeground
                       tooltipText: modelData.name + (modelData.city ? " · " + modelData.city : "")
@@ -789,7 +789,7 @@ Ui.Panel {
                         anchors.fill: parent
                         anchors.margins: Style.space(7)
                         spacing: Style.space(2)
-                        Text { width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideRight }
+                        Radio.MarqueeText { scrolling: false; width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                         Text { width: parent.width; text: modelData.city || modelData.country || ""; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.space(11); elide: Text.ElideRight }
                       }
                     }
@@ -1117,7 +1117,7 @@ Ui.Panel {
               width: parent.width - Style.space(44) - dockBack.width - dockPlay.width - dockForward.width - dockStop.width - parent.spacing * 4
               spacing: Style.space(3)
               anchors.verticalCenter: parent.verticalCenter
-              Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold; maximumLineCount: 2; wrapMode: Text.Wrap; elide: Text.ElideRight }
+              Radio.MarqueeText { scrolling: false; width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.weight: Font.DemiBold }
               Text { width: parent.width; text: root.radio.playbackKind === "recording" ? root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration) : root.listeningStatus; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); elide: Text.ElideRight }
             }
             Radio.FocusButton { id: dockBack; width: Style.space(30); horizontalPadding: 0; iconName: "back"; tooltipText: "Rewind 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canRewind; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(-30) }

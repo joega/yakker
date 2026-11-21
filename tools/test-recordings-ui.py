@@ -43,7 +43,7 @@ def main():
         shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
         for name in ("Commons", "services"):
             (qs / name).symlink_to(shell / name, target_is_directory=True)
-        for name in ("Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "qmldir"):
+        for name in ("Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "qmldir"):
             shutil.copy2(ROOT / name, plugin / name)
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
         panel = plugin / "Panel.qml"

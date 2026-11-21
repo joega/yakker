@@ -27,7 +27,7 @@ import (
 
 var bundleFiles = []string{
 	"manifest.json", "qmldir", "BarWidget.qml",
-	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml",
+	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml",
 	"stations.json", "README.md", "LICENSE",
 	"assets/wbns-fm.png", "assets/wkrk-fm.webp", "assets/kwfn-fm.webp",
 	"assets/wzgc-fm.webp", "assets/kkfn-fm.webp", "assets/klac.png",

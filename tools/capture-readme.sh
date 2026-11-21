@@ -47,7 +47,7 @@ cp -r "$shell_dir/Ui" "$capture_dir/imports/qs/Ui"
 cp "$project_dir/tools/readme/KeyboardPanel.qml" "$capture_dir/imports/qs/Ui/KeyboardPanel.qml"
 ln -s "$shell_dir/Commons" "$capture_dir/imports/qs/Commons"
 ln -s "$shell_dir/services" "$capture_dir/imports/qs/services"
-cp "$project_dir"/{Panel.qml,RecordingsView.qml,RadioService.qml,RecordingNotices.js,StationLogo.qml,FocusButton.qml,FocusIcon.qml,StationPicker.qml,qmldir,stations.json} "$capture_dir/plugin/"
+cp "$project_dir"/{Panel.qml,RecordingsView.qml,RadioService.qml,RecordingNotices.js,StationLogo.qml,FocusButton.qml,FocusIcon.qml,StationPicker.qml,MarqueeText.qml,qmldir,stations.json} "$capture_dir/plugin/"
 ln -s "$project_dir/assets" "$capture_dir/plugin/assets"
 awk '
   /property var anchorItem: null/ {

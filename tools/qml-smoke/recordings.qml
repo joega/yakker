@@ -11,6 +11,7 @@ ShellRoot {
     Rectangle { anchors.fill: parent; color: Commons.Color.popups.background }
     Plugin.Panel { id: panel; width: window.width; height: window.height }
     Plugin.Panel { id: peer; visible: false; width: window.width; height: window.height }
+    Plugin.MarqueeText { id: marqueeFixture; visible: false; z: 100; width: 100; text: "98.5 The Sports Hub"; font.family: "Adwaita Sans"; font.pixelSize: 24; color: Commons.Color.foreground }
     Timer { interval: 300; running: true; onTriggered: tests.runChecks() }
     TestCase { id: tests; name: "FullRecordings"; when: false
       function capture(name) {
@@ -20,6 +21,31 @@ ShellRoot {
       }
       function runChecks() {
         try {
+          const reducedMotion = Commons.Style.reduceMotion
+          Commons.Style.reduceMotion = false
+          marqueeFixture.width = marqueeFixture.implicitWidth - 12
+          marqueeFixture.visible = true
+          const titleHeight = marqueeFixture.height
+          verify(marqueeFixture.overflowing && marqueeFixture.motionAllowed)
+          compare(marqueeFixture.offset, 0)
+          wait(150); compare(marqueeFixture.offset, 0, "Long titles did not pause before scrolling")
+          tryVerify(function() { return marqueeFixture.offset < -1 }, 1800)
+          tryVerify(function() { return marqueeFixture.offset === -marqueeFixture.overflowDistance }, 1800)
+          const endOffset = marqueeFixture.offset
+          wait(200); compare(marqueeFixture.offset, endOffset, "The title did not pause at the far end")
+          tryVerify(function() { return marqueeFixture.offset > endOffset + 1 }, 1800)
+          tryVerify(function() { return Math.abs(marqueeFixture.offset) < 0.1 }, 1800)
+          marqueeFixture.text = "TSN 690"
+          verify(!marqueeFixture.overflowing && !marqueeFixture.motionAllowed)
+          compare(marqueeFixture.offset, 0); compare(marqueeFixture.height, titleHeight)
+          marqueeFixture.text = "<b>A very long literal station name</b>"
+          compare(marqueeFixture.textFormat, Text.PlainText)
+          Commons.Style.reduceMotion = true
+          verify(marqueeFixture.overflowing && !marqueeFixture.motionAllowed && marqueeFixture.truncated)
+          compare(marqueeFixture.offset, 0); compare(marqueeFixture.height, titleHeight)
+          marqueeFixture.visible = false
+          Commons.Style.reduceMotion = reducedMotion
+          verify(!marqueeFixture.motionAllowed, "A hidden title kept animating")
           let state = Notices.update(null, {recordings:[{id:"old",status:"complete"}]}, true, false)
           compare(state.notices.length, 0, "Historic recording triggered a notification")
           state = Notices.update(state.state, {recordings:[{id:"new",status:"recording"}]}, true, false)
