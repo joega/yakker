@@ -15,7 +15,7 @@ import (
 )
 
 var installFiles = []string{
-	"docs/yakker-bar-states.png",
+	"docs/yakker-bar-states.png", "docs/yakker-bar-tooltips.png",
 	"manifest.json", "qmldir", "BarWidget.qml",
 	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml",
 	"assets/sports-hub.png", "assets/weei-fm.png", "assets/wscr.webp",

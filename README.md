@@ -172,7 +172,12 @@ behind-live, connecting/reconnecting, and offline states. Full status text and
 connection/replay details stay in the tooltip. Stop restores the neutral radio
 icon. A separate **REC** count shows background recordings even when listening
 is stopped. Vertical bars use a compact state marker over the artwork and a
-separate recording dot.
+separate recording dot. The tooltip groups the source name and location, playback
+state, replay availability and delay, and active recording names. Saved-show
+playback identifies its original station and elapsed time. Long metadata is
+bounded and displayed as plain text.
+
+![Bar tooltip examples for live, paused buffering, stopped listening with captures, and saved-show playback](docs/yakker-bar-tooltips.png)
 
 ![Native bar widget states: live, paused buffering, stopped with a background recording, offline, and paused saved recording](docs/yakker-bar-states.png)
 

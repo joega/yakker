@@ -3,6 +3,7 @@ import QtQuick.Window
 import QtTest
 import Quickshell
 import qs.Commons as Commons
+import qs.Ui as Ui
 import "plugin" as Plugin
 import "plugin/RecordingNotices.js" as Notices
 ShellRoot {
@@ -28,6 +29,29 @@ ShellRoot {
       function showTooltip(item, text) {}
     }
     Plugin.BarWidget { id: barFixture; visible: false; z: 200; bar: barConfig; width: implicitWidth; height: implicitHeight; anchors.centerIn: parent }
+    // The bar owns this native plain-text surface; render the production string
+    // with the same font, border and insets in the isolated test window.
+    Ui.BorderSurface {
+      id: tooltipFixture
+      visible: false; z: 300
+      anchors.centerIn: parent
+      width: tooltipPreview.implicitWidth + 20
+      height: tooltipPreview.implicitHeight + 14
+      color: Commons.Color.tooltip.background
+      borderSpec: Commons.Border.surfaceSpec("tooltip", "border", Commons.Color.tooltip.border, 1)
+      radius: Commons.Style.cornerRadius
+      Text {
+        id: tooltipPreview
+        anchors.centerIn: parent
+        text: barFixture.testButton.tooltipText
+        textFormat: Text.PlainText
+        color: Commons.Color.tooltip.text
+        font.family: barConfig.fontFamily
+        font.pixelSize: Commons.Style.font.body
+        horizontalAlignment: Text.AlignHCenter
+        verticalAlignment: Text.AlignVCenter
+      }
+    }
     Timer { interval: 300; running: true; onTriggered: tests.runChecks() }
     TestCase { id: tests; name: "FullRecordings"; when: false
       function capture(name) {
@@ -41,23 +65,38 @@ ShellRoot {
         barFixture.grabToImage(function(result) { saved = result.saveToFile("__OUTPUT__/" + name + ".png"); done = true })
         tryVerify(function() { return done }, 5000); verify(saved, "bar screenshot failed: " + name)
       }
+      function captureTooltip(name) {
+        tooltipFixture.visible = true
+        wait(60)
+        verify(tooltipFixture.width <= window.width, "Tooltip exceeded the test window width")
+        var done = false, saved = false
+        tooltipFixture.grabToImage(function(result) { saved = result.saveToFile("__OUTPUT__/" + name + ".png"); done = true })
+        tryVerify(function() { return done }, 5000); verify(saved)
+        tooltipFixture.visible = false
+      }
       function checkBarStates() {
         const radio = panel.radio
-        const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","recordingId","recordingTitle","recordings"]
+        const keys = ["wanted","paused","playbackState","playbackKind","bufferMinutes","temporaryBuffer","dvr","position","bufferStart","bufferEnd","bufferExpired","station","stationId","recordingId","recordingTitle","duration","title","recordings"]
         const saved = keys.map(function(key) { return radio[key] })
         try {
           barFixture.visible = true
           radio.station = radio.stations.find(function(station) { return station.id === "wip-fm" }); radio.stationId = "wip-fm"
           radio.playbackKind = "live"; radio.wanted = true; radio.paused = false; radio.playbackState = "playing"
           radio.dvr = false; radio.temporaryBuffer = false
-          verify(barFixture.testButton.tooltipText.indexOf(" · Live") >= 0); compare(barFixture.testStateIcon.name, "play")
+          verify(barFixture.testButton.tooltipText.split("\n").indexOf("Live") >= 0); compare(barFixture.testStateIcon.name, "play")
           compare(barFixture.testLogo.station.id, "wip-fm")
+          verify(barFixture.testButton.tooltipText.indexOf("Philadelphia · United States") >= 0)
+          captureTooltip("tooltip-live")
           captureBar("bar-live")
           radio.station = radio.stations.find(function(station) { return station.id === "weei-fm" }); radio.stationId = "weei-fm"
           radio.paused = true; radio.playbackState = "paused"; radio.temporaryBuffer = true
+          radio.dvr = true; radio.bufferStart = 0; radio.bufferEnd = 75; radio.position = 30
           verify(barFixture.testButton.tooltipText.indexOf("Paused · buffering") >= 0); compare(barFixture.testStateIcon.name, "pause")
           verify(barFixture.testLogo.station.id === "weei-fm", "Pausing removed the source artwork")
           verify(barFixture.testButton.tooltipText.indexOf("Stream stays connected") >= 0)
+          verify(barFixture.testButton.tooltipText.indexOf("0:45 behind live") >= 0)
+          verify(barFixture.testButton.tooltipText.indexOf("Temporary replay · 1:15 available") >= 0)
+          captureTooltip("tooltip-paused-buffering")
           captureBar("bar-paused-buffering")
           radio.station = radio.stations.find(function(station) { return station.id === "bbc-radio-5-live" }); radio.stationId = "bbc-radio-5-live"
           barConfig.vertical = true
@@ -70,6 +109,18 @@ ShellRoot {
           verify(barFixture.testButton.tooltipText.indexOf("Stream disconnected · Replay cleared") >= 0)
           radio.recordings = Object.assign({}, radio.recordings, {activeCount:1})
           verify(barFixture.testRecordingIndicator.visible && barFixture.testStateIcon.name === "stop", "Recording activity hid the stopped listening state")
+          const captureRows = [
+            {id:"active-1",status:"recording",label:"Morning drive",stationName:"WEEI 93.7"},
+            {id:"active-2",status:"recording",label:"Football review",stationName:"talkSPORT"},
+            {id:"history",status:"complete",label:"Historic recording",stationName:"WFAN"}
+          ]
+          radio.recordings = Object.assign({}, radio.recordings, {activeCount:2,recordings:captureRows})
+          verify(barFixture.testButton.tooltipText.indexOf("Recording now · 2 active shows") >= 0)
+          verify(barFixture.testButton.tooltipText.indexOf("Morning drive · WEEI 93.7") >= 0)
+          verify(barFixture.testButton.tooltipText.indexOf("Football review · talkSPORT") >= 0)
+          verify(barFixture.testButton.tooltipText.indexOf("Historic recording") < 0, "Tooltip listed completed recordings as active")
+          verify(barFixture.testButton.tooltipText.indexOf("Replay ·") < 0 && barFixture.testButton.tooltipText.indexOf("Temporary replay") < 0, "Stopped tooltip advertises active buffering")
+          captureTooltip("tooltip-stopped-recordings")
           captureBar("bar-stopped-recording")
           radio.recordings = saved[keys.indexOf("recordings")]
           radio.wanted = true; radio.paused = true; radio.playbackState = "retrying"
@@ -82,13 +133,23 @@ ShellRoot {
           radio.playbackState = "paused"
           verify(barFixture.testButton.tooltipText.indexOf("Recording paused") >= 0)
           verify(barFixture.testButton.tooltipText.indexOf("buffering") < 0, "A saved recording is labeled as buffering")
+          radio.duration = 60; radio.position = 23
+          verify(barFixture.testButton.tooltipText.indexOf("Saved recording · 98.5 The Sports Hub") >= 0, "Saved-show tooltip followed the selected live station")
+          verify(barFixture.testButton.tooltipText.indexOf("0:23 / 1:00") >= 0)
+          captureTooltip("tooltip-paused-recording")
           captureBar("bar-paused-recording")
           radio.paused = false; radio.playbackState = "playing"
           verify(barFixture.testButton.tooltipText.indexOf("Playing recording") >= 0)
           verify(!barFixture.testRecordingIndicator.visible, "Saved playback looks like a recording capture")
+          radio.playbackKind = "live"; radio.station = Object.assign({}, radio.station, {name:"<b>Literal name</b>\nUntrusted title " + "long text ".repeat(40)})
+          const literalTooltip = barFixture.testButton.tooltipText
+          verify(literalTooltip.indexOf("<b>Literal name</b>") === 0, "Tooltip changed literal station text into markup")
+          verify(literalTooltip.indexOf("\nUntrusted title") < 0, "Station metadata injected a tooltip section")
+          compare(tooltipPreview.textFormat, Text.PlainText)
+          captureTooltip("tooltip-long-literal")
         } finally {
           keys.forEach(function(key,index) { radio[key] = saved[index] })
-          barConfig.vertical = false; barFixture.visible = false
+          barConfig.vertical = false; barFixture.visible = false; tooltipFixture.visible = false
         }
       }
       function checkPlaybackStates() {

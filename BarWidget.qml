@@ -24,6 +24,80 @@ Ui.BarWidget {
     : radio.wanted && (radio.playbackState === "playing" || radio.playbackPaused && radio.playbackKind === "live") ? Commons.Color.accent
     : root.bar ? root.bar.barForeground : Commons.Color.foreground
 
+  readonly property string tooltipStatus: buildTooltip()
+  FontMetrics {
+    id: tooltipMetrics
+    font.family: button.fontFamily
+    font.pixelSize: Style.font.body
+  }
+  function tooltipText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim()
+  }
+  function tooltipLine(value) {
+    return tooltipMetrics.elidedText(tooltipText(value), Text.ElideRight, Style.space(340))
+  }
+  function tooltipParagraph(value) {
+    const words = tooltipText(value).split(" ")
+    const lines = []
+    let line = ""
+    for (let i = 0; i < words.length; i++) {
+      const next = line ? line + " " + words[i] : words[i]
+      if (line && tooltipMetrics.advanceWidth(next) > Style.space(340)) {
+        lines.push(line)
+        if (lines.length === 1) {
+          line = words.slice(i).join(" ")
+          break
+        }
+        line = words[i]
+      } else line = next
+    }
+    if (line) lines.push(tooltipLine(line))
+    return lines.join("\n")
+  }
+  function buildTooltip() {
+    const saved = radio.playbackKind === "recording"
+    const source = saved ? radio.playbackStation : radio.station
+    const selected = saved || radio.hasStation
+    const heading = [tooltipLine(selected ? (saved ? radio.recordingTitle || "Saved recording" : source.name) : "Yakker")]
+    if (saved) heading.push(tooltipLine("Saved recording · " + (source.name || "Unknown station")))
+    const country = (radio.countryNames[source.country] || source.country || "").replace(/ \([A-Z]{2}\)$/, "")
+    const location = [source.city || "", country].filter(function(part) { return !!part }).join(" · ")
+    if (selected && location) heading.push(tooltipLine(location))
+    else if (selected && !saved && source.subtitle) heading.push(tooltipLine(source.subtitle))
+    const groups = [heading.join("\n")]
+    let state = radio.statusText
+    if (saved && radio.wanted && radio.duration > 0)
+      state += " · " + radio.clock(radio.position) + " / " + radio.clock(radio.duration)
+    else if (!saved && radio.wanted && radio.dvr && (radio.playbackPaused || radio.playbackState === "playing") && radio.behindLive > 3)
+      state = (radio.playbackPaused ? state : "Playing") + " · " + radio.clock(radio.behindLive) + " behind live"
+    const listening = [tooltipParagraph(state)]
+    if (radio.playbackDetail && selected) listening.push(tooltipParagraph(radio.playbackDetail))
+    if (!saved && radio.wanted && (radio.playbackPaused || radio.playbackState === "playing")) {
+      if (radio.dvr) listening.push(tooltipParagraph((radio.temporaryBuffer ? "Temporary replay" : "Replay") + " · "
+        + radio.clock(Math.max(0, radio.bufferEnd - radio.bufferStart)) + " available"))
+      else listening.push(radio.bufferActive ? "Replay · Building buffer…" : "Live only · Pause to keep your place")
+      if (radio.playbackState === "playing" && radio.behindLive <= 3 && tooltipText(radio.title))
+        listening.push(tooltipParagraph("Now playing · " + radio.title))
+    }
+    groups.push(listening.join("\n"))
+    const snapshot = radio.recordings || {}
+    if (snapshot.available === false) groups.push("Recording status unavailable")
+    else if (recordingActive) {
+      const active = (snapshot.recordings || []).filter(function(item) { return item.status === "recording" })
+      const count = Math.max(Number(snapshot.activeCount) || 0, active.length)
+      const captures = ["Recording now · " + count + (count === 1 ? " active show" : " active shows")]
+      active.slice(0, 3).forEach(function(item) {
+        const name = tooltipText(item.label || item.stationName || "Recording")
+        const station = tooltipText(item.stationName)
+        captures.push(tooltipParagraph("• " + name + (station && station !== name ? " · " + station : "")))
+      })
+      if (count > 3) captures.push("+ " + (count - 3) + " more in Library")
+      groups.push(captures.join("\n"))
+    }
+    groups.push("Click: player · Right-click: stations")
+    return groups.join("\n\n")
+  }
+
   function open() { if (panelLoader.item) panelLoader.item.open() }
   function close() { if (panelLoader.item) panelLoader.item.close() }
   function toggle() { if (panelLoader.item) panelLoader.item.toggle() }
@@ -119,11 +193,8 @@ Ui.BarWidget {
     foreground: root.playbackColor
     Accessible.role: Accessible.Button
     Accessible.name: "Yakker · " + (root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name) + " · " + root.radio.statusText
-    Accessible.description: root.radio.playbackDetail + (root.recordingActive ? " · Recording " + root.radio.recordings.activeCount + " stream(s)" : "")
-    tooltipText: (root.radio.playbackKind === "recording" ? root.radio.recordingTitle : root.radio.station.name) + " · " + root.radio.statusText
-      + (root.radio.playbackDetail ? "\n" + root.radio.playbackDetail : "")
-      + (root.recordingActive ? "\nRecording " + root.radio.recordings.activeCount + " stream(s)" : "")
-      + "\nClick for controls · Right-click for stations"
+    Accessible.description: root.tooltipStatus
+    tooltipText: root.tooltipStatus
     onPressed: buttonCode => {
       if (buttonCode === Qt.LeftButton) root.toggle()
       else if (buttonCode === Qt.RightButton) root.chooseStation()
