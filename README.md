@@ -191,7 +191,12 @@ Settings and the DVR controls when available;
 Space/Enter activates the selection. Inside the station selector, type to search,
 Down browses the matches, Enter selects, and Escape cancels and clears the search. Left/Right adjusts volume by 5%; M toggles
 mute; R retries a stopped stream; Escape dismisses the popup. Right-clicking the
-volume slider also toggles mute. Wheel over the slider adjusts volume.
+volume slider also toggles mute. Wheel over a slider uses the same steps as
+Left/Right: 5% for volume or 30 seconds for playback position. When a slider is
+focused, Page Up/Down adjusts volume by 10% or playback by one minute; Home/End
+jumps to its limits. Sliders share a 36 px interaction height, inset tracks, and
+hover/focus feedback without changing size. Recording elapsed and total times
+sit at opposite ends of the track; the elapsed time previews a drag before seeking.
 
 Left/Right on a navigation tab switches sections and keeps focus on the tab strip.
 Tab continues through the controls in visual order. Fields use normal text-editing

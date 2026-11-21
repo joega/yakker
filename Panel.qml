@@ -494,6 +494,21 @@ Ui.Panel {
       id: keyCatcher
       anchors.fill: parent
       blocked: root.recordingsOpen || root.settingsOpen && (root.settingsStorage || root.settingsTab === "stations") || sleepPopup.opened || speedPicker.popupOpen || stationPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
+      function sliderKey(event) {
+        event.accepted = false
+        if (blocked) return
+        const slider = root.cursor === 2 ? volumeSlider : root.cursor === 15 ? fileTimeline : root.cursor === 22 ? timelineSlider : null
+        if (slider && slider.visible) slider.handleKey(event)
+      }
+      Keys.forwardTo: [sliderKeys]
+      Item {
+        id: sliderKeys
+        Keys.onPressed: event => {
+          event.accepted = false
+          if (root.virtualFocus && [Qt.Key_Home,Qt.Key_End,Qt.Key_PageUp,Qt.Key_PageDown].indexOf(event.key) >= 0)
+            keyCatcher.sliderKey(event)
+        }
+      }
       Keys.onEscapePressed: event => {
         if (root.settingsOpen) { root.backFromSettings(); event.accepted = true }
         else event.accepted = false
@@ -505,9 +520,9 @@ Ui.Panel {
         if (dx) {
           root.keyboardNavigation = true
           if (root.settingsOpen && root.cursor >= 30 && root.cursor <= 33 || !root.settingsOpen && [20,14,21].indexOf(root.cursor) >= 0) root.moveTab(dx)
-          else if (root.cursor === 15 && root.radio.playbackKind === "recording") root.radio.seekRecording(root.radio.position + dx * 30)
-          else if (root.cursor === 22 && root.radio.dvr) root.radio.seek(root.radio.position + dx * 30)
-          else { root.cursor = 2; root.radio.commitVolume(root.radio.volume + dx * 5) }
+          else if (root.cursor === 15 && fileTimeline.enabled) fileTimeline.adjustBy(dx * fileTimeline.step)
+          else if (root.cursor === 22 && timelineSlider.enabled) timelineSlider.adjustBy(dx * timelineSlider.step)
+          else { root.cursor = 2; volumeSlider.adjustBy(dx * volumeSlider.step) }
         }
       }
       onActivateRequested: { root.keyboardNavigation = true; root.activate() }
@@ -1094,29 +1109,24 @@ Ui.Panel {
                     onClicked: root.radio.goLive()
                   }
                 }
-                Ui.BorderSurface {
+                Radio.FocusSlider {
+                  id: timelineSlider
                   width: parent.width
-                  implicitHeight: timelineSlider.implicitHeight + Style.space(4)
                   visible: root.radio.wanted && root.radio.bufferActive && root.radio.playbackKind !== "recording"
-                  color: "transparent"
-                  radius: Style.cornerRadius
-                  borderSpec: root.virtualFocus && root.cursor === 22 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-                  Ui.PanelSlider {
-                    id: timelineSlider
-                    anchors.fill: parent
-                    anchors.margins: Style.space(2)
-                    minimum: root.radio.bufferStart
-                    maximum: Math.max(minimum + 1, root.radio.bufferEnd)
-                    value: root.radio.position
-                    step: 30
-                    bar: root.bar
-                    enabled: root.radio.dvr
-                    fillColor: Commons.Color.accent
-                    knobColor: Commons.Color.accent
-                    trackColor: Qt.alpha(root.barForeground, 0.15)
-                    Accessible.name: "Live replay position"
-                    onReleased: value => root.radio.seek(value)
-                  }
+                  minimum: root.radio.bufferStart
+                  maximum: Math.max(minimum + 1, root.radio.bufferEnd)
+                  value: root.radio.position
+                  valueText: root.radio.clock(root.radio.bufferEnd - displayValue) + " behind live"
+                  step: 30
+                  pageStep: 60
+                  bar: root.bar
+                  foreground: root.barForeground
+                  enabled: root.seekable
+                  hasCursor: root.virtualFocus && root.cursor === 22
+                  onActiveFocusChanged: if (activeFocus) { root.cursor = 22; root.ensureItemVisible(timelineSlider) }
+                  Accessible.name: "Live replay position"
+                  onPointerUsed: { root.keyboardNavigation = false; root.cursor = 22 }
+                  onReleased: value => root.radio.seek(value)
                 }
                 Row {
                   width: parent.width
@@ -1124,31 +1134,31 @@ Ui.Panel {
                   Text { width: parent.width / 2; text: "−" + root.radio.clock(root.radio.bufferEnd - root.radio.bufferStart); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                   Text { width: parent.width / 2; text: "LIVE"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; horizontalAlignment: Text.AlignRight; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 }
-                Ui.BorderSurface {
+                Radio.FocusSlider {
+                  id: fileTimeline
                   width: parent.width
-                  implicitHeight: fileTimeline.implicitHeight + Style.space(4)
                   visible: root.radio.wanted && root.radio.playbackKind === "recording"
-                  color: "transparent"
-                  radius: Style.cornerRadius
-                  borderSpec: root.virtualFocus && root.cursor === 15 ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-                  Ui.PanelSlider {
-                    id: fileTimeline
-                    anchors.fill: parent
-                    anchors.margins: Style.space(2)
-                    minimum: 0
-                    maximum: Math.max(1, root.radio.duration)
-                    value: root.radio.position
-                    step: 1
-                    bar: root.bar
-                    enabled: root.seekable
-                    fillColor: Commons.Color.accent
-                    knobColor: Commons.Color.accent
-                    trackColor: Qt.alpha(root.barForeground, 0.15)
-                    Accessible.name: "Recording position"
-                    onReleased: value => root.radio.seekRecording(value)
-                  }
+                  minimum: 0
+                  maximum: Math.max(1, root.radio.duration)
+                  value: root.radio.position
+                  valueText: root.radio.clock(displayValue) + " of " + root.radio.clock(root.radio.duration)
+                  step: 30
+                  pageStep: 60
+                  bar: root.bar
+                  foreground: root.barForeground
+                  enabled: root.seekable
+                  hasCursor: root.virtualFocus && root.cursor === 15
+                  onActiveFocusChanged: if (activeFocus) { root.cursor = 15; root.ensureItemVisible(fileTimeline) }
+                  Accessible.name: "Recording position"
+                  onPointerUsed: { root.keyboardNavigation = false; root.cursor = 15 }
+                  onReleased: value => root.radio.seekRecording(value)
                 }
-                Text { width: parent.width; visible: root.radio.wanted && root.radio.playbackKind === "recording"; text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                Row {
+                  width: parent.width
+                  visible: fileTimeline.visible
+                  Text { width: parent.width / 2; text: root.radio.clock(fileTimeline.displayValue); textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.75); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                  Text { width: parent.width / 2; text: root.radio.clock(root.radio.duration); textFormat: Text.PlainText; horizontalAlignment: Text.AlignRight; color: Qt.alpha(root.barForeground, 0.75); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                }
                 Text { width: parent.width; visible: root.radio.wanted && root.radio.playbackKind === "live" && root.radio.bufferExpired; text: "Older audio expired. Playback moved to the available buffer."; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
               }
               Radio.StateCard {
@@ -1515,6 +1525,7 @@ Ui.Panel {
             spacing: Style.space(8)
             Radio.FocusButton {
               id: muteButton
+              anchors.verticalCenter: parent.verticalCenter
               width: Style.space(32)
               horizontalPadding: 0
               iconName: root.radio.muted ? "muted" : "volume"
@@ -1527,35 +1538,30 @@ Ui.Panel {
               onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 3 } }
               onClicked: root.radio.toggleMute()
             }
-            Ui.BorderSurface {
+            Radio.FocusSlider {
+              id: volumeSlider
               width: parent.width - muteButton.width - volumeLabel.width - parent.spacing * 2
-              implicitHeight: volumeSlider.implicitHeight + Style.space(4)
-              color: "transparent"
-              radius: Style.cornerRadius
-              borderSpec: (root.virtualFocus && root.cursor === 2) || volumeSlider.activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
-              Ui.PanelSlider {
-                id: volumeSlider
-                anchors.fill: parent
-                anchors.margins: Style.space(2)
-                bar: root.bar
-                value: root.radio.volume
-                minimum: 0
-                maximum: 100
-                step: 5
-                integer: true
-                fillColor: Qt.alpha(root.barForeground, 0.6)
-                knobColor: root.barForeground
-                trackColor: Qt.alpha(root.barForeground, 0.15)
-                Accessible.name: "Volume"
-                activeFocusOnTab: root.auxiliaryView
-                Keys.onLeftPressed: root.radio.commitVolume(root.radio.volume - 5)
-                Keys.onRightPressed: root.radio.commitVolume(root.radio.volume + 5)
-                onMoved: value => { root.cursor = 2; root.radio.setVolume(value) }
-                onReleased: value => root.radio.commitVolume(value)
-                onRightClicked: root.radio.toggleMute()
-              }
+              anchors.verticalCenter: parent.verticalCenter
+              bar: root.bar
+              foreground: root.barForeground
+              knobColor: root.barForeground
+              value: root.radio.volume
+              valueText: Math.round(displayValue) + "%" + (root.radio.muted ? ", muted" : "")
+              minimum: 0
+              maximum: 100
+              step: 5
+              pageStep: 10
+              integer: true
+              fillColor: Qt.alpha(root.barForeground, controlFocused || controlHovered ? 0.9 : 0.6)
+              onActiveFocusChanged: if (activeFocus) root.cursor = 2
+              Accessible.name: "Volume"
+              hasCursor: root.virtualFocus && root.cursor === 2
+              onPointerUsed: { root.keyboardNavigation = false; root.cursor = 2 }
+              onMoved: value => root.radio.setVolume(value)
+              onReleased: value => root.radio.commitVolume(value)
+              onRightClicked: root.radio.toggleMute()
             }
-            Text { id: volumeLabel; width: Style.space(36); anchors.verticalCenter: parent.verticalCenter; text: root.radio.muted ? "Muted" : Math.round(volumeSlider.dragging ? volumeSlider.liveValue : root.radio.volume) + "%"; textFormat: Text.PlainText; horizontalAlignment: Text.AlignRight; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+            Text { id: volumeLabel; width: Math.max(Style.space(40), implicitWidth); anchors.verticalCenter: parent.verticalCenter; text: root.radio.muted ? "Muted" : Math.round(volumeSlider.dragging ? volumeSlider.liveValue : root.radio.volume) + "%"; textFormat: Text.PlainText; horizontalAlignment: Text.AlignRight; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
           }
           Text {
             width: parent.width

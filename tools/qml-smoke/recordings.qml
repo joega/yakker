@@ -13,6 +13,14 @@ ShellRoot {
     Plugin.Panel { id: panel; width: window.width; height: window.height }
     Plugin.Panel { id: peer; visible: false; width: window.width; height: window.height }
     Plugin.MarqueeText { id: marqueeFixture; visible: false; z: 100; width: 100; text: "98.5 The Sports Hub"; font.family: "Adwaita Sans"; font.pixelSize: 24; color: Commons.Color.foreground }
+    Plugin.FocusSlider {
+      id: sliderFixture
+      visible: false; z: 310
+      anchors.centerIn: parent
+      width: window.width - 32
+      minimum: 10; maximum: 310; value: 130; step: 30; pageStep: 60
+      onReleased: value => sliderFixture.value = value
+    }
     QtObject {
       id: barConfig
       property bool vertical: false
@@ -152,6 +160,96 @@ ShellRoot {
           barConfig.vertical = false; barFixture.visible = false; tooltipFixture.visible = false
         }
       }
+      function checkSliders() {
+        const savedVolume = panel.radio.volume
+        const savedFont = Commons.Style.fontBaseSize
+        try {
+          sliderFixture.visible = true
+          sliderFixture.forceActiveFocus()
+          keyClick(Qt.Key_Right); compare(sliderFixture.value,160)
+          keyClick(Qt.Key_Left); compare(sliderFixture.value,130)
+          keyClick(Qt.Key_PageUp); compare(sliderFixture.value,190)
+          keyClick(Qt.Key_PageDown); compare(sliderFixture.value,130)
+          keyClick(Qt.Key_Home); compare(sliderFixture.value,10)
+          keyClick(Qt.Key_Left); compare(sliderFixture.value,10)
+          keyClick(Qt.Key_End); compare(sliderFixture.value,310)
+          keyClick(Qt.Key_Right); compare(sliderFixture.value,310)
+          keyClick(Qt.Key_Home)
+          mouseWheel(sliderFixture,sliderFixture.width/2,sliderFixture.height/2,0,120)
+          compare(sliderFixture.value,40, "Wheel and keyboard steps differ")
+          const sliderHeight = sliderFixture.height
+          mousePress(sliderFixture,sliderFixture.width/2,sliderFixture.height/2)
+          verify(sliderFixture.dragging && sliderFixture.activeFocus)
+          verify(Math.abs(sliderFixture.displayValue-160) < 1, "Drag preview does not follow the pointer")
+          mouseMove(sliderFixture,sliderFixture.width-16,sliderFixture.height/2)
+          mouseRelease(sliderFixture,sliderFixture.width-16,sliderFixture.height/2)
+          verify(!sliderFixture.dragging)
+          compare(sliderFixture.height,sliderHeight, "Slider size changed on interaction")
+          sliderFixture.enabled = false
+          sliderFixture.adjustBy(-30); compare(sliderFixture.value,310)
+          sliderFixture.enabled = true; sliderFixture.visible = false
+          for (const view of ["listen","library","schedules","settings"]) {
+            if (view === "listen") panel.showPlayer()
+            else if (view === "library") panel.openRecordings(false)
+            else if (view === "schedules") panel.openSchedules()
+            else panel.openSettings()
+            wait(40) // Allow section focus handoff before focusing its slider.
+            panel.radio.commitVolume(50)
+            panel.testVolume.forceActiveFocus()
+            verify(panel.testVolume.controlFocused)
+            keyClick(Qt.Key_Right); compare(panel.radio.volume,55, "Volume key failed in " + view)
+            keyClick(Qt.Key_Left); compare(panel.radio.volume,50, "Left key in " + view + ": volume " + panel.radio.volume + ", focus " + panel.testVolume.activeFocus + ", cursor " + panel.cursor)
+            keyClick(Qt.Key_PageUp); compare(panel.radio.volume,60)
+            keyClick(Qt.Key_PageDown); compare(panel.radio.volume,50)
+            keyClick(Qt.Key_Home); compare(panel.radio.volume,0)
+            keyClick(Qt.Key_End); compare(panel.radio.volume,100)
+            for (const width of [420,320,288]) {
+              window.width = width; wait(20)
+              const slider = panel.testVolume
+              verify(slider.width >= 130, "Compact volume track is too short")
+              verify(slider.height >= 36)
+              const left = slider.mapToItem(panel,0,0).x
+              const right = slider.mapToItem(panel,slider.width,0).x
+              verify(left >= 0 && right <= window.width, "Volume slider escaped the panel")
+              verify(panel.testMute.mapToItem(panel,panel.testMute.width,0).x < left)
+              verify(panel.testVolumeLabel.mapToItem(panel,0,0).x > right)
+            }
+            if (view !== "listen") {
+              keyClick(Qt.Key_Backtab)
+              verify(!panel.testVolume.activeFocus, "Shift+Tab trapped volume focus in " + view)
+            }
+          }
+          const muted = panel.radio.muted, rightClickVolume = panel.radio.volume
+          mouseClick(panel.testVolume,panel.testVolume.width/2,panel.testVolume.height/2,Qt.RightButton)
+          compare(panel.radio.muted,!muted)
+          compare(panel.radio.volume,rightClickVolume, "Right-click moved the volume")
+          mouseClick(panel.testVolume,panel.testVolume.width/2,panel.testVolume.height/2,Qt.RightButton)
+          compare(panel.radio.muted,muted)
+          panel.showPlayer(); window.width = 320
+          Commons.Style.fontBaseSize = Math.max(savedFont,14); wait(30)
+          verify(panel.testVolumeLabel.width >= panel.testVolumeLabel.implicitWidth)
+          panel.testCatcher.forceActiveFocus(); panel.cursor = 2; panel.keyboardNavigation = true
+          keyClick(Qt.Key_Home); compare(panel.radio.volume,0)
+          keyClick(Qt.Key_PageUp); compare(panel.radio.volume,10)
+          keyClick(Qt.Key_Right); compare(panel.radio.volume,15)
+          keyClick(Qt.Key_End); compare(panel.radio.volume,100)
+          keyClick(Qt.Key_Tab); verify(panel.cursor !== 2, "Tab trapped virtual slider focus")
+          panel.testSettingsButton.forceActiveFocus()
+          mouseMove(panel.testVolume,panel.testVolume.width/2,panel.testVolume.height/2); wait(30)
+          verify(panel.testVolume.controlHovered, "Volume slider has no hover state")
+          const height = panel.testVolume.height, width = panel.testVolume.width
+          panel.testVolume.forceActiveFocus()
+          mouseMove(panel,0,0); wait(30)
+          verify(panel.testVolume.controlFocused && !panel.testVolume.controlHovered)
+          compare(panel.testVolume.height,height); compare(panel.testVolume.width,width)
+        } finally {
+          sliderFixture.visible = false; sliderFixture.enabled = true
+          panel.radio.commitVolume(savedVolume)
+          Commons.Style.fontBaseSize = savedFont
+          window.width = 420; window.height = 650
+          panel.showPlayer()
+        }
+      }
       function checkFields() {
         const view = panel.testView
         try {
@@ -289,6 +387,13 @@ ShellRoot {
           verify(panel.testPlayerStatus.text.indexOf("Paused · buffering") === 0)
           verify(panel.testPlaybackHint.text.indexOf("Stream stays connected") === 0)
           verify(panel.testTimeline.visible && panel.testPlayButton.iconName === "play" && panel.testStopButton.enabled)
+          for (const width of [420,320,288]) {
+            window.width = width; wait(20)
+            verify(panel.testTimeline.width > 240 && panel.testTimeline.height >= 36)
+            const corner = panel.testTimeline.mapToItem(panel,0,0)
+            verify(corner.x >= 0 && corner.x + panel.testTimeline.width <= window.width)
+          }
+          window.width = 420
           capture("paused-live")
           panel.openRecordings(false)
           compare(panel.testDockStatus.text, "Paused · buffering")
@@ -403,6 +508,7 @@ ShellRoot {
           verify(!panel.testPlayButton.enabled && !panel.testFavoriteButton.enabled)
           compare(panel.testStationPicker.placeholderText, "Choose a station")
           capture("first-launch")
+          checkSliders()
           checkFields()
           checkNavigationRows()
           checkPlaybackStates()
@@ -810,6 +916,24 @@ ShellRoot {
           verify(panel.testPlaybackHint.text.indexOf("buffer") < 0, "A paused saved recording claims to buffer live audio")
           panel.testCatcher.forceActiveFocus(); panel.cursor = 0
           keyClick(Qt.Key_Tab); compare(panel.cursor, 15, "Recording seek is out of visual tab order")
+          keyClick(Qt.Key_Right)
+          tryVerify(function() { return Math.abs(panel.radio.position-30) < 0.5 },5000)
+          keyClick(Qt.Key_Home)
+          tryVerify(function() { return panel.radio.position < 0.5 },5000)
+          panel.testFileTimeline.forceActiveFocus()
+          keyClick(Qt.Key_Right)
+          tryVerify(function() { return Math.abs(panel.radio.position-30) < 0.5 },5000)
+          keyClick(Qt.Key_PageDown)
+          tryVerify(function() { return panel.radio.position < 0.5 },5000)
+          window.width = 320; window.height = 450
+          panel.testFileTimeline.forceActiveFocus(); wait(60)
+          const seekCorner = panel.testFileTimeline.mapToItem(panel,0,0)
+          verify(seekCorner.x >= 0 && seekCorner.x + panel.testFileTimeline.width <= window.width)
+          verify(seekCorner.y >= 0 && seekCorner.y + panel.testFileTimeline.height <= window.height, "Focused timeline was not scrolled into view")
+          capture("recording-seek-focus-small")
+          window.width = 420; window.height = 650
+
+          keyClick(Qt.Key_Tab); verify(!panel.testFileTimeline.activeFocus, "Recording timeline trapped keyboard focus")
           console.log("QA: seek")
           verify(panel.testForwardButton.enabled)
           panel.cursor = 8; panel.activate(); tryVerify(function() { return panel.radio.position > 28 }, 5000)
