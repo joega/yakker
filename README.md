@@ -294,7 +294,13 @@ The current show updates live and its row can pause/resume the same player.
 Unknown durations never show an invented percentage. **Details**, restart,
 deletion and storage controls use quieter secondary actions. Search
 by title or station and filter by status across the full library before moving between pages. Open
-**Details** for times, size, reason, deletion, and **Restart from beginning**.
+**Details** for a compact status, duration, and size summary, separate scheduled
+and recorded time ranges in local time, and any recording note. **Play from start**
+and **Delete** are quiet secondary actions. Delete shows what will be removed and
+requires confirmation; Cancel or Hide details clears that confirmation.
+
+[<img src="docs/yakker-recording-details.png" alt="Expanded recording details with grouped metadata, scheduled and actual capture times, and quiet restart and delete actions" width="300">](docs/yakker-recording-details.png)
+
 **Play** or **Resume** starts a retained file while keeping the library open.
 A fixed playback dock remains available while you scroll recordings, schedules,
 or editors, with pause/resume, 30-second skips, Stop, and volume. The playing row

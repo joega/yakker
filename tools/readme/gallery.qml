@@ -68,7 +68,7 @@ ShellRoot {
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
-          compare(Object.keys(themes).length, 13)
+          compare(Object.keys(themes).length, 14)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
@@ -103,6 +103,12 @@ ShellRoot {
           selectExample("kiro-am")
           panel.openRecordings(false)
           capture("recordings")
+          selectExample("kdka-fm")
+          const detailed = Object.assign({}, complete, {id:"detailed",label:"Afternoon sports",stationId:"kdka-fm",stationName:"93.7 The Fan"})
+          radio.recordings = snapshot([], [detailed], 0)
+          panel.screenshotView.toggleDetails("detailed")
+          capture("recording-details")
+          panel.screenshotView.toggleDetails("detailed")
 
           selectExample("talksport")
           const later = Object.assign({}, schedule, {id: "later", label: "Afternoon drive", stationId: "wscr", stationName: "670 The Score", startTime: "16:00", endTime: "17:00", nextStart: "2026-11-23T16:00:00-05:00", nextEnd: "2026-11-23T17:00:00-05:00"})

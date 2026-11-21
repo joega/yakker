@@ -125,6 +125,12 @@ def main():
         property alias testDetails: rowDetails
         property alias testDelete: rowDelete
         property alias testRestart: rowRestart
+        property alias testCancelDelete: rowCancelDelete
+        property alias testMetadata: recordingMetadata
+        property alias testScheduled: detailsScheduled
+        property alias testCaptured: detailsCaptured
+        property alias testDuration: detailsDuration
+        property alias testReason: detailsReason
         property alias testProgress: listeningProgress
         property alias testTitle: recordTitle""", 1))
         view.write_text(view.read_text().replace('        id: scheduleRow', '        id: scheduleRow\n        property alias testEdit: scheduleEditButton\n        property alias testTitle: scheduleTitle', 1))

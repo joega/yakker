@@ -201,10 +201,13 @@ ShellRoot {
           panel.radio.recordings = Object.assign({}, librarySnapshot, {recordings:[
             {id:"bounds",label:"<b>Literal title</b>",stationName:"Station",status:"complete",playable:true,durationSeconds:60,resumePosition:90},
             {id:"unknown",label:"Unknown duration",stationName:"Station",status:"complete",playable:true,durationSeconds:0,resumePosition:12},
-            {id:"partial",label:"Retained segment",stationName:"Station",status:"partial",playable:true,durationSeconds:120,resumePosition:30},
-            {id:"missing",label:"Missing audio",stationName:"Station",status:"missing",playable:false,durationSeconds:60,resumePosition:20}
+            {id:"partial",label:"Retained segment",stationName:"Station",status:"partial",playable:true,durationSeconds:120,resumePosition:30,
+              plannedStart:new Date(2030,0,2,23,50).toISOString(),plannedEnd:new Date(2030,0,3,0,10).toISOString(),
+              startedAt:new Date(2030,0,2,23,51).toISOString(),endedAt:new Date(2030,0,3,0,0).toISOString(),reason:"<b>Stream interrupted</b>"},
+            {id:"missing",label:"Missing audio",stationName:"Station",status:"missing",playable:false,durationSeconds:60,resumePosition:20},
+            {id:"capturing",label:"Live capture",stationName:"Station",status:"recording",playable:false,startedAt:new Date(2030,0,2,23,50).toISOString()}
           ]})
-          tryCompare(panel.testView.testLibrary, "count", 4)
+          tryCompare(panel.testView.testLibrary, "count", 5)
           var boundedRow = panel.testView.testLibrary.itemAt(0)
           compare(boundedRow.listeningPosition, 60)
           compare(boundedRow.testProgress.visualPosition, 1)
@@ -222,6 +225,21 @@ ShellRoot {
           var missingRow = panel.testView.testLibrary.itemAt(3)
           verify(!missingRow.testPrimary.visible && !missingRow.testProgress.visible)
           verify(missingRow.progressLabel.indexOf("File unavailable") >= 0)
+          console.log("QA: expanded recording metadata")
+          unknownRow.testDetails.clicked()
+          compare(unknownRow.testDuration.value, "Unknown")
+          compare(unknownRow.testCaptured.value, "Time unavailable")
+          partialRow.testDetails.clicked()
+          verify(partialRow.testMetadata.visible)
+          compare(partialRow.testReason.text, "<b>Stream interrupted</b>")
+          compare(partialRow.testReason.textFormat, Text.PlainText)
+          verify(partialRow.testScheduled.value.indexOf("Jan 2") >= 0 && partialRow.testScheduled.value.indexOf("Jan 3") >= 0, "Overnight range omitted a date")
+          verify(partialRow.testCaptured.value.indexOf("11:51PM") >= 0 && partialRow.testScheduled.value.indexOf("11:50PM") >= 0, "Scheduled and actual capture times were conflated")
+          const capturingRow = panel.testView.testLibrary.itemAt(4)
+          capturingRow.testDetails.clicked()
+          compare(capturingRow.testDuration.value, "In progress")
+          verify(capturingRow.testCaptured.value.indexOf("In progress") >= 0)
+          verify(!capturingRow.testDelete.enabled, "Active capture could be deleted")
           panel.radio.recordings = librarySnapshot
           tryCompare(panel.testView.testLibrary, "count", 1)
           capture("recordings")
@@ -599,6 +617,23 @@ ShellRoot {
           libraryRow = panel.testView.testLibrary.itemAt(0)
           libraryRow.testDetails.clicked()
           verify(libraryRow.expanded && libraryRow.testRestart.visible)
+          libraryRow.testDelete.clicked()
+          compare(panel.testView.confirmation, "deleteRecording:test-recording")
+          verify(libraryRow.testCancelDelete.visible)
+          libraryRow.testCancelDelete.clicked()
+          compare(panel.testView.confirmation, "")
+          verify(panel.radio.recordings.recordings.some(function(r) { return r.id === "test-recording" }), "Cancel delete removed the recording")
+          window.width = 320; window.height = 300
+          wait(50)
+          libraryRow.testRestart.forceActiveFocus()
+          tryVerify(function() { const y = libraryRow.testRestart.mapToItem(panel,0,0).y; return y >= 0 && y + libraryRow.testRestart.height <= panel.testDock.mapToItem(panel,0,0).y }, 2000)
+          capture("recording-details-small")
+          window.width = 420; window.height = 650; wait(50)
+          libraryRow.testRestart.clicked()
+          tryVerify(function() { return panel.radio.playbackState === "playing" && panel.radio.position < 5 }, 8000)
+          verify(panel.recordingsOpen, "Restart left the recording library")
+          panel.radio.stop()
+          tryVerify(function() { return panel.radio.playbackState === "stopped" }, 5000)
           libraryRow.testDelete.clicked()
           compare(panel.testView.confirmation, "deleteRecording:test-recording")
           verify(panel.radio.recordings.recordings.some(function(r) { return r.id === "test-recording" }), "First delete click removed audio without confirmation")

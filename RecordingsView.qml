@@ -141,6 +141,23 @@ Column {
     wrapMode: Text.Wrap
   }
 
+  component DetailStat: Column {
+    property string label: ""
+    property string value: ""
+    property color valueColor: root.foreground
+    spacing: Style.space(4)
+    Hint { text: parent.label }
+    Text { width: parent.width; text: parent.value; textFormat: Text.PlainText; color: parent.valueColor; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.083); font.weight: Font.Medium; wrapMode: Text.Wrap }
+  }
+  component DetailLine: Row {
+    property string label: ""
+    property alias value: detailValue.text
+    width: parent.width
+    spacing: Style.space(10)
+    Hint { width: Style.space(66); text: parent.label }
+    Text { id: detailValue; width: parent.width - Style.space(66) - parent.spacing; textFormat: Text.PlainText; color: Qt.alpha(root.foreground, 0.85); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+  }
+
   component StorageToggle: Ui.Toggle {
     width: parent.width
     foreground: root.foreground
@@ -316,6 +333,14 @@ Column {
     return locale.dayName(day, Locale.ShortFormat) + " " + locale.monthName(month, Locale.ShortFormat)
       + " " + date + " " + year + " " + timeText(hours, minutes)
   }
+  function recordingRangeText(start, end, ongoing) {
+    const a = new Date(start), b = new Date(end)
+    if (!start || isNaN(a.getTime())) return "Time unavailable"
+    if (!end || isNaN(b.getTime())) return dateText(start) + (ongoing ? " · In progress" : " · End time unavailable")
+    const sameDay = a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+    return dateText(start) + " – " + (sameDay ? timeText(b.getHours(), b.getMinutes()) : "\n" + dateText(end))
+  }
+
   function shortDateText(value) {
     const date = new Date(value)
     if (!value || isNaN(date.getTime())) return "Date unavailable"
@@ -780,46 +805,88 @@ Column {
             onClicked: root.toggleDetails(recordRow.rowData.id)
           }
         }
-        Column {
+        Rectangle {
+          id: recordingMetadata
           width: parent.width
-          spacing: Style.space(8)
+          implicitHeight: detailsBody.implicitHeight + Style.space(24)
           visible: recordRow.expanded
-          Text {
-            width: parent.width
-            text: "Planned: " + root.dateText(recordRow.rowData.plannedStart) + " – " + root.dateText(recordRow.rowData.plannedEnd)
-              + (recordRow.rowData.startedAt ? "\nActual: " + root.dateText(recordRow.rowData.startedAt) + (recordRow.rowData.endedAt ? " – " + root.dateText(recordRow.rowData.endedAt) : "") : "")
-              + "\nSize: " + root.sizeText(recordRow.rowData.bytes) + " · " + root.statusText(recordRow.rowData.status)
-              + (recordRow.rowData.reason ? "\n" + recordRow.rowData.reason : "")
-            textFormat: Text.PlainText
-            color: root.foreground
-            opacity: 0.8
-            font.family: root.uiFontFamily
-            font.pixelSize: Style.fontPx(1)
-            wrapMode: Text.Wrap
-          }
-          Row {
-            width: parent.width
-            spacing: Style.space(8)
-            Radio.FocusButton {
-              id: rowRestart
-              visible: recordRow.rowData.playable === true
-              text: "Play from start"
-              fontSize: Style.fontPx(1)
-              foreground: root.foreground
-              focusable: true
-              enabled: root.radio.ready && !root.pending
-              onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
-              onClicked: root.playItem(recordRow.rowData.id, true)
+          radius: Style.space(8)
+          color: Qt.alpha(root.foreground, 0.035)
+          Column {
+            id: detailsBody
+            x: Style.space(12); y: Style.space(12)
+            width: parent.width - Style.space(24)
+            spacing: Style.space(12)
+            Row {
+              width: parent.width
+              spacing: Style.space(12)
+              DetailStat { width: (parent.width - parent.spacing * 2) / 3; label: "Status"; value: root.statusText(recordRow.rowData.status); valueColor: recordRow.capturing || ["error", "missing"].indexOf(recordRow.rowData.status) >= 0 ? Commons.Color.urgent : root.foreground }
+              DetailStat { id: detailsDuration; width: (parent.width - parent.spacing * 2) / 3; label: "Duration"; value: recordRow.capturing ? "In progress" : recordRow.durationSeconds > 0 ? root.radio.clock(recordRow.durationSeconds) : "Unknown" }
+              DetailStat { width: (parent.width - parent.spacing * 2) / 3; label: "File size"; value: recordRow.rowData.bytes === undefined || recordRow.rowData.bytes === null ? "Unknown" : root.sizeText(recordRow.rowData.bytes) }
             }
-            Radio.FocusButton {
-              id: rowDelete
-              text: root.confirmation === "deleteRecording:" + recordRow.rowData.id ? "Confirm delete" : "Delete"
-              fontSize: Style.fontPx(1)
-              foreground: Commons.Color.urgent
-              focusable: true
-              enabled: root.available && !root.pending && !recordRow.capturing
-              onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
-              onClicked: root.action("deleteRecording", recordRow.rowData.id, root.snapshot.revision)
+            Ui.PanelSeparator { width: parent.width }
+            Column {
+              width: parent.width
+              spacing: Style.space(8)
+              DetailLine { id: detailsScheduled; label: "Scheduled"; value: root.recordingRangeText(recordRow.rowData.plannedStart, recordRow.rowData.plannedEnd, false) }
+              DetailLine { id: detailsCaptured; label: "Recorded"; value: recordRow.rowData.startedAt ? root.recordingRangeText(recordRow.rowData.startedAt, recordRow.rowData.endedAt, recordRow.capturing) : ["missed", "error"].indexOf(recordRow.rowData.status) >= 0 ? "No capture started" : "Time unavailable" }
+              Hint { text: "Times shown in local time."; font.pixelSize: Style.fontPx(0.833) }
+            }
+            Column {
+              width: parent.width
+              spacing: Style.space(4)
+              visible: !!recordRow.rowData.reason
+              FieldLabel { text: "Recording note" }
+              Hint { id: detailsReason; text: recordRow.rowData.reason || ""; color: Qt.alpha(root.foreground, 0.8) }
+            }
+            Hint {
+              visible: root.confirmation === "deleteRecording:" + recordRow.rowData.id
+              text: "Delete this recording and its audio file?"
+              color: Commons.Color.urgent
+            }
+            Row {
+              width: parent.width
+              spacing: Style.space(8)
+              Radio.FocusButton {
+                id: rowRestart
+                visible: recordRow.rowData.playable === true
+                text: "Play from start"
+                tooltipText: "Restart this recording from the beginning"
+                fontSize: Style.fontPx(1)
+                horizontalPadding: 0
+                foreground: Qt.alpha(root.foreground, 0.75)
+                focusable: true
+                enabled: root.radio.ready && !root.pending
+                opacity: enabled ? 1 : 0.4
+                onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                onClicked: { root.confirmation = ""; root.playItem(recordRow.rowData.id, true) }
+              }
+              Item { width: Math.max(0, parent.width - (rowRestart.visible ? rowRestart.width + parent.spacing : 0) - rowDelete.width - (rowCancelDelete.visible ? rowCancelDelete.width + parent.spacing : 0) - parent.spacing); height: 1 }
+              Radio.FocusButton {
+                id: rowDelete
+                text: root.confirmation === "deleteRecording:" + recordRow.rowData.id ? "Confirm delete" : "Delete"
+                tooltipText: "Delete this recording and its audio file"
+                fontSize: Style.fontPx(1)
+                horizontalPadding: 0
+                foreground: root.confirmation === "deleteRecording:" + recordRow.rowData.id ? Commons.Color.urgent : Qt.alpha(root.foreground, 0.65)
+                focusable: true
+                enabled: root.available && !root.pending && !recordRow.capturing
+                opacity: enabled ? 1 : 0.4
+                onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                onClicked: { root.action("deleteRecording", recordRow.rowData.id, root.snapshot.revision); if (!root.pending) root.focusItem(rowDelete) }
+              }
+              Radio.FocusButton {
+                id: rowCancelDelete
+                visible: root.confirmation === "deleteRecording:" + recordRow.rowData.id
+                text: "Cancel"
+                fontSize: Style.fontPx(1)
+                horizontalPadding: 0
+                foreground: Qt.alpha(root.foreground, 0.75)
+                focusable: true
+                enabled: !root.pending
+                onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                onClicked: { root.confirmation = ""; root.focusItem(rowDelete) }
+              }
             }
           }
         }

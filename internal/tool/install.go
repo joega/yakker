@@ -31,7 +31,7 @@ var installFiles = []string{
 	"docs/yakker-recordings.png", "docs/yakker-schedule.png", "docs/yakker-settings.png",
 	"docs/yakker-recording-player.png", "docs/yakker-storage.png", "docs/screenshots.md",
 	"docs/yakker-schedules.png", "docs/yakker-record-now.png", "docs/yakker-notifications.png",
-	"docs/yakker-custom-station.png", "docs/yakker-sleep-timer.png",
+	"docs/yakker-custom-station.png", "docs/yakker-sleep-timer.png", "docs/yakker-recording-details.png",
 }
 
 type installMarker struct {
