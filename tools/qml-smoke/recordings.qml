@@ -184,8 +184,8 @@ ShellRoot {
           compare(panel.testView.testLabel.text, "pmr")
           panel.testView.toggleDay(5); panel.testView.testStart.text = "00:00"; panel.testView.testEnd.text = "00:20"
           var revisionBeforePreview = panel.radio.recordings.revision
-          panel.testView.previewNext()
-          tryVerify(function() { return panel.testView.previewSerial === 0 && panel.testView.previewText.indexOf("Next:") === 0 }, 5000)
+          // The review updates automatically without a Preview button.
+          tryVerify(function() { return panel.testView.previewSerial === 0 && panel.testView.previewText.indexOf(" · ") >= 0 }, 5000)
           verify(!/\d{4}-\d{2}-\d{2}T?/.test(panel.testView.previewText), "Preview still shows an ISO timestamp")
           compare(panel.radio.recordings.revision, revisionBeforePreview)
           panel.testView.testStart.text = "00:01"
@@ -222,6 +222,69 @@ ShellRoot {
           verify(panel.radio.recordingMutationOK, panel.testView.localError)
           compare(panel.radio.recordings.schedules.length, 2)
           verify(panel.radio.recordings.schedules.some(function(s) { return s.kind === "once" && s.date === "2030-01-02" }))
+          console.log("QA: schedule order and editor flow")
+          const scheduleSnapshot = panel.radio.recordings
+          const scheduleBase = {kind:"weekly", weekdays:[1,2,3,4,5], startTime:"14:00", endTime:"14:20", timezone:"America/New_York", stationName:"Station", stationId:"wfan", enabled:true}
+          panel.radio.recordings = Object.assign({}, scheduleSnapshot, {schedules:[
+            Object.assign({}, scheduleBase, {id:"paused",label:"Paused",enabled:false,nextStart:"2030-01-01T14:00:00-05:00"}),
+            Object.assign({}, scheduleBase, {id:"later",label:"Later",nextStart:"2030-01-03T14:00:00-05:00",nextEnd:"2030-01-03T14:20:00-05:00"}),
+            Object.assign({}, scheduleBase, {id:"ended",label:"Ended",kind:"once",date:"2020-01-01",nextStart:""}),
+            Object.assign({}, scheduleBase, {id:"first",label:"<b>Literal show</b>",nextStart:"2030-01-02T14:00:00+09:00",nextEnd:"2030-01-02T14:20:00+09:00"})
+          ]})
+          tryCompare(panel.testView.testSchedules, "count", 4)
+          compare(panel.testView.sortedSchedules.map(function(s) { return s.id }).join(","), "first,later,ended,paused")
+          compare(panel.testView.upcomingCount, 2)
+          verify(panel.testView.testSchedules.itemAt(0).nextUp)
+          compare(panel.testView.testSchedules.itemAt(0).testTitle.textFormat, Text.PlainText)
+          compare(panel.testView.testSchedules.itemAt(0).testTitle.text, "<b>Literal show</b>")
+          verify(!panel.testView.testSchedules.itemAt(3).upcoming)
+          verify(panel.testView.occurrenceText("2030-01-02T14:00:00+09:00", "2030-01-02T14:20:00+09:00").indexOf("02:00PM–02:20PM") >= 0, "Upcoming times were converted out of the saved timezone")
+          verify(panel.testView.occurrenceText("2030-01-02T23:00:00+09:00", "2030-01-03T01:00:00+09:00").indexOf("Thu Jan 3") >= 0, "Overnight upcoming range omitted the end date")
+          panel.testView.testSchedules.itemAt(0).testEdit.clicked()
+          tryVerify(function() { return panel.testView.testLabel.activeFocus }, 2000)
+          compare(panel.testView.editingId, "first")
+          compare(panel.testView.testLabel.text, "<b>Literal show</b>")
+          panel.testView.testStart.text = "23:00"; panel.testView.testEnd.text = "01:00"
+          compare(panel.testView.durationText(), "2 hr · Ends the next day")
+          panel.testView.testEnd.text = "15:00"; verify(panel.testView.durationText().indexOf("12 hours") >= 0)
+          window.width = 320; window.height = 300
+          panel.testView.testSaveSchedule.forceActiveFocus()
+          tryVerify(function() {
+            const y = panel.testView.testSaveSchedule.mapToItem(panel, 0, 0).y
+            const dockTop = panel.testDock.mapToItem(panel, 0, 0).y
+            return y >= 0 && y + panel.testView.testSaveSchedule.height <= dockTop
+          }, 2000, "Editor Save action was hidden behind the playback dock")
+          capture("schedule-editor-small")
+          window.width = 420; window.height = 650
+          panel.testView.goBack()
+          panel.radio.recordings = scheduleSnapshot
+          // Create/edit/pause/delete a future one-time schedule in the isolated controller.
+          panel.testView.beginEdit(null)
+          panel.testView.scheduleKind = "once"; panel.testView.testDate.text = "2030-01-02"
+          panel.testView.testLabel.text = "Temporary schedule"
+          panel.testView.testSaveSchedule.clicked()
+          tryVerify(function() { return !panel.testView.pending }, 5000)
+          verify(panel.radio.recordingMutationOK, panel.testView.localError)
+          const tempSchedule = panel.radio.recordings.schedules.find(function(s) { return s.label === "Temporary schedule" })
+          verify(!!tempSchedule && tempSchedule.enabled)
+          panel.testView.beginEdit(tempSchedule)
+          panel.testView.testEnabled.clicked()
+          verify(!panel.testView.scheduleEnabled)
+          panel.testView.testLabel.text = "Edited schedule"
+          panel.testView.testSaveSchedule.clicked()
+          tryVerify(function() { return !panel.testView.pending }, 5000)
+          verify(panel.radio.recordingMutationOK, panel.testView.localError)
+          const editedSchedule = panel.radio.recordings.schedules.find(function(s) { return s.id === tempSchedule.id })
+          verify(!editedSchedule.enabled && editedSchedule.label === "Edited schedule" && editedSchedule.date === "2030-01-02")
+          panel.testView.beginEdit(editedSchedule)
+          panel.testView.testDeleteSchedule.clicked()
+          compare(panel.radio.recordings.schedules.length, 3, "First delete removed the schedule")
+          panel.testView.goBack(); compare(panel.testView.confirmation, "")
+          panel.testView.beginEdit(editedSchedule)
+          panel.testView.testDeleteSchedule.clicked(); panel.testView.testDeleteSchedule.clicked()
+          tryVerify(function() { return !panel.testView.pending && !panel.testView.editing }, 5000)
+          verify(panel.radio.recordingMutationOK, panel.testView.localError)
+          compare(panel.radio.recordings.schedules.length, 2)
           const realSnapshot = panel.radio.recordings
           const many = []
           for (let i = 0; i < 26; i++) many.push({id:"search-"+i,label:i===25?"Needle":"Other",stationName:"Station",status:i===25?"error":"complete"})
@@ -238,7 +301,7 @@ ShellRoot {
           panel.testView.searchText = ""; panel.testView.statusFilter = "all"
           panel.radio.recordings = realSnapshot
           panel.testView.beginNow()
-          compare(panel.testView.viewMode, "now")
+          compare(panel.testView.viewMode, "now"); compare(panel.testView.tab, "library")
           panel.testView.testDuration.text = "0"; panel.testView.startNow()
           verify(panel.testView.localError.length > 0 && !panel.testView.pending)
           panel.testView.goBack()

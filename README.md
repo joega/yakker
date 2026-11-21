@@ -30,7 +30,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Favorites and search | Recording schedules | Settings and custom stations |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with weekly or one-time choices, date, start and end times, timezone, and preview" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
+| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with grouped fields, automatic next-recording preview, and clear save actions" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
 
 Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
@@ -236,12 +236,22 @@ Open **Library** or **Schedules** from the tabs at the top. Library also contain
 **Record now** and **Storage**; **Record** on the player opens Record now directly.
 In Schedules, choose **New schedule**, select a bundled or
 custom station, then choose weekly weekdays or a one-time date. Enter start and
-end times in 24-hour format and choose an IANA timezone. **Preview next time**
-checks the resolved occurrence before saving. For example, WBZ-FM can record
-Fridays from `14:00` to `14:20` in `America/New_York`. An end time before the
+end times in 24-hour format. **Next recording** checks the resolved occurrence
+automatically as you edit. The timezone defaults to your local zone; choose
+**Change zone** when needed. For example, WEEI can record Fridays from `14:00`
+to `14:20` in `America/New_York`. An end time before the
 start ends the next day; recordings can last up to 12 hours. Daylight saving
 follows the saved timezone. Schedules start empty; create and enable the ones
 you want.
+
+Schedules appear in upcoming order, with **Next up** highlighted and paused
+schedules grouped at the bottom. **Edit schedule** opens the saved values;
+use the enabled switch to pause a schedule or the confirmed delete action to
+remove it. Existing recordings stay in Library.
+
+| Upcoming recordings | Record now |
+| --- | --- |
+| [<img src="docs/yakker-schedules.png" alt="Chronological schedule list with next recording highlighted and paused schedules grouped below" width="300">](docs/yakker-schedules.png) | [<img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300">](docs/yakker-record-now.png) |
 
 For an immediate capture, choose **Record now**, a station, and a duration. It
 defaults to 30 minutes, with 15, 30, and 60 minute presets and a custom range of
@@ -419,7 +429,7 @@ This is a plain line-oriented CLI; each command requires Enter.
 ## Settings and stations
 
 The gear opens a dedicated Settings page, replacing the main player while keeping
-a compact playback dock available. Back or Escape returns to the section you
+a compact playback dock available. The single **Back** control or Escape returns to the section you
 came from. Settings groups listening preferences, recording storage and alerts,
 custom stations, and keyboard shortcuts. Storage and the station editor open
 as separate pages; saving or cancelling storage returns to Settings.

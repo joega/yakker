@@ -76,7 +76,13 @@ def main():
   property alias testName: stationName
   property var anchorItem: null''', 1))
         view = plugin / "RecordingsView.qml"
-        view.write_text(view.read_text().replace('  required property var radio', '''  property alias testDate: dateField
+        view.write_text(view.read_text().replace('  required property var radio', '''  property alias testSchedules: scheduleRepeater
+  property alias testEnabled: scheduleEnabledToggle
+  property alias testZone: zoneField
+  property alias testSaveSchedule: saveScheduleButton
+  property alias testDeleteSchedule: deleteScheduleButton
+  property alias testStartNow: startNowButton
+  property alias testDate: dateField
   property alias testDuration: durationField
   property alias testSearch: searchField
   property alias testStatus: statusPicker
@@ -94,6 +100,7 @@ def main():
         property alias testRestart: rowRestart
         property alias testProgress: listeningProgress
         property alias testTitle: recordTitle""", 1))
+        view.write_text(view.read_text().replace('        id: scheduleRow', '        id: scheduleRow\n        property alias testEdit: scheduleEditButton\n        property alias testTitle: scheduleTitle', 1))
         service = plugin / "RadioService.qml"
         service.write_text(service.read_text().replace('  property int clients: 0', '  property alias testHelper: helper\n  property int clients: 0', 1))
         stations = json.loads((ROOT / "stations.json").read_text())

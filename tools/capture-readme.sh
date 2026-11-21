@@ -71,4 +71,4 @@ if ! rg -q 'YAKKER_README_SCREENSHOTS_PASS' "$capture_dir/render.log"; then
   cat "$capture_dir/render.log"
   exit 1
 fi
-printf 'Rendered eight README screenshots in %s\n' "$output_dir"
+printf 'Rendered ten README screenshots in %s\n' "$output_dir"

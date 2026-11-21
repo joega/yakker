@@ -21,16 +21,19 @@ Column {
   spacing: Style.space(8)
   readonly property var snapshot: radio.recordings || ({})
   readonly property bool available: radio.ready && snapshot.available === true
+  onAvailableChanged: if (editing && available) previewDelay.restart()
   property bool editing: false
   property string editingId: ""
   property int editRevision: 0
   property var days: []
   property bool scheduleEnabled: true
+  property bool timezoneEditing: false
   property int pendingSerial: 0
   property int playbackSerial: 0
   property string playbackId: ""
   property string pendingKind: ""
   property string localError: ""
+  onLocalErrorChanged: if (localError && visible) Qt.callLater(function() { root.ensureVisible(localErrorText) })
   property string confirmation: ""
   property int confirmRevision: 0
   property var expandedRecordings: ({})
@@ -58,6 +61,16 @@ Column {
   readonly property int libraryPages: Math.max(1, Math.ceil(filteredRecordings.length / pageSize))
   readonly property string formKey: JSON.stringify(scheduleForm())
   readonly property bool pending: pendingSerial !== 0
+  readonly property var sortedSchedules: (snapshot.schedules || []).slice().sort(function(a, b) {
+    const rank = function(s) { return s.enabled && s.nextStart ? 0 : s.enabled ? 1 : 2 }
+    const order = rank(a) - rank(b)
+    if (order) return order
+    const time = function(s) { const n = Date.parse(s.nextStart); return isFinite(n) ? n : Infinity }
+    if (time(a) !== time(b)) return time(a) < time(b) ? -1 : 1
+    return String(a.label || a.stationName).localeCompare(String(b.label || b.stationName))
+  })
+  readonly property int upcomingCount: sortedSchedules.filter(function(s) { return s.enabled && !!s.nextStart }).length
+  onSortedSchedulesChanged: syncRows(scheduleRows, sortedSchedules)
   ListModel { id: scheduleRows; dynamicRoles: true }
   ListModel { id: libraryRows; dynamicRoles: true }
 
@@ -74,7 +87,7 @@ Column {
     if (model.count > rows.length) model.remove(rows.length, model.count - rows.length)
   }
   function refreshRows() {
-    syncRows(scheduleRows, snapshot.schedules || [])
+    syncRows(scheduleRows, sortedSchedules)
     syncRows(libraryRows, filteredRecordings.slice(libraryPage * pageSize, (libraryPage + 1) * pageSize))
   }
   onSnapshotChanged: {
@@ -96,7 +109,30 @@ Column {
   onSearchTextChanged: { confirmation = ""; libraryPage = 0; refreshRows() }
   onStatusFilterChanged: { confirmation = ""; libraryPage = 0; refreshRows() }
   Component.onCompleted: refreshRows()
-  onFormKeyChanged: { previewSerial = 0; previewText = "" }
+  onFormKeyChanged: { previewSerial = 0; previewText = ""; if (editing) previewDelay.restart() }
+  onEditingChanged: { if (editing) previewDelay.restart(); else previewDelay.stop() }
+  Timer {
+    id: previewDelay
+    interval: 500
+    onTriggered: if (root.editing && root.available && root.stationValue && (root.scheduleKind === "once" ? dateField.text.length === 10 : root.days.length > 0)
+                    && /^\d{2}:\d{2}$/.test(startField.text) && /^\d{2}:\d{2}$/.test(endField.text) && zoneField.text.trim()) root.previewNext()
+  }
+  component FieldLabel: Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    color: root.foreground
+    font.family: root.uiFontFamily
+    font.pixelSize: Style.fontPx(1)
+    font.weight: Font.DemiBold
+  }
+  component Hint: Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    color: Qt.alpha(root.foreground, 0.65)
+    font.family: root.uiFontFamily
+    font.pixelSize: Style.fontPx(1)
+    wrapMode: Text.Wrap
+  }
 
   function activate() { focusItem(backButton.visible ? backButton : tab === "schedules" ? newScheduleButton : searchField) }
   function goBack() {
@@ -122,7 +158,9 @@ Column {
     storageEditing = false; nowEditing = false; tab = "schedules"
     s = s || {}
     scheduleKind = s.kind || "weekly"
-    dateField.text = s.date || ""
+    const today = new Date()
+    dateField.text = s.date || today.getFullYear() + "-" + String(today.getMonth()+1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0")
+    timezoneEditing = false
     editingId = s.id || ""
     editRevision = Number(snapshot.revision) || 0
     stationValue = s.stationId || radio.stationId
@@ -152,6 +190,7 @@ Column {
     return {id: editingId, stationId: stationValue, label: labelField.text.trim(), kind: scheduleKind, date: scheduleKind === "once" ? dateField.text.trim() : "", weekdays: scheduleKind === "weekly" ? days : [], startTime: startField.text.trim(), endTime: endField.text.trim(), timezone: zoneField.text.trim(), enabled: scheduleEnabled}
   }
   function previewNext() {
+    previewDelay.stop()
     previewKey = formKey
     previewSerial = radio.previewSchedule(scheduleForm())
     previewText = previewSerial ? "Calculating…" : "Recording manager disconnected."
@@ -188,7 +227,7 @@ Column {
   }
   function beginNow() {
     if (pending || !available) return
-    editing = false; storageEditing = false; nowEditing = true
+    editing = false; storageEditing = false; nowEditing = true; tab = "library"
     nowStation = radio.stationId || ""; nowRevision = Number(snapshot.revision) || 0
     durationField.text = "30"; localError = ""; focusItem(durationField)
   }
@@ -266,6 +305,31 @@ Column {
     return radio.stations.find(function(station) { return station.id === recording.stationId })
       || {name: recording.stationName || "Saved recording", icon: "󰲸"}
   }
+  function repeatText(schedule) {
+    if (schedule.kind === "once") return "One time · " + schedule.date
+    const days = (schedule.weekdays || []).slice().sort(function(a,b) { return a-b })
+    if (days.join(",") === "1,2,3,4,5") return "Weekdays"
+    if (days.length === 7) return "Every day"
+    return days.map(function(day) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day] }).join(", ") || "No days selected"
+  }
+  function occurrenceText(start, end) {
+    // Keep saved schedule wall-clock fields, including their timezone offset.
+    const wall = function(value) { return new Date(String(value).replace(/(?:Z|[+-]\d{2}:\d{2})$/, "Z")) }
+    const a = wall(start), b = wall(end)
+    if (isNaN(a.getTime())) return "Time unavailable"
+    const locale = Qt.locale(Commons.I18n.formatLocale)
+    const day = function(d) { return locale.dayName(d.getUTCDay(), Locale.ShortFormat) + " " + locale.monthName(d.getUTCMonth(), Locale.ShortFormat) + " " + d.getUTCDate() + (d.getUTCFullYear() !== new Date().getFullYear() ? " " + d.getUTCFullYear() : "") }
+    return day(a) + " · " + timeText(a.getUTCHours(), a.getUTCMinutes())
+      + (isNaN(b.getTime()) ? "" : "–" + (a.getUTCDate() !== b.getUTCDate() || a.getUTCMonth() !== b.getUTCMonth() || a.getUTCFullYear() !== b.getUTCFullYear() ? day(b) + " · " : "") + timeText(b.getUTCHours(), b.getUTCMinutes()))
+  }
+  function durationText() {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startField.text) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(endField.text)) return ""
+    const minutes = function(value) { return Number(value.slice(0,2))*60 + Number(value.slice(3)) }
+    const a = minutes(startField.text), b = minutes(endField.text), span = (b-a+1440)%1440
+    if (!span) return "Choose different start and end times."
+    if (span > 720) return "Choose a recording up to 12 hours."
+    return (span >= 60 ? Math.floor(span/60) + " hr" + (span%60 ? " " + span%60 + " min" : "") : span + " min") + (b < a ? " · Ends the next day" : " recording")
+  }
   function sizeText(n) {
     const bytes = Math.max(0, Number(n) || 0)
     if (bytes < 1024) return Math.round(bytes) + " B"
@@ -282,7 +346,7 @@ Column {
       if (!root.previewSerial || root.radio.schedulePreviewSerial !== root.previewSerial || root.previewKey !== root.formKey) return
       root.previewSerial = 0
       const p = root.radio.schedulePreview || {}
-      root.previewText = root.radio.schedulePreviewError || (p.nextStart ? "Next: " + root.dateText(p.nextStart, true) + " – " + root.dateText(p.nextEnd, true) + " · " + p.timezone : (root.scheduleEnabled ? "No upcoming occurrence." : "This schedule is disabled."))
+      root.previewText = root.radio.schedulePreviewError || (p.nextStart ? root.occurrenceText(p.nextStart, p.nextEnd) + " · " + p.timezone : (root.scheduleEnabled ? "No upcoming occurrence." : "This schedule is disabled."))
     }
     function onRecordingMutationSerialChanged() {
       if (!root.pendingSerial || root.radio.recordingMutationSerial !== root.pendingSerial) return
@@ -290,7 +354,10 @@ Column {
       root.pendingSerial = 0; root.pendingKind = ""
       root.localError = root.radio.recordingError || ""
       if (root.radio.recordingMutationOK) {
-        if (kind === "schedule") root.editing = false
+        if (kind === "schedule" || kind === "deleteSchedule") {
+          root.editing = false
+          if (root.visible) root.activate()
+        }
         if (kind === "settings") { root.storageEditing = false; root.storageClosed() }
         if (kind === "now") { root.nowEditing = false; root.tab = "library" }
         if (kind === "deleteRecording" && root.visible && root.viewMode === "library") root.activate()
@@ -314,64 +381,207 @@ Column {
       }
     }
   }
-  Radio.FocusButton { id: backButton; visible: !root.externalBack && (!root.embedded || root.editing || root.storageEditing || root.nowEditing); width: parent.width; text: root.editing ? "← Back to schedules" : (root.storageEditing || root.nowEditing) ? "← Back" : "← Back to player"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
-  Text { width: parent.width; visible: !root.externalBack; text: root.storageEditing ? "STORAGE" : root.nowEditing ? "RECORD NOW" : root.tab === "schedules" ? "SCHEDULES" : "Your recordings"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: root.viewMode === "library" ? Style.fontPx(1.5) : Style.fontPx(1); font.weight: Font.DemiBold }
+  Radio.FocusButton {
+    id: backButton
+    visible: !root.externalBack && (!root.embedded || root.editing || root.storageEditing || root.nowEditing)
+    text: root.editing ? "Schedules" : root.nowEditing ? "Library" : "Back"
+    iconName: "left"
+    foreground: Qt.alpha(root.foreground, 0.8)
+    fontSize: Style.fontPx(1)
+    horizontalPadding: 0
+    focusable: true
+    enabled: !root.pending
+    onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+    onClicked: root.goBack()
+  }
+  Text {
+    width: parent.width
+    visible: !root.externalBack
+    text: root.storageEditing ? "Recording storage" : root.nowEditing ? "Record now" : root.editing ? (root.editingId ? "Edit schedule" : "New schedule") : root.tab === "schedules" ? "Upcoming recordings" : "Your recordings"
+    textFormat: Text.PlainText
+    color: root.foreground
+    font.family: root.uiFontFamily
+    font.pixelSize: Style.fontPx(1.5)
+    font.weight: Font.DemiBold
+  }
   Text { width: parent.width; visible: !root.available || !!root.snapshot.error; text: !root.radio.ready ? "Recording manager disconnected." : (root.snapshot.error || "Recording manager unavailable."); textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); wrapMode: Text.Wrap }
-  Text { width: parent.width; visible: root.localError.length > 0; text: root.localError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+  Text { id: localErrorText; width: parent.width; visible: root.localError.length > 0; text: root.localError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.pending; text: "Working…"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
   Row { width: parent.width; spacing: Style.space(4); visible: !root.embedded && (root.viewMode === "library" || root.viewMode === "schedules")
     Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Library"; selected: root.tab === "library"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.tab = "library" }
     Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Schedules"; selected: root.tab === "schedules"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.tab = "schedules" }
   }
-  Column { width: parent.width; spacing: Style.space(8); visible: root.viewMode === "schedules"
-  Text { width: parent.width; text: "Schedules"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); font.bold: true }
-  Radio.FocusButton { id: newScheduleButton; width: parent.width; text: "New schedule"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.beginEdit(null) }
+  Column {
+    width: parent.width
+    spacing: Style.space(12)
+    visible: root.viewMode === "schedules"
+    Row {
+      width: parent.width
+      spacing: Style.space(8)
+      Hint {
+        width: Math.max(0, parent.width - newScheduleButton.width - parent.spacing)
+        anchors.verticalCenter: parent.verticalCenter
+        text: root.upcomingCount ? root.upcomingCount + (root.upcomingCount === 1 ? " upcoming schedule" : " upcoming schedules") : "Plan a show for later"
+      }
+      Radio.FocusButton {
+        id: newScheduleButton
+        text: "New schedule"
+        iconName: "plus"
+        fontSize: Style.fontPx(1)
+        color: Qt.alpha(Commons.Color.accent, 0.12)
+        foreground: root.foreground
+        focusable: true
+        enabled: root.available && !root.pending
+        onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+        onClicked: root.beginEdit(null)
+      }
+    }
+    Hint { visible: root.available && !(root.snapshot.schedules || []).length; text: "Record a favorite show once or every week. Your saved shows will appear in Library." }
+    Repeater {
+      id: scheduleRepeater
+      model: scheduleRows
+      Column {
+        id: scheduleRow
+        required property var rowData
+        required property int index
+        readonly property bool upcoming: rowData.enabled && !!rowData.nextStart
+        readonly property bool nextUp: upcoming && index === 0
+        width: root.width
+        spacing: Style.space(8)
+        Ui.PanelSeparator { width: parent.width }
+        Item { width: 1; height: Style.space(2) }
+        FieldLabel {
+          visible: scheduleRow.nextUp || !scheduleRow.rowData.enabled && (scheduleRow.index === 0 || !!root.sortedSchedules[scheduleRow.index-1] && root.sortedSchedules[scheduleRow.index-1].enabled)
+          text: scheduleRow.nextUp ? "NEXT UP" : "PAUSED"
+          color: scheduleRow.nextUp ? Commons.Color.accent : Qt.alpha(root.foreground, 0.6)
+          font.pixelSize: Style.fontPx(0.833)
+          font.letterSpacing: Style.space(1)
+        }
+        Row {
+          width: parent.width
+          spacing: Style.space(12)
+          Radio.StationLogo { width: Style.space(36); height: width; station: root.recordingStation(scheduleRow.rowData); fallbackColor: root.foreground }
+          Column {
+            width: parent.width - Style.space(36) - parent.spacing
+            spacing: Style.space(3)
+            Text { id: scheduleTitle; width: parent.width; text: scheduleRow.rowData.label || scheduleRow.rowData.stationName; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold; wrapMode: Text.Wrap }
+            Hint { text: scheduleRow.rowData.stationName }
+          }
+        }
+        Text {
+          width: parent.width
+          text: scheduleRow.upcoming ? root.occurrenceText(scheduleRow.rowData.nextStart, scheduleRow.rowData.nextEnd)
+            : scheduleRow.rowData.enabled ? "No upcoming recording" : "Schedule paused"
+          textFormat: Text.PlainText
+          color: scheduleRow.nextUp ? Commons.Color.accent : root.foreground
+          font.family: root.uiFontFamily
+          font.pixelSize: Style.fontPx(1.083)
+          font.weight: Font.Medium
+          wrapMode: Text.Wrap
+        }
+        Hint { text: root.repeatText(scheduleRow.rowData) + (scheduleRow.upcoming ? "" : " · " + root.scheduleTimeText(scheduleRow.rowData.startTime) + "–" + root.scheduleTimeText(scheduleRow.rowData.endTime)) + " · " + scheduleRow.rowData.timezone }
+        Radio.FocusButton {
+          id: scheduleEditButton
+          text: "Edit schedule"
+          fontSize: Style.fontPx(1)
+          horizontalPadding: 0
+          foreground: Qt.alpha(root.foreground, 0.8)
+          focusable: true
+          enabled: root.available && !root.pending
+          onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+          onClicked: root.beginEdit(scheduleRow.rowData)
+        }
+      }
+    }
   }
   Column {
-    width: parent.width; spacing: Style.space(6); visible: root.editing
-    Ui.SearchableDropdown { fontFamily: root.uiFontFamily; id: stationPicker; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.stationValue; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.stationValue = value } }
-    Text { width: parent.width; visible: root.editingId.length > 0; text: "Saving uses the station's latest available stream for future recordings."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: labelField; width: parent.width; placeholderText: "Label (optional)"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 160; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Row { width: parent.width; spacing: Style.space(4)
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Weekly"; selected: root.scheduleKind === "weekly"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.scheduleKind = "weekly" }
-      Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Once"; selected: root.scheduleKind === "once"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.scheduleKind = "once" }
+    width: parent.width
+    spacing: Style.space(16)
+    visible: root.editing
+    enabled: !root.pending
+    Column {
+      width: parent.width; spacing: Style.space(6)
+      FieldLabel { text: "Show name" }
+      Ui.TextField { id: labelField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "Optional · e.g. Morning drive"; Accessible.name: "Show name (optional)"; foreground: root.foreground; maximumLength: 160; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+      FieldLabel { text: "Station" }
+      Ui.SearchableDropdown { id: stationPicker; fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.stationValue; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.stationValue = value } }
     }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: dateField; width: parent.width; visible: root.scheduleKind === "once"; placeholderText: "Date YYYY-MM-DD"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 10; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Text { width: parent.width; visible: root.scheduleKind === "weekly"; text: "Days"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Row { width: parent.width; spacing: Style.space(2); visible: root.scheduleKind === "weekly"
-      Repeater { model: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
-        Radio.FocusButton { required property int index; required property string modelData; width: (parent.width - parent.spacing * 6) / 7; text: modelData; Accessible.name: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][index]; Accessible.checkable: true; Accessible.checked: selected; selected: root.days.indexOf(index) >= 0; foreground: root.foreground; bordered: true; focusable: true; horizontalPadding: 0; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.toggleDay(index) }
+    Ui.PanelSeparator { width: parent.width }
+    Column {
+      width: parent.width; spacing: Style.space(8)
+      FieldLabel { text: "When" }
+      Row {
+        width: parent.width; spacing: Style.space(4)
+        Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "Every week"; selected: root.scheduleKind === "weekly"; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.scheduleKind = "weekly" }
+        Radio.FocusButton { width: (parent.width-parent.spacing)/2; text: "One time"; selected: root.scheduleKind === "once"; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.scheduleKind = "once" }
+      }
+      Column {
+        width: parent.width; spacing: Style.space(6); visible: root.scheduleKind === "once"
+        FieldLabel { text: "Date · YYYY-MM-DD" }
+        Ui.TextField { id: dateField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "YYYY-MM-DD"; Accessible.name: "Recording date YYYY-MM-DD"; foreground: root.foreground; maximumLength: 10; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+      }
+      Row {
+        width: parent.width; spacing: Style.space(2); visible: root.scheduleKind === "weekly"
+        Repeater { model: ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
+          Radio.FocusButton { required property int index; required property string modelData; width: (parent.width - parent.spacing * 6) / 7; text: modelData; Accessible.name: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][index]; Accessible.checkable: true; Accessible.checked: selected; selected: root.days.indexOf(index) >= 0; foreground: root.foreground; focusable: true; horizontalPadding: 0; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.toggleDay(index) }
+        }
+      }
+      Row {
+        width: parent.width; spacing: Style.space(12)
+        Column {
+          width: (parent.width-parent.spacing)/2; spacing: Style.space(6)
+          FieldLabel { text: "Start · 24h" }
+          Ui.TextField { id: startField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "HH:mm"; Accessible.name: "Start time in 24-hour format"; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+        }
+        Column {
+          width: (parent.width-parent.spacing)/2; spacing: Style.space(6)
+          FieldLabel { text: "End · 24h" }
+          Ui.TextField { id: endField; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "HH:mm"; Accessible.name: "End time in 24-hour format"; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+        }
+      }
+      Hint { text: root.durationText() || "Enter start and end times." }
+      Row {
+        width: parent.width; spacing: Style.space(8)
+        Hint { width: Math.max(0, parent.width - changeZone.width - parent.spacing); anchors.verticalCenter: parent.verticalCenter; text: zoneField.text }
+        Radio.FocusButton { id: changeZone; text: root.timezoneEditing ? "Done" : "Change zone"; fontSize: Style.fontPx(1); horizontalPadding: 0; foreground: root.foreground; focusable: true; onClicked: { root.timezoneEditing = !root.timezoneEditing; if (root.timezoneEditing) root.focusItem(zoneField) } }
+      }
+      Ui.TextField { id: zoneField; visible: root.timezoneEditing; width: parent.width; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "e.g. America/New_York"; Accessible.name: "Recording timezone"; foreground: root.foreground; maximumLength: 128; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+    }
+    Ui.Toggle {
+      id: scheduleEnabledToggle
+      width: parent.width
+      label: "Schedule enabled"
+      description: root.scheduleEnabled ? "Records automatically at the chosen time" : "Keep this schedule paused"
+      checked: root.scheduleEnabled
+      foreground: root.foreground
+      fontFamily: root.uiFontFamily
+      titleSize: Style.fontPx(1.083)
+      descriptionSize: Style.fontPx(1)
+      Accessible.role: Accessible.CheckBox
+      Accessible.name: label
+      Accessible.checked: checked
+      onClicked: root.scheduleEnabled = !root.scheduleEnabled
+      onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+    }
+    Rectangle {
+      width: parent.width
+      implicitHeight: review.implicitHeight + Style.space(20)
+      radius: Style.space(8)
+      color: Qt.alpha(Commons.Color.accent, 0.07)
+      Column {
+        id: review
+        x: Style.space(10); y: Style.space(10); width: parent.width - Style.space(20); spacing: Style.space(5)
+        FieldLabel { text: "Next recording" }
+        Hint { text: !root.scheduleEnabled ? "Paused · enable this schedule to record automatically." : root.previewText || (root.previewSerial ? "Checking next recording…" : root.scheduleKind === "weekly" && !root.days.length ? "Choose at least one day." : "Your next recording time will appear here."); color: Qt.alpha(root.foreground, 0.8) }
       }
     }
-    Text { width: parent.width; text: "Start / end · 24-hour time"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Row { width: parent.width; spacing: Style.space(6)
-      Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: startField; width: (parent.width-parent.spacing)/2; placeholderText: "Start HH:mm"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-      Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: endField; width: (parent.width-parent.spacing)/2; placeholderText: "End HH:mm"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 5; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+    Radio.FocusButton { id: refreshDraftButton; width: parent.width; visible: root.editRevision !== Number(root.snapshot.revision); text: "Refresh and keep this draft"; foreground: root.foreground; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.refreshDraft() }
+    Row {
+      width: parent.width; spacing: Style.space(8)
+      Radio.FocusButton { id: saveScheduleButton; width: (parent.width-parent.spacing)*0.65; text: root.pending && root.pendingKind === "schedule" ? "Saving…" : root.editingId ? "Save changes" : "Create schedule"; color: Qt.alpha(Commons.Color.accent, 0.16); foreground: root.foreground; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.save() }
+      Radio.FocusButton { width: (parent.width-parent.spacing)*0.35; text: "Cancel"; foreground: root.foreground; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
     }
-    Text { width: parent.width; text: "An end time before the start ends the next day."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-    Text { width: parent.width; text: "Timezone"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: zoneField; width: parent.width; placeholderText: "IANA timezone (e.g. America/New_York)"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 128; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Radio.FocusButton { width: parent.width; text: root.scheduleEnabled ? "Enabled" : "Disabled"; selected: root.scheduleEnabled; Accessible.checkable: true; Accessible.checked: selected; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.scheduleEnabled = !root.scheduleEnabled }
-    Radio.FocusButton { width: parent.width; text: "Preview next time"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.radio.ready && !root.previewSerial; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.previewNext() }
-    Text { width: parent.width; visible: root.previewText.length > 0; text: root.previewText; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-    Radio.FocusButton { width: parent.width; text: root.pending && root.pendingKind === "schedule" ? "Saving…" : "Save schedule"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.save() }
-    Radio.FocusButton { id: refreshDraftButton; width: parent.width; visible: root.editRevision !== Number(root.snapshot.revision); text: "Refresh and keep this draft"; foreground: root.foreground; bordered: true; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.refreshDraft() }
-    Radio.FocusButton { width: parent.width; text: "Cancel"; foreground: root.foreground; bordered: true; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
-  }
-  Column { width: parent.width; spacing: Style.space(8); visible: root.viewMode === "schedules"
-  Text { width: parent.width; visible: root.available && (root.snapshot.schedules || []).length === 0; text: "No schedules yet."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-  Repeater { model: scheduleRows
-    Column { required property var rowData; readonly property var modelData: rowData; readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.recordingId === rowData.id && root.radio.wanted; width: root.width; spacing: Style.space(4)
-      Ui.PanelSeparator { width: parent.width }
-      Text { width: parent.width; text: (parent.modelData.label || parent.modelData.stationName) + (parent.modelData.enabled ? " · Enabled" : " · Disabled"); textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); font.bold: true; wrapMode: Text.Wrap }
-      Text { width: parent.width; text: parent.modelData.stationName + " · " + (parent.modelData.kind === "once" ? parent.modelData.date : (parent.modelData.weekdays || []).map(function(d) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d] }).join(", ")) + " · " + root.scheduleTimeText(parent.modelData.startTime) + "–" + root.scheduleTimeText(parent.modelData.endTime) + " · " + parent.modelData.timezone + "\n" + (parent.modelData.nextStart ? "Next: " + root.dateText(parent.modelData.nextStart, true) + " – " + root.dateText(parent.modelData.nextEnd, true) : "No upcoming occurrence"); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
-      Row { width: parent.width; spacing: Style.space(4)
-        Radio.FocusButton { width: (parent.width-parent.spacing*2)/3; text: "Edit"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.beginEdit(parent.parent.modelData) }
-        Radio.FocusButton { width: (parent.width-parent.spacing*2)/3; text: parent.parent.modelData.enabled ? "Disable" : "Enable"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const s = parent.parent.modelData; root.submit(root.radio.upsertSchedule(root.snapshot.revision, {id:s.id, stationId:s.stationId, label:s.label, kind:s.kind || "weekly", date:s.date || "", weekdays:s.weekdays, startTime:s.startTime, endTime:s.endTime, timezone:s.timezone, enabled:!s.enabled}), "toggle") } }
-        Radio.FocusButton { width: (parent.width-parent.spacing*2)/3; text: root.confirmation === "deleteSchedule:" + parent.parent.modelData.id ? "Confirm" : "Delete"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.action("deleteSchedule", parent.parent.modelData.id, root.snapshot.revision) }
-      }
-    }
-  }
+    Radio.FocusButton { id: deleteScheduleButton; visible: !!root.editingId; text: root.confirmation === "deleteSchedule:" + root.editingId ? "Confirm delete schedule" : "Delete schedule"; fontSize: Style.fontPx(1); horizontalPadding: 0; foreground: Commons.Color.urgent; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.action("deleteSchedule", root.editingId, root.editRevision) }
   }
   Column {
     width: parent.width
@@ -593,16 +803,33 @@ Column {
     }
     Text { width: parent.width; visible: root.libraryPages > 1; text: "Page " + (root.libraryPage + 1) + " of " + root.libraryPages; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
   }
-  Column { width: parent.width; spacing: Style.space(6); visible: root.nowEditing
-    Text { width: parent.width; text: "Record now"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); font.bold: true }
-    Ui.SearchableDropdown { fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.nowStation; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.nowStation = value } }
-    Text { width: parent.width; text: "Duration in minutes (1–720)"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-    Row { width: parent.width; spacing: Style.space(4)
-      Repeater { model: [15, 30, 60]; Radio.FocusButton { required property int modelData; width: (parent.width-parent.spacing*2)/3; text: modelData + " min"; selected: Number(durationField.text) === modelData; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: durationField.text = String(modelData) } }
+  Column {
+    width: parent.width
+    spacing: Style.space(16)
+    visible: root.nowEditing
+    enabled: !root.pending
+    Hint { text: "Save a show while you listen, or record another station in the background." }
+    Column {
+      width: parent.width; spacing: Style.space(6)
+      FieldLabel { text: "Station" }
+      Ui.SearchableDropdown { fontFamily: root.uiFontFamily; width: parent.width; showLabel: false; placeholderText: "Choose station"; value: root.nowStation; options: root.radio.stationOptions; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onChanged: value => { root.nowStation = value } }
     }
-    Ui.TextField { font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); id: durationField; width: parent.width; placeholderText: "Duration in minutes"; Accessible.name: placeholderText; foreground: root.foreground; maximumLength: 3; inputMethodHints: Qt.ImhDigitsOnly; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
-    Radio.FocusButton { width: parent.width; text: root.pending && root.pendingKind === "now" ? "Starting…" : "Start recording"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.available && !root.pending; onClicked: root.startNow() }
-    Radio.FocusButton { width: parent.width; visible: root.nowRevision !== Number(root.snapshot.revision); text: "Refresh and keep this draft"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: !root.pending; onClicked: { root.nowRevision = Number(root.snapshot.revision) || 0; root.localError = "" } }
+    Column {
+      width: parent.width; spacing: Style.space(8)
+      FieldLabel { text: "Record for" }
+      Row {
+        width: parent.width; spacing: Style.space(4)
+        Repeater { model: [15, 30, 60]; Radio.FocusButton { required property int modelData; width: (parent.width-parent.spacing*2)/3; text: modelData + " min"; selected: Number(durationField.text) === modelData; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: durationField.text = String(modelData) } }
+      }
+      Row {
+        width: parent.width; spacing: Style.space(12)
+        Ui.TextField { id: durationField; width: Style.space(88); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); placeholderText: "30"; Accessible.name: "Recording duration in minutes"; foreground: root.foreground; maximumLength: 3; inputMethodHints: Qt.ImhDigitsOnly; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+        Hint { width: parent.width - durationField.width - parent.spacing; anchors.verticalCenter: parent.verticalCenter; text: "minutes · up to 12 hours" }
+      }
+    }
+    Hint { text: "Stops automatically. Find the recording and its progress in Library." }
+    Radio.FocusButton { id: startNowButton; width: parent.width; text: root.pending && root.pendingKind === "now" ? "Starting…" : "Start recording"; iconName: "record"; color: Qt.alpha(Commons.Color.accent, 0.16); foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: root.available && !root.pending; onClicked: root.startNow() }
+    Radio.FocusButton { width: parent.width; visible: root.nowRevision !== Number(root.snapshot.revision); text: "Refresh and keep this draft"; foreground: root.foreground; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); enabled: !root.pending; onClicked: { root.nowRevision = Number(root.snapshot.revision) || 0; root.localError = "" } }
   }
   FolderDialog { id: folderDialog; title: "Choose recording folder"; onAccepted: { const path = root.pathFromFolderUrl(selectedFolder); if (path) { folderField.text = path; root.localError = "" } else root.localError = "Choose a local folder." } }
   Column { width: parent.width; spacing: Style.space(6); visible: root.storageEditing

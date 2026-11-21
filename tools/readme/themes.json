@@ -6,5 +6,7 @@
   "schedule": "catppuccin-latte",
   "settings": "catppuccin-latte",
   "recording-player": "catppuccin-latte",
-  "storage": "catppuccin-latte"
+  "storage": "catppuccin-latte",
+  "schedules": "catppuccin-latte",
+  "record-now": "catppuccin-latte"
 }

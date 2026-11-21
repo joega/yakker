@@ -68,7 +68,7 @@ ShellRoot {
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
-          compare(Object.keys(themes).length, 8)
+          compare(Object.keys(themes).length, 10)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
@@ -104,10 +104,24 @@ ShellRoot {
           panel.openRecordings(false)
           capture("recordings")
 
+          selectExample("talksport")
+          const later = Object.assign({}, schedule, {id: "later", label: "Afternoon drive", stationId: "wscr", stationName: "670 The Score", startTime: "16:00", endTime: "17:00", nextStart: "2026-11-23T16:00:00-05:00", nextEnd: "2026-11-23T17:00:00-05:00"})
+          const paused = Object.assign({}, schedule, {id: "paused", label: "Weekend catch-up", stationId: "bbc-radio-5-live", stationName: "BBC Radio 5 Live", weekdays: [0,6], enabled: false, nextStart: "", nextEnd: ""})
+          radio.recordings = snapshot([paused, later, schedule], [], 0)
+          panel.openSchedules()
+          capture("schedules")
+
+          selectExample("wzgc-fm")
           radio.recordings = snapshot([], [], 0)
           panel.screenshotView.beginEdit(Object.assign({}, schedule, {id: "", kind: "once", date: "2026-11-23"}))
+          panel.screenshotView.previewText = "Mon Nov 23 · 02:00PM–02:20PM · America/New_York"
           capture("schedule")
           panel.screenshotView.editing = false
+
+          selectExample("klac")
+          panel.screenshotView.beginNow()
+          capture("record-now")
+          panel.screenshotView.nowEditing = false
 
           panel.recordingsOpen = false
           radio.recordings = snapshot([], [complete], 0)
