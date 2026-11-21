@@ -26,7 +26,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Live player with favorite station, Recordings, Sleep timer and Settings icons, and a compact rewind, Stop, Play/Pause, forward row" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Compact recording library with title and station search, status filter, and saved shows" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, favorite presets, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Recording library with search, status filter, saved shows, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
 
 | Favorites and search | Recording schedules | Settings and custom stations |
 | :---: | :---: | :---: |
@@ -133,8 +133,11 @@ packaging builds locally and does not publish or install anything.
 Click the radio icon in the bar, select a station, then press the **Play** icon.
 Your last chosen station is restored on later launches. If it is no longer in
 the catalogue, choose another station; Yakker never substitutes a broadcaster.
-The transport row contains **Rewind · Stop · Play/Pause · Forward**. Rewind and
-forward skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
+The Focus player shows the full station name above **Change station**, with
+up to six favorite presets in the order you added them. The **Listen**, **Library**,
+and **Schedules** tabs stay at the top. **Rewind · Play/Pause · Forward** form the
+main transport row, with a larger Play/Pause control; **Record**, **Sleep**, and
+**Stop** sit below it. Rewind and forward skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
 an active player; **Stop** releases it. Playing a stopped radio starts a fresh
 live stream. Closing the popup leaves audio playing.
 Right-click the bar icon to open the station list directly.
@@ -172,7 +175,7 @@ omarchy-shell shell hide io.github.joega.yakker
 
 ## Pause and rewind
 
-The timer icon beside Recordings and Settings opens the session-only **Sleep timer**: choose Off, 15, 30, or 60
+The **Sleep** button below Play/Pause opens the session-only **Sleep timer**: choose Off, 15, 30, or 60
 minutes, or set a custom duration from 1 to 240 minutes. It stops foreground
 listening when it expires; captures continue. Changing stations keeps the
 deadline, and pressing **Stop** cancels the timer.
@@ -225,8 +228,9 @@ independent of the desktop widget.
 
 ## Scheduled recordings
 
-Open **Recordings** for focused **Library**, **Schedules**, **Record now**, and
-**Storage** views. In Schedules, choose **New schedule**, select a bundled or
+Open **Library** or **Schedules** from the tabs at the top. Library also contains
+**Record now** and **Storage**; **Record** on the player opens Record now directly.
+In Schedules, choose **New schedule**, select a bundled or
 custom station, then choose weekly weekdays or a one-time date. Enter start and
 end times in 24-hour format and choose an IANA timezone. **Preview next time**
 checks the resolved occurrence before saving. For example, WBZ-FM can record
@@ -247,7 +251,7 @@ captures and does not create a repeating schedule.
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
 playing a saved recording leaves those captures running. The bar dot turns red
-while capturing; the Recordings button highlights and its tooltip shows the active count. The machine must be awake
+while capturing; a **REC** indicator in the player header shows the active count and opens the library. The machine must be awake
 with the plugin loaded in the bar. Disabling/removing the last widget, restarting
 the shell, or shutting down the helper interrupts captures. Recoverable output is
 retained as partial; when the plugin returns during the scheduled interval it can
@@ -260,8 +264,12 @@ varying by content. The bitrate is an internal encoder parameter; raising it lat
 affects future captures. The Library shows compact rows for each recording. Search
 by title or station and filter by status across the full library before moving between pages. Open
 **Details** for times, size, reason, deletion, and **Restart from beginning**.
-**Play** or **Resume** opens a retained file in the foreground player, with
-pause/resume, a duration-based seek bar and **Return to live**. Position is saved
+**Play** or **Resume** starts a retained file while keeping the library open.
+A fixed playback dock remains available while you scroll recordings, schedules,
+or editors, with pause/resume, 30-second skips, Stop, and volume. The playing row
+also offers Pause/Resume. Choose **Listen** for the full player, duration-based
+seek bar, speed controls, and **Return to live**. Artwork follows the source of
+the saved show, independently of the selected live station. Position is saved
 at most every 10 seconds and when pausing, stopping, switching, or shutting down;
 finishing or reaching the end resets it. Saved recordings support 0.75×, 1×,
 1.25×, 1.5×, and 2× playback with pitch correction; live listening returns to
@@ -405,7 +413,7 @@ In Settings, use **Add custom station** to save a name and HTTP(S) audio stream 
 
 Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
 
-Use the heart beside the station picker to add or remove the selected station from favorites. Favorites appear first in the picker and in matching search results, including custom stations.
+Use the heart beside the station title to add or remove the selected station from favorites. The first six favorites appear as presets on Listen; all favorites appear first in the station picker and in matching search results, including custom stations. Selecting a preset follows the same rules as the picker: it changes the stream while listening and selects without starting playback while stopped.
 
 The selected station, favorites, volume, mute and listening buffer length are saved through Quattro's inline entry persistence in
 `~/.config/omarchy/shell.json`. The widget entry also accepts:

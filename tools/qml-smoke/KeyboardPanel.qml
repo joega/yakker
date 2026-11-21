@@ -9,6 +9,6 @@ Item {
   property int contentHeight: 650
   width: contentWidth
   height: Math.min(contentHeight, owner ? owner.height : contentHeight)
-  function fittedContentWidth(value) { return value }
+  function fittedContentWidth(value) { return Math.min(value, owner ? owner.width : value) }
   function fittedContentHeight(value) { return value }
 }

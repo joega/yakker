@@ -6,7 +6,7 @@ import qs.Commons as Commons
 import "plugin" as Plugin
 import "plugin/RecordingNotices.js" as Notices
 ShellRoot {
-  Window { id: window; visible: true; width: 380; height: 650
+  Window { id: window; visible: true; width: 420; height: 650
     color: Commons.Color.popups.background
     Rectangle { anchors.fill: parent; color: Commons.Color.popups.background }
     Plugin.Panel { id: panel; width: window.width; height: window.height }
@@ -95,16 +95,28 @@ ShellRoot {
           console.log("QA: chosen station", panel.radio.stationId, panel.radio.hasStation, panel.testStationPicker.popupOpen, panel.radio.error)
           tryVerify(function() { return panel.radio.stationId === "wfan" && panel.radio.hasStation }, 3000)
           verify(!panel.radio.wanted, "Choosing a station started playback")
+          panel.radio.favoriteIds = ["wfan", "tsn-690"]
+          tryCompare(panel.testPresets, "count", 2)
+          panel.testPresets.itemAt(1).clicked()
+          compare(panel.radio.stationId, "tsn-690")
+          verify(!panel.radio.wanted, "A favorite preset started a stopped player")
+          panel.cursor = 100; panel.activate()
+          compare(panel.radio.stationId, "wfan")
+          panel.radio.toggleFavorite("tsn-690")
+          tryCompare(panel.testPresets, "count", 1)
+          compare(panel.testHeading.text, panel.radio.station.name)
+          verify(!panel.testHeading.truncated, "The station heading was truncated")
           verify(panel.testBackButton.visible && !panel.testBackButton.enabled)
           verify(panel.testForwardButton.visible && !panel.testForwardButton.enabled)
           verify(!panel.testStopButton.enabled && panel.testPlayButton.enabled)
           compare(panel.testPlayButton.tooltipText, "Play")
-          compare(panel.testBackButton.y, panel.testPlayButton.y)
-          compare(panel.testStopButton.y, panel.testPlayButton.y)
-          compare(panel.testForwardButton.y, panel.testPlayButton.y)
-          verify(panel.testBackButton.x < panel.testStopButton.x && panel.testStopButton.x < panel.testPlayButton.x && panel.testPlayButton.x < panel.testForwardButton.x)
+          var backCenter = panel.testBackButton.mapToItem(panel, panel.testBackButton.width / 2, panel.testBackButton.height / 2)
+          var playCenter = panel.testPlayButton.mapToItem(panel, panel.testPlayButton.width / 2, panel.testPlayButton.height / 2)
+          var forwardCenter = panel.testForwardButton.mapToItem(panel, panel.testForwardButton.width / 2, panel.testForwardButton.height / 2)
+          verify(backCenter.x < playCenter.x && playCenter.x < forwardCenter.x, "Time skips must flank the primary play control")
+          verify(panel.testPlayButton.height > panel.testStopButton.height, "Play/Pause lost primary emphasis")
           capture("player")
-          panel.cursor = 14; panel.advanceCursor(1); compare(panel.cursor, 4)
+          panel.cursor = 14; panel.advanceCursor(1); compare(panel.cursor, 21)
           panel.advanceCursor(-1); compare(panel.cursor, 14)
           panel.activate(); verify(panel.recordingsOpen); verify(panel.testCatcher.blocked)
           compare(panel.testView.libraryPage, 0)
@@ -180,10 +192,34 @@ ShellRoot {
           verify(panel.recordingsOpen, "failed playback left library")
           console.log("QA: recording handoff")
           panel.testView.playItem("test-recording")
-          tryVerify(function() { return !panel.recordingsOpen && panel.radio.playbackKind === "recording" && panel.radio.wanted }, 5000)
+          tryVerify(function() { return panel.radio.playbackKind === "recording" && panel.radio.wanted }, 5000)
+          verify(panel.recordingsOpen && panel.testDock.visible, "Playing a saved show left the recording library")
           compare(panel.radio.recordingId, "test-recording")
+          compare(panel.radio.playbackStation.id, "wbz-fm", "Recording artwork followed the selected live station")
+          compare(panel.radio.stationId, "wfan", "Saved playback changed the selected live station")
           console.log("QA: waiting for file playback")
           try { tryVerify(function() { return panel.radio.playbackState === "playing" }, 8000) } catch(e) { console.log("QA: playback state", panel.radio.playbackState, panel.radio.error, panel.radio.wanted); throw e }
+          panel.testDockPlay.clicked()
+          tryVerify(function() { return panel.radio.paused }, 5000)
+          panel.testDockPlay.forceActiveFocus(); keyClick(Qt.Key_P)
+          tryVerify(function() { return !panel.radio.paused }, 5000)
+          panel.testView.testSearch.forceActiveFocus(); keyClick(Qt.Key_P); keyClick(Qt.Key_M)
+          compare(panel.testView.testSearch.text, "pm", "Library search activated a playback shortcut")
+          verify(!panel.radio.paused && !panel.radio.muted)
+          panel.testView.testSearch.text = ""
+          window.height = 300; window.width = 320
+          wait(100)
+          var dockY = panel.testDock.mapToItem(panel, 0, 0).y
+          verify(dockY >= 0 && dockY + panel.testDock.height <= window.height, "Playback dock fell outside the small popup")
+          panel.testScroller.contentY = Math.max(0, panel.testScroller.contentHeight - panel.testScroller.height)
+          compare(panel.testDock.mapToItem(panel, 0, 0).y, dockY, "Scrolling moved persistent playback controls")
+          capture("library-dock-small")
+          window.height = 650; window.width = 420
+          panel.chooseStation()
+          tryVerify(function() { return !panel.recordingsOpen && panel.testStationPicker.popupOpen }, 2000)
+          verify(panel.radio.wanted && panel.radio.playbackKind === "recording", "Opening the station chooser interrupted library playback")
+          keyClick(Qt.Key_Escape)
+          tryVerify(function() { return !panel.testStationPicker.popupOpen }, 2000)
           console.log("QA: pause")
           compare(panel.testPlayButton.tooltipText, "Pause")
           panel.cursor = 1; panel.activate(); tryVerify(function() { return panel.radio.paused }, 5000)
@@ -192,8 +228,7 @@ ShellRoot {
           verify(panel.testForwardButton.enabled)
           panel.cursor = 8; panel.activate(); tryVerify(function() { return panel.radio.position > 28 }, 5000)
           verify(panel.testBackButton.enabled)
-          panel.cursor = 7; panel.advanceCursor(1); compare(panel.cursor, 6)
-          panel.advanceCursor(1); compare(panel.cursor, 1)
+          panel.cursor = 7; panel.advanceCursor(1); compare(panel.cursor, 1)
           panel.advanceCursor(1); compare(panel.cursor, 8)
           panel.cursor = 7; panel.activate(); tryVerify(function() { return panel.radio.position < 0.5 }, 5000)
           verify(!panel.testBackButton.enabled)
@@ -238,7 +273,7 @@ ShellRoot {
           keyClick(Qt.Key_Escape); verify(panel.recordingsOpen && panel.testView.viewMode === "schedules", "Escape did not return to schedules")
           wait(100); keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen, "Second Escape did not return to player")
           panel.settingsOpen = true; verify(panel.testStorageButton.visible)
-          panel.cursor = 17; panel.activate(); verify(panel.recordingsOpen); verify(panel.testView.storageEditing)
+          panel.cursor = 17; panel.activate(); verify(panel.recordingsOpen); verify(panel.testView.storageEditing); compare(panel.testView.tab, "library")
           tryVerify(function() { return panel.testView.testFolder.activeFocus }, 2000)
           tryVerify(function() { var y = panel.testView.testFolder.mapToItem(panel, 0, 0).y; return y >= 0 && y + panel.testView.testFolder.height <= window.height }, 2000)
           capture("storage")

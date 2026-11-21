@@ -51,6 +51,13 @@ def main():
   property alias testCatcher: keyCatcher
   property alias testRecordingsButton: recordingsButton
   property alias testStorageButton: storageButton
+  property alias testDock: playbackDock
+  property alias testDockPlay: dockPlay
+  property alias testDockBack: dockBack
+  property alias testDockForward: dockForward
+  property alias testScroller: scroller
+  property alias testPresets: presetRepeater
+  property alias testHeading: stationHeading
   property alias testPlayButton: playButton
   property alias testStopButton: stopButton
   property alias testBackButton: backButton

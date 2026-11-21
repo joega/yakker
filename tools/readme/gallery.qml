@@ -9,7 +9,7 @@ ShellRoot {
   Window {
     id: window
     visible: true
-    width: 380
+    width: 420
     height: 600
     color: "transparent"
     Plugin.Panel { id: panel; width: window.width; height: window.height }
@@ -85,7 +85,7 @@ ShellRoot {
           capture("stations")
           panel.screenshotPicker.close()
 
-          const complete = {id: "saved", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "complete", bytes: 3600000, durationSeconds: 1200,
+          const complete = {id: "saved", stationId: "wbz-fm", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "complete", bytes: 3600000, durationSeconds: 1200,
             plannedStart: "2026-11-19T14:00:00-05:00", plannedEnd: "2026-11-19T14:20:00-05:00", startedAt: "2026-11-19T14:00:01-05:00", endedAt: "2026-11-19T14:20:00-05:00", playable: true, resumePosition: 486}
           const active = {id: "capturing", label: "Afternoon sports", stationName: "98.5 The Sports Hub", status: "recording", bytes: 1800000,
             plannedStart: "2026-11-20T14:00:00-05:00", plannedEnd: "2026-11-20T14:20:00-05:00", startedAt: "2026-11-20T14:00:01-05:00", playable: false}
@@ -99,6 +99,8 @@ ShellRoot {
           panel.screenshotView.editing = false
 
           panel.recordingsOpen = false
+          radio.recordings = snapshot([], [complete], 0)
+          radio.recordingId = "saved"
           radio.playbackKind = "recording"; radio.recordingTitle = "Afternoon sports"
           radio.duration = 1200; radio.position = 486
           radio.playbackSpeed = 1.25; radio.sleepRemaining = 900

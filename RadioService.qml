@@ -61,6 +61,13 @@ Item {
   property var station: noStation
   readonly property bool hasStation: stationId.length > 0 && station.id === stationId
   property var stations: []
+  // Saved audio can come from a different station than the selected live one.
+  readonly property var playbackStation: {
+    if (playbackKind !== "recording") return station
+    const item = (recordings.recordings || []).find(function(recording) { return recording.id === root.recordingId })
+    return stations.find(function(source) { return item && source.id === item.stationId })
+      || {name: item ? item.stationName : "Saved recording", icon: "󰲸"}
+  }
   property var favoriteIds: []
   readonly property var countryNames: ({US: "United States (US)", CA: "Canada (CA)", GB: "United Kingdom (UK)", IE: "Ireland (IE)"})
   readonly property var stationOptions: {

@@ -126,7 +126,7 @@ Ui.BarWidget {
         anchors.verticalCenter: parent.verticalCenter
         // An idle selection is not a live station; use the neutral radio fallback.
         station: Radio.RadioService.wanted && Radio.RadioService.playbackState === "playing"
-          ? Radio.RadioService.station : ({})
+          ? Radio.RadioService.playbackStation : ({})
         fallbackColor: button.foreground
       }
       Text {

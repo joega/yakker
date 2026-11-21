@@ -9,8 +9,10 @@ Column {
   required property var radio
   property color foreground: Commons.Color.foreground
   property var bar
+  property bool embedded: false
   property var ensureVisible: function(item) {}
   signal back()
+  signal playbackShortcut(string text)
   spacing: Style.space(8)
   readonly property var snapshot: radio.recordings || ({})
   readonly property bool available: radio.ready && snapshot.available === true
@@ -91,7 +93,7 @@ Column {
   Component.onCompleted: refreshRows()
   onFormKeyChanged: { previewSerial = 0; previewText = "" }
 
-  function activate() { focusItem(backButton) }
+  function activate() { focusItem(backButton.visible ? backButton : tab === "schedules" ? newScheduleButton : searchField) }
   function goBack() {
     if (pending) return
     localError = ""; confirmation = ""
@@ -99,9 +101,16 @@ Column {
     else if (storageEditing) storageEditing = false
     else if (nowEditing) nowEditing = false
     else { back(); return }
-    focusItem(backButton)
+    activate()
   }
   Keys.onEscapePressed: event => { event.accepted = true; root.goBack() }
+  // Text fields consume their own letters before keys bubble to this view.
+  // Keep listening shortcuts available from buttons and the library itself.
+  Keys.onPressed: event => {
+    if (event.modifiers !== Qt.NoModifier || "p[]gmr".indexOf(event.text.toLowerCase()) < 0 || !event.text) return
+    root.playbackShortcut(event.text)
+    event.accepted = true
+  }
   function focusItem(item) { Qt.callLater(function() { item.forceActiveFocus(); root.ensureVisible(item) }) }
   function beginEdit(s) {
     if (pending) return
@@ -270,7 +279,8 @@ Column {
       if (root.radio.error) {
         root.playbackSerial = 0; root.localError = root.radio.error
       } else if (root.radio.playbackKind === "recording" && root.radio.recordingId === root.playbackId && root.radio.wanted) {
-        root.playbackSerial = 0; root.back()
+        root.playbackSerial = 0
+        if (!root.embedded) root.back()
       }
     }
     function onReadyChanged() {
@@ -282,18 +292,18 @@ Column {
       }
     }
   }
-  Ui.Button { id: backButton; width: parent.width; text: root.editing ? "← Back to schedules" : (root.storageEditing || root.nowEditing) ? "← Back" : "← Back to player"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
-  Text { width: parent.width; text: "RECORDINGS"; textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true }
+  Ui.Button { id: backButton; visible: !root.embedded || root.editing || root.storageEditing || root.nowEditing; width: parent.width; text: root.editing ? "← Back to schedules" : (root.storageEditing || root.nowEditing) ? "← Back" : "← Back to player"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
+  Text { width: parent.width; text: root.storageEditing ? "STORAGE" : root.nowEditing ? "RECORD NOW" : root.tab === "schedules" ? "SCHEDULES" : "RECORDINGS"; textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption; font.bold: true }
   Text { width: parent.width; visible: !root.available || !!root.snapshot.error; text: !root.radio.ready ? "Recording manager disconnected." : (root.snapshot.error || "Recording manager unavailable."); textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: Style.font.family; font.pixelSize: Style.font.body; wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.localError.length > 0; text: root.localError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.pending; text: "Working…"; textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.caption }
-  Row { width: parent.width; spacing: Style.space(4); visible: root.viewMode === "library" || root.viewMode === "schedules"
+  Row { width: parent.width; spacing: Style.space(4); visible: !root.embedded && (root.viewMode === "library" || root.viewMode === "schedules")
     Ui.Button { width: (parent.width-parent.spacing)/2; text: "Library"; selected: root.tab === "library"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.tab = "library" }
     Ui.Button { width: (parent.width-parent.spacing)/2; text: "Schedules"; selected: root.tab === "schedules"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.tab = "schedules" }
   }
   Column { width: parent.width; spacing: Style.space(8); visible: root.viewMode === "schedules"
   Text { width: parent.width; text: "Schedules"; textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true }
-  Ui.Button { width: parent.width; text: "New schedule"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.beginEdit(null) }
+  Ui.Button { id: newScheduleButton; width: parent.width; text: "New schedule"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.available && !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.beginEdit(null) }
   }
   Column {
     width: parent.width; spacing: Style.space(6); visible: root.editing
@@ -329,7 +339,7 @@ Column {
   Column { width: parent.width; spacing: Style.space(8); visible: root.viewMode === "schedules"
   Text { width: parent.width; visible: root.available && (root.snapshot.schedules || []).length === 0; text: "No schedules yet."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: Style.font.family; font.pixelSize: Style.font.caption }
   Repeater { model: scheduleRows
-    Column { required property var rowData; readonly property var modelData: rowData; width: root.width; spacing: Style.space(4)
+    Column { required property var rowData; readonly property var modelData: rowData; readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.recordingId === rowData.id && root.radio.wanted; width: root.width; spacing: Style.space(4)
       Ui.PanelSeparator { width: parent.width }
       Text { width: parent.width; text: (parent.modelData.label || parent.modelData.stationName) + (parent.modelData.enabled ? " · Enabled" : " · Disabled"); textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; wrapMode: Text.Wrap }
       Text { width: parent.width; text: parent.modelData.stationName + " · " + (parent.modelData.kind === "once" ? parent.modelData.date : (parent.modelData.weekdays || []).map(function(d) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d] }).join(", ")) + " · " + root.scheduleTimeText(parent.modelData.startTime) + "–" + root.scheduleTimeText(parent.modelData.endTime) + " · " + parent.modelData.timezone + "\n" + (parent.modelData.nextStart ? "Next: " + root.dateText(parent.modelData.nextStart, true) + " – " + root.dateText(parent.modelData.nextEnd, true) : "No upcoming occurrence"); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
@@ -350,11 +360,11 @@ Column {
     Ui.SearchableDropdown { id: statusPicker; width: parent.width; showLabel: false; placeholderText: "Status"; value: root.statusFilter; foreground: root.foreground; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); options: [{value:"all", label:"All statuses"}, {value:"recording", label:"Recording"}, {value:"complete", label:"Completed"}, {value:"partial", label:"Partial"}, {value:"error", label:"Failed"}, {value:"missing", label:"Missing"}, {value:"missed", label:"Missed"}]; onChanged: value => { root.statusFilter = value } }
     Text { width: parent.width; visible: root.available && root.filteredRecordings.length === 0; text: (root.snapshot.recordings || []).length ? "No recordings match." : "No recordings yet."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: Style.font.family; font.pixelSize: Style.font.caption }
     Repeater { id: libraryRepeater; model: libraryRows
-      Column { id: recordRow; required property var rowData; readonly property bool expanded: !!root.expandedRecordings[rowData.id]; readonly property var modelData: rowData; width: root.width; spacing: Style.space(4)
+      Column { id: recordRow; required property var rowData; readonly property bool expanded: !!root.expandedRecordings[rowData.id]; readonly property var modelData: rowData; readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.recordingId === rowData.id && root.radio.wanted; width: root.width; spacing: Style.space(4)
         Text { width: parent.width; text: parent.modelData.label || parent.modelData.stationName; textFormat: Text.PlainText; color: root.foreground; font.family: Style.font.family; font.pixelSize: Style.font.body; font.bold: true; wrapMode: Text.Wrap }
         Text { width: parent.width; text: parent.modelData.stationName + " · " + root.dateText(parent.modelData.startedAt || parent.modelData.plannedStart) + (parent.modelData.status === "recording" ? "" : " · " + root.radio.clock(parent.modelData.durationSeconds || 0)) + " · " + root.statusText(parent.modelData.status); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
         Row { width: parent.width; spacing: Style.space(4)
-          Ui.Button { width: (parent.width-parent.spacing)/2; text: recordRow.modelData.status === "recording" ? "Stop capture" : Number(recordRow.modelData.resumePosition) > 0 ? "Resume" : "Play"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.radio.ready && !root.pending && (recordRow.modelData.status === "recording" ? root.available : recordRow.modelData.playable === true); onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const r = recordRow.modelData; if (r.status === "recording") root.action("stopRecording", r.id, root.snapshot.revision); else root.playItem(r.id) } }
+          Ui.Button { width: (parent.width-parent.spacing)/2; text: recordRow.modelData.status === "recording" ? "Stop capture" : recordRow.playingHere ? (root.radio.paused ? "Resume" : "Pause") : Number(recordRow.modelData.resumePosition) > 0 ? "Resume" : "Play"; foreground: root.foreground; bordered: true; focusable: true; enabled: root.radio.ready && !root.pending && (recordRow.modelData.status === "recording" ? root.available : recordRow.modelData.playable === true); onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: { const r = recordRow.modelData; if (r.status === "recording") root.action("stopRecording", r.id, root.snapshot.revision); else if (recordRow.playingHere) root.radio.togglePause(); else root.playItem(r.id) } }
           Ui.Button { width: (parent.width-parent.spacing)/2; text: recordRow.expanded ? "Hide details" : "Details"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.toggleDetails(recordRow.modelData.id) }
         }
         Text { width: parent.width; visible: recordRow.expanded; text: "Planned: " + root.dateText(recordRow.modelData.plannedStart) + " – " + root.dateText(recordRow.modelData.plannedEnd) + (recordRow.modelData.startedAt ? "\nActual: " + root.dateText(recordRow.modelData.startedAt) + (recordRow.modelData.endedAt ? " – " + root.dateText(recordRow.modelData.endedAt) : "") : "") + "\nSize: " + root.sizeText(recordRow.modelData.bytes) + (recordRow.modelData.reason ? "\n" + recordRow.modelData.reason : ""); textFormat: Text.PlainText; color: root.foreground; opacity: 0.8; font.family: Style.font.family; font.pixelSize: Style.font.caption; wrapMode: Text.Wrap }
