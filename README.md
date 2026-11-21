@@ -242,6 +242,13 @@ In the terminal UI, **P** pauses/resumes, **[ / ]** skip 30 seconds, **G** goes 
 and Space retains Play / Stop. Buffer preferences in terminal sessions are
 independent of the desktop widget.
 
+If a station cannot connect, a recovery card offers **Retry** and **Choose
+station**, with technical information under **Show details**. Automatic retries
+show the countdown; a compact Retry action also stays available in the playback
+dock while browsing other sections.
+
+[<img src="docs/yakker-connection-error.png" alt="Connection failure with clear retry and choose-station recovery actions" width="300">](docs/yakker-connection-error.png)
+
 ## Scheduled recordings
 
 Open **Library** or **Schedules** from the tabs at the top. Library also contains
@@ -302,6 +309,16 @@ requires confirmation; Cancel or Hide details clears that confirmation.
 [<img src="docs/yakker-recording-details.png" alt="Expanded recording details with grouped metadata, scheduled and actual capture times, and quiet restart and delete actions" width="300">](docs/yakker-recording-details.png)
 
 **Play** or **Resume** starts a retained file while keeping the library open.
+An empty library explains how to **Record now** or create a **New schedule**.
+When a search or status filter matches nothing, **Clear filters** resets both
+without changing saved audio. Library loading failures are shown separately from
+an empty library. Station search offers a clear-search or Show all stations action
+when no results or favorites are available.
+
+| Empty library | No matching recordings |
+| --- | --- |
+| [<img src="docs/yakker-empty-library.png" alt="Empty recording library with record-now and schedule guidance" width="300">](docs/yakker-empty-library.png) | [<img src="docs/yakker-empty-search.png" alt="No matching recordings with a clear-filters action" width="300">](docs/yakker-empty-search.png) |
+
 A fixed playback dock remains available while you scroll recordings, schedules,
 or editors, with pause/resume, 30-second skips, Stop, and volume. The playing row
 also offers Pause/Resume. Choose **Listen** for the full player, duration-based

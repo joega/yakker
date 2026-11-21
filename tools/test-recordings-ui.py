@@ -43,11 +43,13 @@ def main():
         shutil.copy2(SMOKE / "KeyboardPanel.qml", qs / "Ui/KeyboardPanel.qml")
         for name in ("Commons", "services"):
             (qs / name).symlink_to(shell / name, target_is_directory=True)
-        for name in ("Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "qmldir"):
+        for name in ("Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "qmldir"):
             shutil.copy2(ROOT / name, plugin / name)
         (plugin / "assets").symlink_to(ROOT / "assets", target_is_directory=True)
         panel = plugin / "Panel.qml"
-        panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testView: recordingsView
+        panel.write_text(panel.read_text().replace('  property var anchorItem: null', '''  property alias testConnectionState: connectionState
+  property alias testDockRetry: dockRetry
+  property alias testView: recordingsView
   property alias testCatcher: keyCatcher
   property alias testListenButton: listenButton
   property alias testSchedulesButton: schedulesButton
@@ -93,7 +95,9 @@ def main():
   property var anchorItem: null''', 1))
         panel.write_text(panel.read_text().replace('                    id: customStationRow', '                    id: customStationRow\n                    property alias testTitle: customStationTitle\n                    property alias testEdit: customStationEdit', 1))
         view = plugin / "RecordingsView.qml"
-        view.write_text(view.read_text().replace('  required property var radio', '''  property alias testSchedules: scheduleRepeater
+        view.write_text(view.read_text().replace('  required property var radio', '''  property alias testEmptyLibrary: emptyLibrary
+  property alias testUnavailable: recordingsUnavailable
+  property alias testSchedules: scheduleRepeater
   property alias testEnabled: scheduleEnabledToggle
   property alias testZone: zoneField
   property alias testSaveSchedule: saveScheduleButton
@@ -135,7 +139,9 @@ def main():
         property alias testTitle: recordTitle""", 1))
         view.write_text(view.read_text().replace('        id: scheduleRow', '        id: scheduleRow\n        property alias testEdit: scheduleEditButton\n        property alias testTitle: scheduleTitle', 1))
         picker = plugin / "StationPicker.qml"
-        picker.write_text(picker.read_text().replace('  property string value: ""', '  property alias testSearch: search\n  property alias testList: list\n  property alias testPopup: popup\n  property alias testAll: allFilter\n  property alias testFavorites: favoritesFilter\n  property alias testClear: clearSearch\n  property string value: ""', 1).replace('          id: stationRow', '          id: stationRow\n          property alias testTitle: stationTitle\n          property alias testFavorite: favoriteButton\n          property alias testResult: stationResult', 1))
+        picker.write_text(picker.read_text().replace('  property string value: ""', '  property alias testSearch: search\n  property alias testList: list\n  property alias testPopup: popup\n  property alias testEmpty: pickerEmpty\n  property alias testEmptyViewport: emptyViewport\n  property alias testAll: allFilter\n  property alias testFavorites: favoritesFilter\n  property alias testClear: clearSearch\n  property string value: ""', 1).replace('          id: stationRow', '          id: stationRow\n          property alias testTitle: stationTitle\n          property alias testFavorite: favoriteButton\n          property alias testResult: stationResult', 1))
+        card = plugin / "StateCard.qml"
+        card.write_text(card.read_text().replace('  property string title: ""', '  property alias testDiagnostics: diagnostics\n  property string title: ""', 1))
         service = plugin / "RadioService.qml"
         service.write_text(service.read_text().replace('  property int clients: 0', '  property alias testHelper: helper\n  property int clients: 0', 1))
         stations = json.loads((ROOT / "stations.json").read_text())

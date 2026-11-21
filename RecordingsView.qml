@@ -58,6 +58,7 @@ Column {
   property int nowRevision: 0
   property string searchText: ""
   property string statusFilter: "all"
+  readonly property bool hasLibraryFilters: !!searchText.trim() || statusFilter !== "all"
   readonly property var filteredRecordings: (snapshot.recordings || []).filter(function(r) {
     const q = root.searchText.trim().toLowerCase()
     return (!q || ((r.label || "") + " " + (r.stationName || "")).toLowerCase().indexOf(q) >= 0)
@@ -174,7 +175,17 @@ Column {
     onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
   }
 
-  function activate() { focusItem(backButton.visible ? backButton : tab === "schedules" ? newScheduleButton : searchField) }
+  function activate() {
+    if (backButton.visible) focusItem(backButton)
+    else if (recordingsUnavailable.visible) focusItem(recordingsUnavailable.actionText ? recordingsUnavailable.primaryControl : recordingsUnavailable.secondaryControl)
+    else if (tab === "schedules") focusItem(newScheduleButton)
+    else focusItem(emptyLibrary.visible && !hasLibraryFilters ? emptyLibrary.primaryControl : searchField)
+  }
+  function clearLibraryFilters() {
+    searchField.text = ""; searchText = ""; statusFilter = "all"; libraryPage = 0
+    confirmation = ""
+    if (visible) activate()
+  }
   function goBack() {
     if (pending) return
     localError = ""; confirmation = ""
@@ -459,7 +470,24 @@ Column {
     font.pixelSize: Style.fontPx(1.5)
     font.weight: Font.DemiBold
   }
-  Text { width: parent.width; visible: !root.available || !!root.snapshot.error; text: !root.radio.ready ? "Recording manager disconnected." : (root.snapshot.error || "Recording manager unavailable."); textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); wrapMode: Text.Wrap }
+  Radio.StateCard {
+    id: recordingsUnavailable
+    width: parent.width
+    visible: !root.available || !!root.snapshot.error
+    title: root.available ? "Recording needs attention" : "Recordings unavailable"
+    description: root.available ? "Check the details, then review your recording storage settings." : "Yakker can’t load the recording library right now. Return to the player and try again later."
+    iconName: "folder"
+    iconColor: Commons.Color.urgent
+    foreground: root.foreground
+    actionText: root.available && root.viewMode !== "storage" ? "Storage settings" : ""
+    actionEnabled: !root.pending
+    secondaryText: "Return to player"
+    secondaryEnabled: !root.pending
+    detailText: root.snapshot.error || (!root.radio.ready ? "Recording manager disconnected." : "Recording manager unavailable.")
+    ensureVisible: root.ensureVisible
+    onAction: root.embedded ? root.requestStorage() : root.beginStorage()
+    onSecondary: root.back()
+  }
   Text { id: localErrorText; width: parent.width; visible: root.localError.length > 0; text: root.localError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.pending; text: "Working…"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
   Row { width: parent.width; spacing: Style.space(4); visible: !root.embedded && (root.viewMode === "library" || root.viewMode === "schedules")
@@ -645,8 +673,10 @@ Column {
     Row {
       width: parent.width
       spacing: Style.space(8)
+      visible: (root.snapshot.recordings || []).length > 0 || root.hasLibraryFilters
       Radio.FocusButton {
         id: libraryRecordButton
+        visible: !emptyLibrary.visible || root.hasLibraryFilters
         text: "Record now"
         iconName: "record"
         iconSize: Style.space(16)
@@ -657,7 +687,7 @@ Column {
         enabled: root.available && !root.pending
         onClicked: root.beginNow()
       }
-      Item { width: Math.max(0, parent.width - libraryRecordButton.width - libraryStorageButton.width - parent.spacing * 2); height: 1 }
+      Item { width: Math.max(0, parent.width - (libraryRecordButton.visible ? libraryRecordButton.width + parent.spacing : 0) - libraryStorageButton.width - parent.spacing); height: 1 }
       Radio.FocusButton {
         id: libraryStorageButton
         text: "Storage"
@@ -674,6 +704,7 @@ Column {
     Row {
       width: parent.width
       spacing: Style.space(8)
+      visible: (root.snapshot.recordings || []).length > 0 || root.hasLibraryFilters
       Ui.TextField {
         id: searchField
         width: parent.width - statusPicker.width - parent.spacing
@@ -698,7 +729,24 @@ Column {
         onChanged: value => { root.statusFilter = value }
       }
     }
-    Text { width: parent.width; visible: root.available && root.filteredRecordings.length === 0; text: (root.snapshot.recordings || []).length ? "No recordings match." : "No recordings yet."; textFormat: Text.PlainText; color: root.foreground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+    Radio.StateCard {
+      id: emptyLibrary
+      width: parent.width
+      visible: root.available && !root.snapshot.error && root.filteredRecordings.length === 0
+      title: root.hasLibraryFilters ? "No matching recordings" : "No recordings yet"
+      description: root.hasLibraryFilters
+        ? ((root.snapshot.recordings || []).length ? "Try a different title or station, or clear the search and status filter." : "There are no recordings to search yet. Clear the filters to start your library.")
+        : "Record a station now, or schedule a show for later. Your saved audio will appear here."
+      iconName: root.hasLibraryFilters ? "search" : "folder"
+      foreground: root.foreground
+      actionText: root.hasLibraryFilters ? "Clear filters" : "Record now"
+      secondaryText: root.hasLibraryFilters ? "" : "New schedule"
+      actionEnabled: !root.pending
+      secondaryEnabled: !root.pending
+      ensureVisible: root.ensureVisible
+      onAction: root.hasLibraryFilters ? root.clearLibraryFilters() : root.beginNow()
+      onSecondary: root.beginEdit(null)
+    }
     Repeater {
       id: libraryRepeater
       model: libraryRows

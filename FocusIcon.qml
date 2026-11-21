@@ -26,6 +26,7 @@ Image {
     "folder": '<path d="M3 6h6l2 2h10v12H3zM3 8V4h6l2 2h10v2"/>',
     "plus": '<path d="M12 5v14M5 12h14"/>',
     "radio": '<rect x="3" y="8" width="18" height="12" rx="3"/><path d="M5 8l13-5M15 12h3m-3 4h3"/><circle cx="8" cy="14" r="2"/>',
+    "search": '<circle cx="10" cy="10" r="6"/><path d="M15 15l6 6"/>',
     "close": '<path d="M6 6l12 12M18 6L6 18"/>'
   })
   source: name && paths[name] ? "data:image/svg+xml;charset=utf-8," + encodeURIComponent(

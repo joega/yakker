@@ -68,7 +68,7 @@ ShellRoot {
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
-          compare(Object.keys(themes).length, 14)
+          compare(Object.keys(themes).length, 18)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
@@ -161,6 +161,28 @@ ShellRoot {
           panel.selectSettingsTab("stations")
           panel.openStationEditor({name:"Community Radio", streamUrl:"https://radio.example/stream", city:"Boston", country:"US", website:"https://radio.example"})
           capture("custom-station")
+          panel.showPlayer()
+          radio.playbackKind = "live"; radio.playbackState = "playing"; radio.wanted = true
+          selectExample("krld-fm")
+          radio.recordings = snapshot([], [], 0)
+          panel.openRecordings(false)
+          panel.screenshotView.clearLibraryFilters()
+          capture("empty-library")
+          selectExample("wscr")
+          radio.recordings = snapshot([], [complete], 0)
+          panel.screenshotView.screenshotSearch.text = "Late game"
+          capture("empty-search")
+          panel.showPlayer()
+          selectExample("espn-new-york")
+          radio.wanted = false; radio.playbackState = "error"
+          radio.error = "The stream could not be opened."
+          capture("connection-error")
+          radio.error = ""; radio.wanted = true; radio.playbackState = "playing"
+          selectExample("off-the-ball")
+          panel.screenshotPicker.open()
+          panel.screenshotPicker.screenshotSearch.text = "Snowboarding"
+          capture("empty-stations")
+          panel.screenshotPicker.close()
           console.log("YAKKER_README_SCREENSHOTS_PASS")
         } catch (error) {
           console.error("YAKKER_README_SCREENSHOTS_FAIL", error, error.stack)

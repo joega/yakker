@@ -47,7 +47,7 @@ cp -r "$shell_dir/Ui" "$capture_dir/imports/qs/Ui"
 cp "$project_dir/tools/readme/KeyboardPanel.qml" "$capture_dir/imports/qs/Ui/KeyboardPanel.qml"
 ln -s "$shell_dir/Commons" "$capture_dir/imports/qs/Commons"
 ln -s "$shell_dir/services" "$capture_dir/imports/qs/services"
-cp "$project_dir"/{Panel.qml,RecordingsView.qml,RadioService.qml,RecordingNotices.js,StationLogo.qml,FocusButton.qml,FocusIcon.qml,StationPicker.qml,MarqueeText.qml,qmldir,stations.json} "$capture_dir/plugin/"
+cp "$project_dir"/{Panel.qml,RecordingsView.qml,RadioService.qml,RecordingNotices.js,StationLogo.qml,FocusButton.qml,FocusIcon.qml,StationPicker.qml,MarqueeText.qml,StateCard.qml,qmldir,stations.json} "$capture_dir/plugin/"
 ln -s "$project_dir/assets" "$capture_dir/plugin/assets"
 awk '
   /property var anchorItem: null/ {
@@ -59,6 +59,8 @@ awk '
   }
   { print }
 ' "$project_dir/Panel.qml" > "$capture_dir/plugin/Panel.qml"
+awk '/required property var radio/ { print "  property alias screenshotSearch: searchField" } { print }' "$project_dir/RecordingsView.qml" > "$capture_dir/plugin/RecordingsView.qml"
+awk '/property string value:/ { print "  property alias screenshotSearch: search" } { print }' "$project_dir/StationPicker.qml" > "$capture_dir/plugin/StationPicker.qml"
 cp "$project_dir/tools/readme/gallery.qml" "$capture_dir/shell.qml"
 if ! timeout 60s env -u QT_QPA_PLATFORMTHEME \
   XDG_RUNTIME_DIR="$capture_dir/runtime" XDG_CONFIG_HOME="$capture_dir/config" XDG_DATA_HOME="$capture_dir/data" \
@@ -72,4 +74,4 @@ if ! rg -q 'YAKKER_README_SCREENSHOTS_PASS' "$capture_dir/render.log"; then
   cat "$capture_dir/render.log"
   exit 1
 fi
-printf 'Rendered fourteen README screenshots in %s\n' "$output_dir"
+printf 'Rendered eighteen README screenshots in %s\n' "$output_dir"

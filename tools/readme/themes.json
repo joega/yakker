@@ -12,5 +12,9 @@
   "notifications": "catppuccin-latte",
   "custom-station": "catppuccin-latte",
   "sleep-timer": "catppuccin-latte",
-  "recording-details": "catppuccin-latte"
+  "recording-details": "catppuccin-latte",
+  "empty-library": "catppuccin-latte",
+  "empty-search": "catppuccin-latte",
+  "connection-error": "catppuccin-latte",
+  "empty-stations": "catppuccin-latte"
 }

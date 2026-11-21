@@ -27,7 +27,7 @@ import (
 
 var bundleFiles = []string{
 	"manifest.json", "qmldir", "BarWidget.qml",
-	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml",
+	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml",
 	"stations.json", "README.md", "LICENSE",
 	"assets/wbns-fm.png", "assets/wkrk-fm.webp", "assets/kwfn-fm.webp",
 	"assets/wzgc-fm.webp", "assets/kkfn-fm.webp", "assets/klac.png",
@@ -42,6 +42,8 @@ var bundleFiles = []string{
 	"docs/yakker-recording-player.png", "docs/yakker-storage.png", "docs/screenshots.md",
 	"docs/yakker-schedules.png", "docs/yakker-record-now.png", "docs/yakker-notifications.png",
 	"docs/yakker-custom-station.png", "docs/yakker-sleep-timer.png", "docs/yakker-recording-details.png",
+	"docs/yakker-empty-library.png", "docs/yakker-empty-search.png",
+	"docs/yakker-connection-error.png", "docs/yakker-empty-stations.png",
 }
 
 type entry struct {

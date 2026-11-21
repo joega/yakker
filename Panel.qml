@@ -37,6 +37,8 @@ Ui.Panel {
     && (radio.playbackKind === "recording" ? radio.duration > 0 : radio.dvr)
   readonly property bool canRewind: seekable && radio.position > (radio.playbackKind === "recording" ? 0 : radio.bufferStart) + 0.5
   readonly property bool canForward: seekable && (radio.playbackKind === "recording" ? radio.duration - radio.position > 0.5 : radio.behindLive > 3)
+  readonly property string retryCountdown: Math.max(0, radio.retryDelay) + (radio.retryDelay === 1 ? " second" : " seconds")
+  readonly property bool connectionIssue: radio.playbackKind === "live" && (radio.playbackState === "error" || radio.playbackState === "retrying")
   readonly property bool canPlay: (radio.hasStation || radio.wanted) && (!radio.wanted || radio.paused || radio.playbackState === "playing")
   readonly property string playTooltip: !radio.hasStation && !radio.wanted ? "Choose a station first" : radio.wanted ? (radio.paused ? "Resume" : "Pause") : radio.playbackState === "error" ? "Retry" : "Play"
   readonly property string listeningStatus: radio.playbackKind === "recording"
@@ -175,6 +177,7 @@ Ui.Panel {
       order = [4,30,31,32,33]
       if (settingsTab === "listening") order = order.concat([40,41,42,43])
       order = order.concat([2,3])
+      if (dockRetry.visible) order.push(53)
       const index = Math.max(0, order.indexOf(cursor))
       cursor = order[(index + direction + order.length) % order.length]
       Qt.callLater(ensureCursorVisible)
@@ -184,6 +187,11 @@ Ui.Panel {
     if (favoriteButton.visible && favoriteButton.enabled) order.push(13)
     if (radio.playbackKind !== "recording")
       for (let i = 0; i < favoritePresets.length; i++) order.push(100 + i)
+    if (connectionState.visible) {
+      order.push(50)
+      if (connectionState.secondaryText) order.push(51)
+      if (connectionState.detailText) order.push(52)
+    }
     if (timelineSlider.visible && timelineSlider.enabled) order.push(22)
     if (liveButton.visible && liveButton.enabled) order.push(9)
     if (backButton.enabled) order.push(7)
@@ -206,7 +214,7 @@ Ui.Panel {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
                      addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
-    ensureItemVisible(cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
+    ensureItemVisible(cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
   function ensureItemVisible(item) {
     scrollTarget = item
@@ -249,6 +257,11 @@ Ui.Panel {
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
     else if (cursor === 24) backFromSettings()
+    else if (cursor === 53 && dockRetry.visible && dockRetry.enabled) dockRetry.clicked()
+    else if (cursor >= 50 && cursor <= 52 && connectionState.visible) {
+      const target = [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50]
+      if (target.visible && target.enabled) target.clicked()
+    }
     else if (cursor >= 40 && cursor <= 43 && settingsOpen) bufferPresets.itemAt(cursor - 40).clicked()
     else if (cursor >= 30 && cursor <= 33) selectSettingsTab(["listening", "storage", "alerts", "stations"][cursor - 30])
     else if (cursor >= 100 && cursor < 100 + favoritePresets.length) radio.selectStation(favoritePresets[cursor - 100].id)
@@ -951,6 +964,7 @@ Ui.Panel {
                 Row {
                   width: parent.width
                   spacing: Style.space(8)
+                  visible: !root.connectionIssue
                   Rectangle { width: Style.space(6); height: width; radius: width / 2; color: root.radio.playbackState === "error" ? Commons.Color.urgent : root.radio.playbackState === "playing" ? Commons.Color.accent : root.barForeground; anchors.verticalCenter: parent.verticalCenter }
                   Text {
                     width: parent.width - liveButton.width - Style.space(6) - parent.spacing * 2
@@ -1034,7 +1048,29 @@ Ui.Panel {
                 Text { width: parent.width; visible: root.radio.playbackKind === "recording"; text: root.radio.clock(root.radio.position) + " / " + root.radio.clock(root.radio.duration); textFormat: Text.PlainText; color: root.barForeground; opacity: 0.7; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
                 Text { width: parent.width; visible: root.radio.bufferExpired; text: "Older audio expired. Playback moved to the available buffer."; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
               }
-              Text { width: parent.width; visible: text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+              Radio.StateCard {
+                id: connectionState
+                width: parent.width
+                visible: root.connectionIssue
+                title: !root.radio.ready ? "Playback unavailable" : root.radio.playbackState === "retrying" ? "Reconnecting to station" : "Can’t connect to this station"
+                description: root.radio.playbackState === "retrying"
+                  ? "Trying again in " + root.retryCountdown + ". Retry now or choose another station."
+                  : "This stream didn’t start. Try again, or choose another station."
+                iconName: "radio"
+                iconColor: Commons.Color.urgent
+                foreground: root.barForeground
+                actionText: root.radio.hasStation ? (root.radio.playbackState === "retrying" ? "Retry now" : "Retry") : "Choose station"
+                secondaryText: root.radio.hasStation ? "Choose station" : ""
+                detailText: root.radio.error
+                primaryCursor: root.cursor === 50
+                secondaryCursor: root.cursor === 51
+                detailsCursor: root.cursor === 52
+                ensureVisible: root.ensureItemVisible
+                onControlHovered: index => { root.cursor = 50 + index }
+                onAction: { if (root.radio.hasStation) { root.radio.play(); root.cursor = 1; keyCatcher.forceActiveFocus() } else root.chooseStation() }
+                onSecondary: root.chooseStation()
+              }
+              Text { width: parent.width; visible: !root.connectionIssue && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
               Row {
                 width: implicitWidth
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -1271,7 +1307,14 @@ Ui.Panel {
             Radio.FocusButton { id: dockForward; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
             Radio.FocusButton { id: dockStop; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
           }
-          Text { width: parent.width; visible: root.auxiliaryView && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+          Row {
+            width: parent.width
+            visible: root.auxiliaryView && root.connectionIssue
+            spacing: Style.space(8)
+            Text { width: parent.width - dockRetry.width - parent.spacing; anchors.verticalCenter: parent.verticalCenter; text: root.radio.playbackState === "retrying" ? "Reconnecting in " + root.retryCountdown : "Station connection unavailable"; textFormat: Text.PlainText; color: Qt.alpha(root.barForeground, 0.8); font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+            Radio.FocusButton { id: dockRetry; text: "Retry"; fontSize: Style.fontPx(1); foreground: root.barForeground; color: Qt.alpha(Commons.Color.accent, 0.12); enabled: root.radio.hasStation; focusable: true; hasCursor: root.cursor === 53; onHovered: hovered => { if (hovered) root.cursor = 53 }; onClicked: root.radio.play() }
+          }
+          Text { width: parent.width; visible: root.auxiliaryView && !root.connectionIssue && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
           Row {
             width: parent.width
             spacing: Style.space(8)

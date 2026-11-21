@@ -91,7 +91,7 @@ Item {
     width: Math.min(root.popupWidth, root.Window.window ? Math.max(0, root.Window.window.width - Style.space(16)) : root.popupWidth)
     padding: Style.space(10)
     margins: Style.space(8)
-    implicitHeight: Math.min(Style.space(420), pickerHeader.implicitHeight + Math.max(Style.space(64), list.contentHeight) + pickerFooter.implicitHeight + Style.space(36))
+    implicitHeight: Math.min(Style.space(420), pickerHeader.implicitHeight + (list.count ? list.contentHeight : pickerEmpty.implicitHeight) + pickerFooter.implicitHeight + Style.space(36))
     focus: true
     closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
     onOpened: {
@@ -142,6 +142,7 @@ Item {
       }
       ListView {
         id: list
+        visible: count > 0
         width: parent.width
         height: Math.max(0, popup.availableHeight - pickerHeader.height - pickerFooter.height - parent.spacing * 2)
         clip: true
@@ -205,7 +206,39 @@ Item {
             onClicked: root.toggleFavorite(String(stationRow.modelData.value))
           }
         }
-        Text { visible: list.count === 0; width: parent.width; text: root.favoritesOnly && !root.favoriteCount ? "No favorites yet. Use the hearts in All to save stations." : root.emptyText; textFormat: Text.PlainText; color: Qt.alpha(root.foreground, 0.7); font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap; padding: Style.space(8) }
+
+      }
+      Flickable {
+        id: emptyViewport
+        visible: list.count === 0
+        width: parent.width
+        height: Math.max(0, popup.availableHeight - pickerHeader.height - pickerFooter.height - parent.spacing * 2)
+        contentHeight: pickerEmpty.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
+        StateCard {
+          id: pickerEmpty
+          width: parent.width
+          title: root.favoritesOnly && !root.favoriteCount ? "No favorites yet" : !root.options.length ? "Stations unavailable" : "No matching stations"
+          description: root.favoritesOnly && !root.favoriteCount ? "Save stations using the hearts in All stations."
+            : !root.options.length ? "The station list hasn’t loaded. Close the picker and try again after reconnecting."
+            : root.favoritesOnly ? "Try another search, or switch to All stations." : "Try a station name, city or country."
+          iconName: "search"
+          foreground: root.foreground
+          actionText: !root.options.length ? "Close picker" : root.favoritesOnly && !root.favoriteCount ? "Show all stations" : search.text ? "Clear search" : "Show all stations"
+          ensureVisible: function(item) {
+            const y = item.mapToItem(pickerEmpty, 0, 0).y
+            if (y < emptyViewport.contentY) emptyViewport.contentY = y
+            else if (y + item.height > emptyViewport.contentY + emptyViewport.height) emptyViewport.contentY = Math.min(Math.max(0, emptyViewport.contentHeight - emptyViewport.height), y + item.height - emptyViewport.height)
+          }
+          onAction: {
+            if (!root.options.length) { root.close(); return }
+            if (!search.text || !root.favoriteCount) root.favoritesOnly = false
+            search.text = ""; root.setCurrent(0)
+            Qt.callLater(function() { if (popup.opened) search.forceActiveFocus() })
+          }
+        }
       }
       Text { id: pickerFooter; width: parent.width; text: "↑↓ Browse · Enter Select · F Favorite · Esc Close"; textFormat: Text.PlainText; color: Qt.alpha(root.foreground, 0.6); font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(0.833); wrapMode: Text.Wrap }
     }
