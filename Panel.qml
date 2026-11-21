@@ -143,7 +143,7 @@ Ui.Panel {
   function advanceCursor(direction) {
     let order = [4,20,14,21]
     if (settingsOpen) {
-      order = [4,24,5,17,10]
+      order = [24,5,17,10]
       if (radio.station.custom) order = order.concat([11,12])
       order = order.concat([2,3])
       const index = Math.max(0, order.indexOf(cursor))
@@ -356,8 +356,10 @@ Ui.Panel {
             }
             Radio.FocusButton {
               id: settingsButton
-              iconName: root.settingsOpen ? "close" : "settings"
-              tooltipText: root.settingsOpen ? "Return from settings" : "Open settings"
+              visible: !root.settingsOpen
+              width: visible ? implicitWidth : 0
+              iconName: "settings"
+              tooltipText: "Open settings"
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
               foreground: root.barForeground
