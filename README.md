@@ -310,8 +310,8 @@ Up to **three recordings** can run at once, including while you listen to anothe
 station. Closing the popup, stopping foreground audio, changing stations, or
 playing a saved recording leaves those captures running. The bar dot turns red
 while capturing; a recording dot on the **Library** tab marks active captures.
-The Library tooltip shows the count, and Settings keeps a **REC** count that opens
-the library. The machine must be awake
+The Library tooltip shows the count, and the persistent player in Settings
+keeps a **REC** count that opens the library. The machine must be awake
 with the plugin loaded in the bar. Disabling/removing the last widget, restarting
 the shell, or shutting down the helper interrupts captures. Recoverable output is
 retained as partial; when the plugin returns during the scheduled interval it can
@@ -495,11 +495,12 @@ This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
 
-The gear opens **Settings**, with four tabs: **Listening**, **Storage**,
+The gear opens **Settings**, starting with four tabs: **Listening**, **Storage**,
 **Alerts**, and **Stations**. Listening shows the Live only / 5 / 15 / 30 minute
 buffer choices directly, with an explanation of the selected mode and a compact
-two-column keyboard shortcut reference. Each tab replaces the content below it; the playback
-dock and top-right X stay available. X returns to your previous player section.
+two-column keyboard shortcut reference. Each tab replaces the content below it;
+the playback dock stays available, with the X at the right end of the tab row.
+X returns to your previous player section.
 Storage has its own Save and Reset controls. Alerts apply immediately and have
 no save buttons. Switching tabs preserves unfinished storage and station drafts;
 closing settings discards unsaved drafts.

@@ -72,7 +72,6 @@ def main():
   property alias testStationList: customStations
   property alias testSettings: settingsView
   property alias testPlayerView: playerView
-  property alias testSectionTitle: settingsSectionTitle
   property alias testSettingsButton: settingsButton
   property alias testSettingsClose: settingsCloseButton
   property alias testDock: playbackDock

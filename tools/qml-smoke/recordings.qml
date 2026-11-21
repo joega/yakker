@@ -177,8 +177,8 @@ ShellRoot {
           verify(!panel.testDockStatus.truncated, "The compact player hides the buffering state")
           capture("paused-buffering-dock-small")
           radio.recordings = Object.assign({}, radio.recordings, {activeCount:1})
-          panel.testCatcher.forceActiveFocus(); panel.cursor = 4
-          keyClick(Qt.Key_Backtab); compare(panel.cursor, 58)
+          panel.testCatcher.forceActiveFocus(); panel.cursor = 43
+          keyClick(Qt.Key_Tab); compare(panel.cursor, 58)
           keyClick(Qt.Key_Return)
           verify(panel.recordingsOpen && !panel.settingsOpen, "Settings recording indicator did not open Library")
           verify(radio.wanted && radio.paused, "Header navigation interrupted paused playback")
@@ -758,7 +758,6 @@ ShellRoot {
           wait(100); keyClick(Qt.Key_Escape); verify(!panel.recordingsOpen, "Second Escape did not return to player")
           panel.testSettingsButton.clicked()
           verify(panel.settingsOpen && panel.testSettings.visible && !panel.testPlayerView.visible)
-          compare(panel.testSectionTitle.text, "Settings")
           compare(panel.testSettingsTabs.count, 4)
           compare(panel.testSettingsClose.iconName, "close")
           const settingsVolume = panel.radio.volume
@@ -784,7 +783,8 @@ ShellRoot {
           panel.testBufferPresets.itemAt(1).clicked(); tryCompare(panel.radio, "bufferMinutes", 5)
           panel.testBufferPresets.itemAt(0).clicked(); tryCompare(panel.radio, "bufferMinutes", 0)
           verify(panel.testBufferDescription.text.indexOf("temporary 15-minute") >= 0)
-          panel.cursor = 33; panel.advanceCursor(1); compare(panel.cursor, 40)
+          panel.cursor = 33; panel.advanceCursor(1); compare(panel.cursor, 4)
+          panel.advanceCursor(1); compare(panel.cursor, 40)
           window.width = 320; window.height = 300
           wait(50); compare(panel.width, 320)
           panel.cursor = 43; panel.ensureCursorVisible()

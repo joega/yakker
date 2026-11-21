@@ -165,7 +165,7 @@ Ui.Panel {
     recordingsView.storageEditing = false
     stationPicker.close(); speedPicker.close(); sleepPopup.close()
     scroller.contentY = 0
-    cursor = 4
+    cursor = 30
     keyboardNavigation = true
     keyCatcher.forceActiveFocus()
   }
@@ -286,9 +286,9 @@ Ui.Panel {
     keyCatcher.forceActiveFocus()
     let order = [20,14,21,4]
     if (settingsOpen) {
-      order = [4,30,31,32,33]
-      if (captureIndicator.visible) order.unshift(58)
+      order = [30,31,32,33,4]
       if (settingsTab === "listening") order = order.concat([40,41,42,43])
+      if (captureIndicator.visible) order.push(58)
       if (dockBack.enabled) order.push(54)
       if (dockPlay.enabled) order.push(55)
       if (dockForward.enabled) order.push(56)
@@ -490,44 +490,6 @@ Ui.Panel {
           width: parent.width
           spacing: Style.space(4)
           Row {
-            visible: root.settingsOpen
-            width: parent.width
-            spacing: Style.space(8)
-            Text {
-              id: settingsSectionTitle
-              width: parent.width - settingsCloseButton.width - (captureIndicator.visible ? captureIndicator.width + parent.spacing * 2 : parent.spacing)
-              anchors.verticalCenter: parent.verticalCenter
-              text: "Settings"
-              textFormat: Text.PlainText
-              color: root.barForeground
-              font.family: root.uiFontFamily
-              font.pixelSize: Style.fontPx(1.333)
-              font.weight: Font.DemiBold
-              elide: Text.ElideRight
-            }
-            Radio.FocusButton {
-              id: captureIndicator
-              visible: Number(root.radio.recordings.activeCount) > 0
-              width: visible ? implicitWidth : 0
-              text: "● REC " + root.radio.recordings.activeCount
-              fontSize: Style.fontPx(1)
-              foreground: Commons.Color.urgent
-              tooltipText: "Background captures · Open recordings"
-              focusable: true
-              hasCursor: root.virtualFocus && root.cursor === 58
-              onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 58 } }
-              onClicked: root.openRecordings(false)
-            }
-            SettingsControl {
-              id: settingsCloseButton
-              iconName: "close"
-              tooltipText: "Close settings"
-              selected: true
-              focusable: true
-              onClicked: root.closeSettings()
-            }
-          }
-          Row {
             id: mainNavigation
             visible: !root.settingsOpen
             width: parent.width
@@ -597,16 +559,18 @@ Ui.Panel {
             }
           }
           Row {
+            id: settingsNavigation
             width: parent.width
             visible: root.settingsOpen
-            spacing: Style.space(6)
+            spacing: Style.space(4)
             Repeater {
               id: settingsTabs
               model: [{key:"listening",label:"Listening"}, {key:"storage",label:"Storage"}, {key:"alerts",label:"Alerts"}, {key:"stations",label:"Stations"}]
               NavigationTab {
                 required property var modelData
                 required property int index
-                width: (parent.width - parent.spacing * 3) / 4
+                width: (settingsNavigation.width - settingsCloseButton.width - settingsNavigation.spacing * 4) / 4
+                horizontalPadding: Style.space(4)
                 text: modelData.label
                 cursorId: 30 + index
                 fontSize: Style.fontPx(1)
@@ -620,6 +584,15 @@ Ui.Panel {
                 onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 30 + index } }
                 onClicked: root.selectSettingsTab(modelData.key)
               }
+            }
+            SettingsControl {
+              id: settingsCloseButton
+              anchors.verticalCenter: parent.verticalCenter
+              iconName: "close"
+              tooltipText: "Close settings"
+              selected: true
+              focusable: true
+              onClicked: root.closeSettings()
             }
           }
           Ui.PanelSeparator { width: parent.width }
@@ -1418,6 +1391,21 @@ Ui.Panel {
                   maximumLineCount: 2
                   elide: Text.ElideRight
                 }
+              }
+              Radio.FocusButton {
+                id: captureIndicator
+                visible: root.settingsOpen && Number(root.radio.recordings.activeCount) > 0
+                width: visible ? implicitWidth : 0
+                text: "● REC " + root.radio.recordings.activeCount
+                fontSize: Style.fontPx(1)
+                horizontalPadding: Style.space(6)
+                verticalPadding: Style.space(4)
+                foreground: Commons.Color.urgent
+                tooltipText: "Background captures · Open recordings"
+                focusable: true
+                hasCursor: root.virtualFocus && root.cursor === 58
+                onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 58 } }
+                onClicked: root.openRecordings(false)
               }
             }
             Column {
