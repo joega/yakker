@@ -11,10 +11,12 @@ Column {
   property color foreground: Commons.Color.foreground
   property var bar
   property bool embedded: false
+  property bool externalBack: false
   readonly property string uiFontFamily: "Adwaita Sans"
   property var ensureVisible: function(item) {}
   signal back()
   signal playbackShortcut(string text)
+  signal storageClosed()
   spacing: Style.space(8)
   readonly property var snapshot: radio.recordings || ({})
   readonly property bool available: radio.ready && snapshot.available === true
@@ -100,10 +102,10 @@ Column {
     if (pending) return
     localError = ""; confirmation = ""
     if (editing) { editing = false; tab = "schedules" }
-    else if (storageEditing) storageEditing = false
+    else if (storageEditing) { storageEditing = false; storageClosed() }
     else if (nowEditing) nowEditing = false
     else { back(); return }
-    activate()
+    if (visible) activate()
   }
   Keys.onEscapePressed: event => { event.accepted = true; root.goBack() }
   // Text fields consume their own letters before keys bubble to this view.
@@ -272,7 +274,7 @@ Column {
       root.localError = root.radio.recordingError || ""
       if (root.radio.recordingMutationOK) {
         if (kind === "schedule") root.editing = false
-        if (kind === "settings") root.storageEditing = false
+        if (kind === "settings") { root.storageEditing = false; root.storageClosed() }
         if (kind === "now") { root.nowEditing = false; root.tab = "library" }
       }
     }
@@ -294,8 +296,8 @@ Column {
       }
     }
   }
-  Radio.FocusButton { id: backButton; visible: !root.embedded || root.editing || root.storageEditing || root.nowEditing; width: parent.width; text: root.editing ? "← Back to schedules" : (root.storageEditing || root.nowEditing) ? "← Back" : "← Back to player"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
-  Text { width: parent.width; text: root.storageEditing ? "STORAGE" : root.nowEditing ? "RECORD NOW" : root.tab === "schedules" ? "SCHEDULES" : "RECORDINGS"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.bold: true }
+  Radio.FocusButton { id: backButton; visible: !root.externalBack && (!root.embedded || root.editing || root.storageEditing || root.nowEditing); width: parent.width; text: root.editing ? "← Back to schedules" : (root.storageEditing || root.nowEditing) ? "← Back" : "← Back to player"; foreground: root.foreground; bordered: true; focusable: true; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.goBack() }
+  Text { width: parent.width; visible: !root.externalBack; text: root.storageEditing ? "STORAGE" : root.nowEditing ? "RECORD NOW" : root.tab === "schedules" ? "SCHEDULES" : "RECORDINGS"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); font.bold: true }
   Text { width: parent.width; visible: !root.available || !!root.snapshot.error; text: !root.radio.ready ? "Recording manager disconnected." : (root.snapshot.error || "Recording manager unavailable."); textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.167); wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.localError.length > 0; text: root.localError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
   Text { width: parent.width; visible: root.pending; text: "Working…"; textFormat: Text.PlainText; color: root.foreground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }

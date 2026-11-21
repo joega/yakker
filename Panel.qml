@@ -13,6 +13,10 @@ Ui.Panel {
   property var hostWidget: null
   property int cursor: 1
   property bool settingsOpen: false
+  property string settingsReturnView: "listen"
+  property real settingsReturnScroll: 0
+  property bool settingsStorage: false
+  readonly property bool auxiliaryView: recordingsOpen || settingsOpen
   property bool recordingsOpen: false
   property bool stationEditorOpen: false
   property int pendingStationSerial: 0
@@ -48,7 +52,56 @@ Ui.Panel {
     if (text.toLowerCase() === "m") radio.toggleMute()
     if (text.toLowerCase() === "r" && !radio.wanted) radio.play()
   }
+  function openSettings() {
+    if (settingsOpen) { closeSettings(); return }
+    settingsReturnView = recordingsOpen ? recordingsView.tab : "listen"
+    settingsReturnScroll = scroller.contentY
+    recordingsOpen = false
+    settingsStorage = false
+    settingsOpen = true
+    stationPicker.close(); speedPicker.close(); sleepPopup.close()
+    scroller.contentY = 0
+    cursor = 24
+    keyCatcher.forceActiveFocus()
+  }
+  function closeSettings() {
+    if (stationMutationPending || recordingsView.pending) return
+    settingsStorage = false
+    settingsOpen = false
+    recordingsOpen = settingsReturnView !== "listen"
+    if (recordingsOpen) {
+      recordingsView.tab = settingsReturnView
+      recordingsView.editing = false
+      recordingsView.nowEditing = false
+      recordingsView.storageEditing = false
+      recordingsView.activate()
+    } else { cursor = 4; keyCatcher.forceActiveFocus() }
+    Qt.callLater(function() { scroller.contentY = Math.min(settingsReturnScroll, Math.max(0, scroller.contentHeight - scroller.height)) })
+  }
+  function backFromSettings() {
+    if (stationMutationPending || recordingsView.pending) return
+    if (settingsStorage) recordingsView.goBack()
+    else if (stationEditorOpen) { stationEditorOpen = false; cursor = 10; keyCatcher.forceActiveFocus() }
+    else closeSettings()
+  }
+  function openSettingsStorage() {
+    settingsStorage = true
+    recordingsOpen = true
+    recordingsView.tab = "library"
+    recordingsView.beginStorage()
+    scroller.contentY = 0
+  }
+  function finishSettingsStorage() {
+    if (!settingsStorage) return
+    settingsStorage = false
+    recordingsOpen = false
+    settingsOpen = true
+    cursor = 17
+    scroller.contentY = 0
+    keyCatcher.forceActiveFocus()
+  }
   function showPlayer() {
+    settingsStorage = false
     recordingsOpen = false
     settingsOpen = false
     cursor = 1
@@ -90,8 +143,13 @@ Ui.Panel {
   function advanceCursor(direction) {
     let order = [4,20,14,21]
     if (settingsOpen) {
-      order = order.concat([5,17,10])
+      order = [4,24,5,17,10]
       if (radio.station.custom) order = order.concat([11,12])
+      order = order.concat([2,3])
+      const index = Math.max(0, order.indexOf(cursor))
+      cursor = order[(index + direction + order.length) % order.length]
+      Qt.callLater(ensureCursorVisible)
+      return
     }
     order.push(0)
     if (favoriteButton.visible && favoriteButton.enabled) order.push(13)
@@ -118,7 +176,7 @@ Ui.Panel {
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
-                     addStationButton, editStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, storageButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton]
+                     addStationButton, editStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, storageButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, settingsBackButton]
     ensureItemVisible(cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : targets[cursor])
   }
   function ensureItemVisible(item) {
@@ -144,7 +202,7 @@ Ui.Panel {
     if (cursor === 0) stationPicker.toggle()
     else if (cursor === 1 && playButton.enabled) playButton.clicked()
     else if (cursor === 3) radio.toggleMute()
-    else if (cursor === 4) settingsOpen = !settingsOpen
+    else if (cursor === 4) openSettings()
     else if (cursor === 5 && settingsOpen) bufferPicker.toggle()
     else if (cursor === 6 && stopButton.enabled) radio.stop()
     else if (cursor === 7 && backButton.enabled) radio.skip(-30)
@@ -156,15 +214,17 @@ Ui.Panel {
     else if (cursor === 13 && favoriteButton.enabled) radio.toggleFavorite(radio.stationId)
     else if (cursor === 14) openRecordings(false)
     else if (cursor === 16) returnLiveButton.clicked()
-    else if (cursor === 17 && settingsOpen) openRecordings(true)
+    else if (cursor === 17 && settingsOpen) openSettingsStorage()
     else if (cursor === 18 && speedPicker.visible) speedPicker.toggle()
     else if (cursor === 19 && sleepButton.enabled) sleepButton.clicked()
     else if (cursor === 20) showPlayer()
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
+    else if (cursor === 24) backFromSettings()
     else if (cursor >= 100 && cursor < 100 + favoritePresets.length) radio.selectStation(favoritePresets[cursor - 100].id)
   }
   function openRecordings(storage) {
+    settingsStorage = false
     settingsOpen = false
     recordingsOpen = true
     if (storage) {
@@ -249,7 +309,7 @@ Ui.Panel {
       id: keyCatcher
       anchors.fill: parent
       blocked: root.recordingsOpen || sleepPopup.opened || speedPicker.popupOpen || stationPicker.popupOpen || bufferPicker.popupOpen || stationName.activeFocus || stationURL.activeFocus || stationCity.activeFocus || stationCountry.activeFocus || stationWebsite.activeFocus || saveStationButton.activeFocus || cancelStationButton.activeFocus
-      onCloseRequested: root.close()
+      onCloseRequested: root.settingsOpen ? root.backFromSettings() : root.close()
       onTabRequested: direction => root.advanceCursor(direction)
       onMoveRequested: (dx, dy) => {
         if (dy) root.advanceCursor(dy)
@@ -291,24 +351,25 @@ Ui.Panel {
               fontSize: Style.fontPx(1)
               foreground: Commons.Color.urgent
               tooltipText: "Background captures · Open recordings"
-              focusable: root.recordingsOpen
+              focusable: root.auxiliaryView
               onClicked: root.openRecordings(false)
             }
             Radio.FocusButton {
               id: settingsButton
-              iconName: "settings"
-              tooltipText: root.settingsOpen ? "Close settings" : "Open settings"
+              iconName: root.settingsOpen ? "close" : "settings"
+              tooltipText: root.settingsOpen ? "Return from settings" : "Open settings"
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
               foreground: root.barForeground
               selected: root.settingsOpen
-              focusable: root.recordingsOpen
+              focusable: root.auxiliaryView
               hasCursor: root.cursor === 4
               onHovered: hovered => { if (hovered) root.cursor = 4 }
-              onClicked: { root.settingsOpen = root.recordingsOpen || !root.settingsOpen; root.recordingsOpen = false; keyCatcher.forceActiveFocus() }
+              onClicked: root.openSettings()
             }
           }
           Row {
+            visible: !root.settingsOpen
             width: parent.width
             spacing: Style.space(6)
             Radio.FocusButton {
@@ -323,7 +384,7 @@ Ui.Panel {
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: !root.recordingsOpen
-              focusable: root.recordingsOpen
+              focusable: root.auxiliaryView
               hasCursor: root.cursor === 20
               onHovered: hovered => { if (hovered) root.cursor = 20 }
               onClicked: root.showPlayer()
@@ -344,7 +405,7 @@ Ui.Panel {
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "library"
-              focusable: root.recordingsOpen
+              focusable: root.auxiliaryView
               hasCursor: root.cursor === 14
               onHovered: hovered => { if (hovered) root.cursor = 14 }
               onClicked: root.openRecordings(false)
@@ -362,12 +423,28 @@ Ui.Panel {
               borderSpec: hasCursor || activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               foreground: root.barForeground
               selected: root.recordingsOpen && recordingsView.tab === "schedules"
-              focusable: root.recordingsOpen
+              focusable: root.auxiliaryView
               hasCursor: root.cursor === 21
               onHovered: hovered => { if (hovered) root.cursor = 21 }
               onClicked: root.openSchedules()
               Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.bottomMargin: -Style.space(4); height: Style.space(2); color: Commons.Color.accent; visible: parent.selected }
             }
+          }
+          Row {
+            width: parent.width
+            visible: root.settingsOpen
+            spacing: Style.space(8)
+            Radio.FocusButton {
+              id: settingsBackButton
+              iconName: "left"
+              text: "Back"
+              foreground: root.barForeground
+              hasCursor: root.cursor === 24
+              focusable: root.auxiliaryView
+              onHovered: hovered => { if (hovered) root.cursor = 24 }
+              onClicked: root.backFromSettings()
+            }
+            Text { anchors.verticalCenter: parent.verticalCenter; text: root.stationEditorOpen ? (root.editingStationId ? "Edit station" : "Add station") : root.settingsStorage ? "Recording storage" : "Settings"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.5); font.weight: Font.DemiBold }
           }
           Ui.PanelSeparator { width: parent.width }
         }
@@ -391,192 +468,225 @@ Ui.Panel {
               width: parent.width
               visible: root.recordingsOpen
               embedded: true
+              externalBack: root.settingsStorage
               radio: root.radio
               foreground: root.barForeground
               bar: root.bar
               ensureVisible: root.ensureItemVisible
               onBack: root.showPlayer()
               onPlaybackShortcut: text => root.playbackShortcut(text)
+              onStorageClosed: root.finishSettingsStorage()
             }
             Column {
+              id: settingsView
               width: parent.width
-              visible: !root.recordingsOpen
-              spacing: Style.space(16)
+              spacing: Style.space(12)
+              visible: root.settingsOpen && !root.recordingsOpen
+              Text { width: parent.width; visible: !root.stationEditorOpen; text: "Listening"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
+              Ui.Dropdown {
+                id: bufferPicker
+                visible: !root.stationEditorOpen
+                fontFamily: root.uiFontFamily
+                width: parent.width
+                label: "Listening buffer"
+                options: [{value:"0",label:"Live only"}, {value:"5",label:"5 minutes"}, {value:"15",label:"15 minutes"}, {value:"30",label:"30 minutes"}]
+                value: String(root.radio.bufferMinutes)
+                foreground: root.barForeground
+                hasCursor: root.cursor === 5
+                onHovered: hovered => { if (hovered) root.cursor = 5 }
+                onChanged: value => { root.radio.setBufferMinutes(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
+              }
+              Text {
+                width: parent.width
+                visible: !root.stationEditorOpen
+                text: "Replay stays in memory. In Live only, Pause starts a temporary 15-minute buffer. Changing this setting clears history and returns to live."
+                textFormat: Text.PlainText
+                color: root.barForeground
+                opacity: 0.8
+                font.family: root.uiFontFamily
+                font.pixelSize: Style.fontPx(1)
+                wrapMode: Text.WordWrap
+              }
+              Text { width: parent.width; visible: !root.stationEditorOpen; text: "Recordings"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
+              Radio.FocusButton {
+                id: storageButton
+                enabled: root.radio.ready && root.radio.recordings.available === true
+                tooltipText: enabled ? "Recording folder, space limits and capture alerts" : "Recording manager unavailable"
+                opacity: enabled ? 1 : 0.4
+                width: parent.width
+                text: "Storage & notifications"
+                iconName: "folder"
+                leftAlign: true
+                height: Style.space(42)
+                visible: !root.stationEditorOpen
+                foreground: root.barForeground
+                bordered: true
+                hasCursor: root.cursor === 17
+                onHovered: hovered => { if (hovered) root.cursor = 17 }
+                onClicked: root.openSettingsStorage()
+              }
+              Text { width: parent.width; visible: !root.stationEditorOpen; text: "Stations"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
+              Radio.FocusButton {
+                id: addStationButton
+                width: parent.width
+                text: "Add custom station"
+                iconName: "plus"
+                leftAlign: true
+                height: Style.space(42)
+                visible: !root.stationEditorOpen
+                foreground: root.barForeground
+                bordered: true
+                hasCursor: root.cursor === 10
+                onHovered: hovered => { if (hovered) root.cursor = 10 }
+                onClicked: root.openStationEditor(false)
+              }
+              Radio.FocusButton {
+                id: editStationButton
+                width: parent.width
+                visible: root.radio.station.custom === true && !root.stationEditorOpen
+                text: "Edit " + root.radio.station.name
+                leftAlign: true
+                foreground: root.barForeground
+                bordered: true
+                hasCursor: root.cursor === 11
+                onHovered: hovered => { if (hovered) root.cursor = 11 }
+                onClicked: root.openStationEditor(true)
+              }
+              Radio.FocusButton {
+                id: deleteStationButton
+                width: parent.width
+                visible: root.radio.station.custom === true && !root.stationEditorOpen
+                leftAlign: true
+                foreground: Commons.Color.urgent
+                text: root.stationMutationPending && !root.stationEditorOpen ? "Deleting…"
+                  : root.confirmStationDelete ? "Confirm delete selected station" : "Delete selected custom station"
+                bordered: true
+                hasCursor: root.cursor === 12
+                onHovered: hovered => { if (hovered) root.cursor = 12 }
+                onClicked: root.deleteStation()
+              }
               Column {
                 width: parent.width
-                spacing: Style.space(8)
-                visible: root.settingsOpen
-                Ui.Dropdown {
-                  id: bufferPicker
-                  width: parent.width
-                  label: "Listening buffer"
-                  options: [{value:"0",label:"Live only"}, {value:"5",label:"5 minutes"}, {value:"15",label:"15 minutes"}, {value:"30",label:"30 minutes"}]
-                  value: String(root.radio.bufferMinutes)
-                  foreground: root.barForeground
-                  hasCursor: root.cursor === 5
-                  onHovered: hovered => { if (hovered) root.cursor = 5 }
-                  onChanged: value => { root.radio.setBufferMinutes(Number(value)); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
-                }
-                Text {
-                  width: parent.width
-                  text: "Pause in Live only starts a temporary 15-minute buffer for this session. Audio stays in memory; no files are recorded. Changing this setting clears history and returns to live."
-                  textFormat: Text.PlainText
-                  color: root.barForeground
-                  opacity: 0.8
+                spacing: Style.space(6)
+                visible: root.stationEditorOpen
+                Ui.TextField {
                   font.family: root.uiFontFamily
-                  font.pixelSize: Style.fontPx(1)
-                  wrapMode: Text.WordWrap
-                }
-                Radio.FocusButton {
-                  id: storageButton
+                  font.pixelSize: Style.fontPx(1.167)
+                  id: stationName
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationName) })
                   width: parent.width
-                  text: "Recording storage settings"
+                  placeholderText: "Name (required)"
+                  Accessible.name: placeholderText
                   foreground: root.barForeground
-                  bordered: true
-                  hasCursor: root.cursor === 17
-                  onHovered: hovered => { if (hovered) root.cursor = 17 }
-                  onClicked: root.openRecordings(true)
+                  maximumLength: 160
+                  KeyNavigation.tab: stationURL
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
                 }
-                Radio.FocusButton {
-                  id: addStationButton
-                  width: parent.width
-                  text: "Add custom station"
-                  foreground: root.barForeground
-                  bordered: true
-                  hasCursor: root.cursor === 10
-                  onHovered: hovered => { if (hovered) root.cursor = 10 }
-                  onClicked: root.openStationEditor(false)
-                }
-                Radio.FocusButton {
-                  id: editStationButton
-                  width: parent.width
-                  visible: root.radio.station.custom === true
-                  text: "Edit selected custom station"
-                  foreground: root.barForeground
-                  bordered: true
-                  hasCursor: root.cursor === 11
-                  onHovered: hovered => { if (hovered) root.cursor = 11 }
-                  onClicked: root.openStationEditor(true)
-                }
-                Radio.FocusButton {
-                  id: deleteStationButton
-                  width: parent.width
-                  visible: root.radio.station.custom === true
-                  text: root.stationMutationPending && !root.stationEditorOpen ? "Deleting…"
-                    : root.confirmStationDelete ? "Confirm delete selected station" : "Delete selected custom station"
-                  foreground: root.barForeground
-                  bordered: true
-                  hasCursor: root.cursor === 12
-                  onHovered: hovered => { if (hovered) root.cursor = 12 }
-                  onClicked: root.deleteStation()
-                }
-                Column {
-                  width: parent.width
-                  spacing: Style.space(6)
-                  visible: root.stationEditorOpen
-                  Ui.TextField {
-                    id: stationName
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationName) })
-                    width: parent.width
-                    placeholderText: "Name (required)"
-                    Accessible.name: placeholderText
-                    foreground: root.barForeground
-                    maximumLength: 160
-                    KeyNavigation.tab: stationURL
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                  }
-                  Ui.TextField {
-                    id: stationURL
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationURL) })
-                    width: parent.width
-                    placeholderText: "HTTP(S) audio URL (required)"
-                    Accessible.name: placeholderText
-                    foreground: root.barForeground
-                    maximumLength: 2048
-                    KeyNavigation.tab: stationCity
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                  }
-                  Ui.TextField {
-                    id: stationCity
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationCity) })
-                    width: parent.width
-                    placeholderText: "City (optional)"
-                    Accessible.name: placeholderText
-                    foreground: root.barForeground
-                    maximumLength: 100
-                    KeyNavigation.tab: stationCountry
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                  }
-                  Ui.TextField {
-                    id: stationCountry
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationCountry) })
-                    width: parent.width
-                    placeholderText: "Country (optional)"
-                    Accessible.name: placeholderText
-                    foreground: root.barForeground
-                    maximumLength: 100
-                    KeyNavigation.tab: stationWebsite
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                  }
-                  Ui.TextField {
-                    id: stationWebsite
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationWebsite) })
-                    width: parent.width
-                    placeholderText: "HTTP(S) website (optional)"
-                    Accessible.name: placeholderText
-                    foreground: root.barForeground
-                    maximumLength: 2048
-                    KeyNavigation.tab: saveStationButton
-                    Keys.onReturnPressed: root.saveStation()
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                  }
-                  Radio.FocusButton {
-                    id: saveStationButton
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(saveStationButton) })
-                    width: parent.width
-                    text: root.stationMutationPending ? "Saving…" : "Save station"
-                    foreground: root.barForeground
-                    bordered: true
-                    focusable: true
-                    KeyNavigation.tab: cancelStationButton
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                    onClicked: root.saveStation()
-                  }
-                  Radio.FocusButton {
-                    id: cancelStationButton
-                    onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(cancelStationButton) })
-                    width: parent.width
-                    text: "Cancel"
-                    foreground: root.barForeground
-                    bordered: true
-                    focusable: true
-                    KeyNavigation.tab: stationName
-                    Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                    onClicked: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
-                  }
-                }
-                Text {
-                  width: parent.width
-                  visible: text.length > 0
-                  text: root.stationError || root.radio.customCatalogError
-                  textFormat: Text.PlainText
-                  color: Commons.Color.urgent
+                Ui.TextField {
                   font.family: root.uiFontFamily
-                  font.pixelSize: Style.fontPx(1)
-                  wrapMode: Text.Wrap
-                }
-                Text {
+                  font.pixelSize: Style.fontPx(1.167)
+                  id: stationURL
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationURL) })
                   width: parent.width
-                  text: "Keyboard: P Pause/resume · [ ] Skip 30 sec · G Go live · M Mute · ← → Volume"
-                  textFormat: Text.PlainText
-                  color: root.barForeground
-                  opacity: 0.8
-                  font.family: root.uiFontFamily
-                  font.pixelSize: Style.fontPx(1)
-                  wrapMode: Text.Wrap
+                  placeholderText: "HTTP(S) audio URL (required)"
+                  Accessible.name: placeholderText
+                  foreground: root.barForeground
+                  maximumLength: 2048
+                  KeyNavigation.tab: stationCity
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
                 }
-                Ui.PanelSeparator { width: parent.width }
+                Ui.TextField {
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1.167)
+                  id: stationCity
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationCity) })
+                  width: parent.width
+                  placeholderText: "City (optional)"
+                  Accessible.name: placeholderText
+                  foreground: root.barForeground
+                  maximumLength: 100
+                  KeyNavigation.tab: stationCountry
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
+                }
+                Ui.TextField {
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1.167)
+                  id: stationCountry
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationCountry) })
+                  width: parent.width
+                  placeholderText: "Country (optional)"
+                  Accessible.name: placeholderText
+                  foreground: root.barForeground
+                  maximumLength: 100
+                  KeyNavigation.tab: stationWebsite
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
+                }
+                Ui.TextField {
+                  font.family: root.uiFontFamily
+                  font.pixelSize: Style.fontPx(1.167)
+                  id: stationWebsite
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(stationWebsite) })
+                  width: parent.width
+                  placeholderText: "HTTP(S) website (optional)"
+                  Accessible.name: placeholderText
+                  foreground: root.barForeground
+                  maximumLength: 2048
+                  KeyNavigation.tab: saveStationButton
+                  Keys.onReturnPressed: root.saveStation()
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
+                }
+                Radio.FocusButton {
+                  id: saveStationButton
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(saveStationButton) })
+                  width: parent.width
+                  text: root.stationMutationPending ? "Saving…" : "Save station"
+                  foreground: root.barForeground
+                  bordered: true
+                  focusable: true
+                  KeyNavigation.tab: cancelStationButton
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
+                  onClicked: root.saveStation()
+                }
+                Radio.FocusButton {
+                  id: cancelStationButton
+                  onActiveFocusChanged: if (activeFocus) Qt.callLater(function() { root.ensureItemVisible(cancelStationButton) })
+                  width: parent.width
+                  text: "Cancel"
+                  foreground: root.barForeground
+                  bordered: true
+                  focusable: true
+                  KeyNavigation.tab: stationName
+                  Keys.onEscapePressed: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
+                  onClicked: { root.stationEditorOpen = false; keyCatcher.forceActiveFocus() }
+                }
               }
+              Text {
+                width: parent.width
+                visible: text.length > 0
+                text: root.stationError || root.radio.customCatalogError
+                textFormat: Text.PlainText
+                color: Commons.Color.urgent
+                font.family: root.uiFontFamily
+                font.pixelSize: Style.fontPx(1)
+                wrapMode: Text.Wrap
+              }
+              Text { width: parent.width; visible: !root.stationEditorOpen; text: "Keyboard shortcuts"; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
+              Repeater {
+                model: root.stationEditorOpen ? [] : [ {key:"P", action:"Pause / resume"}, {key:"[  /  ]", action:"Skip 30 seconds"}, {key:"G", action:"Return to live"}, {key:"M", action:"Mute / unmute"}, {key:"←  /  →", action:"Adjust volume"} ]
+                Row {
+                  required property var modelData
+                  width: settingsView.width
+                  Text { width: parent.width * 0.64; text: modelData.action; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
+                  Text { width: parent.width * 0.36; text: modelData.key; textFormat: Text.PlainText; color: root.barForeground; horizontalAlignment: Text.AlignRight; font.family: Style.font.family; font.pixelSize: Style.fontPx(0.917) }
+                }
+              }
+            }
+            Column {
+              id: playerView
+              width: parent.width
+              visible: !root.auxiliaryView
+              spacing: Style.space(16)
+
 
               Row {
                 width: parent.width
@@ -1000,7 +1110,7 @@ Ui.Panel {
           Ui.PanelSeparator { width: parent.width }
           Row {
             width: parent.width
-            visible: root.recordingsOpen
+            visible: root.auxiliaryView
             spacing: Style.space(8)
             Radio.StationLogo { width: Style.space(36); height: width; station: root.radio.playbackStation; fallbackColor: Commons.Color.accent; anchors.verticalCenter: parent.verticalCenter }
             Column {
@@ -1015,7 +1125,7 @@ Ui.Panel {
             Radio.FocusButton { id: dockForward; width: Style.space(30); horizontalPadding: 0; iconName: "forward"; tooltipText: "Forward 30 seconds"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.canForward; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.skip(30) }
             Radio.FocusButton { id: dockStop; width: Style.space(30); horizontalPadding: 0; iconName: "stop"; tooltipText: "Stop listening"; Accessible.role: Accessible.Button; Accessible.name: tooltipText; foreground: root.barForeground; enabled: root.radio.wanted; opacity: enabled ? 1 : 0.35; focusable: true; onClicked: root.radio.stop() }
           }
-          Text { width: parent.width; visible: root.recordingsOpen && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
+          Text { width: parent.width; visible: root.auxiliaryView && text.length > 0; text: root.radio.error || root.radio.playbackProgressError; textFormat: Text.PlainText; color: Commons.Color.urgent; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
           Row {
             width: parent.width
             spacing: Style.space(8)
@@ -1028,8 +1138,8 @@ Ui.Panel {
               Accessible.role: Accessible.Button
               Accessible.name: tooltipText
               foreground: root.barForeground
-              focusable: root.recordingsOpen
-              hasCursor: !root.recordingsOpen && root.cursor === 3
+              focusable: root.auxiliaryView
+              hasCursor: root.cursor === 3
               onHovered: hovered => { if (hovered) root.cursor = 3 }
               onClicked: root.radio.toggleMute()
             }
@@ -1038,7 +1148,7 @@ Ui.Panel {
               implicitHeight: volumeSlider.implicitHeight + Style.space(4)
               color: "transparent"
               radius: Style.cornerRadius
-              borderSpec: (root.cursor === 2 && !root.recordingsOpen) || volumeSlider.activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
+              borderSpec: (root.cursor === 2) || volumeSlider.activeFocus ? Border.controlSpec("focus", root.barForeground, Commons.Color.accent) : Border.none()
               Ui.PanelSlider {
                 id: volumeSlider
                 anchors.fill: parent
@@ -1053,7 +1163,7 @@ Ui.Panel {
                 knobColor: root.barForeground
                 trackColor: Qt.alpha(root.barForeground, 0.15)
                 Accessible.name: "Volume"
-                activeFocusOnTab: root.recordingsOpen
+                activeFocusOnTab: root.auxiliaryView
                 Keys.onLeftPressed: root.radio.commitVolume(root.radio.volume - 5)
                 Keys.onRightPressed: root.radio.commitVolume(root.radio.volume + 5)
                 onMoved: value => { root.cursor = 2; root.radio.setVolume(value) }

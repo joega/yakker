@@ -123,7 +123,8 @@ ShellRoot {
           capture("settings")
           panel.settingsOpen = false
           selectExample("sportsnet-590")
-          panel.openRecordings(true)
+          panel.openSettings()
+          panel.openSettingsStorage()
           capture("storage")
           console.log("YAKKER_README_SCREENSHOTS_PASS")
         } catch (error) {

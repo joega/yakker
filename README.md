@@ -32,7 +32,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 | :---: | :---: | :---: |
 | [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedule.png" alt="Schedule editor with weekly or one-time choices, date, start and end times, timezone, and preview" width="240">](docs/yakker-schedule.png) | [<img src="docs/yakker-settings.png" alt="Settings with listening buffer, recording storage, and custom station controls" width="240">](docs/yakker-settings.png) |
 
-Yakker follows your active Omarchy theme. Screenshots use Catppuccin Latte.
+Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
 _Select any screenshot to enlarge it. Screens show the current native UI with
 illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
@@ -141,7 +141,7 @@ main transport row, with a larger Play/Pause control; **Record**, **Sleep**, and
 an active player; **Stop** releases it. Playing a stopped radio starts a fresh
 live stream. Closing the popup leaves audio playing.
 Right-click the bar icon to open the station list directly.
-The popup includes a searchable station selector, volume, mute, connection status, and Retry after errors.
+The popup includes a text-style searchable station selector, volume, mute, connection status, and Retry after errors. Compact underline tabs and proportional typography keep the station name and transport controls prominent.
 Search by station, city or country—for example, `690`, `Seattle`, `UK` or `Ireland`.
 Changing stations while playing makes a fresh live connection; while stopped it
 selects the next station without starting playback. The last station, volume,
@@ -408,6 +408,12 @@ Arguments are parsed locally; the widget's JSON protocol stays internal.
 This is a plain line-oriented CLI; each command requires Enter.
 
 ## Settings and stations
+
+The gear opens a dedicated Settings page, replacing the main player while keeping
+a compact playback dock available. Back or Escape returns to the section you
+came from. Settings groups listening preferences, recording storage and alerts,
+custom stations, and keyboard shortcuts. Storage and the station editor open
+as separate pages; saving or cancelling storage returns to Settings.
 
 In Settings, use **Add custom station** to save a name and HTTP(S) audio stream URL; city, country, and website are optional. Select a saved custom station in the station picker to edit or delete it. Deleting the selected station stops playback and clears the selection so you can choose another. Editing its stream URL reconnects if it was playing. Yakker does not fetch or test a URL until you play it.
 
