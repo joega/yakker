@@ -117,6 +117,23 @@ func (r *controller) applyRecordingCommand(action string, data map[string]json.R
 		return err
 	}
 	switch action {
+	case "startRecording":
+		var stationID string
+		var minutes int
+		if err := decodeRecordingField(data, "stationId", &stationID); err != nil {
+			return err
+		}
+		if err := decodeRecordingField(data, "durationMinutes", &minutes); err != nil {
+			return err
+		}
+		if minutes < 1 || minutes > 720 {
+			return errors.New("Recording duration must be between 1 and 720 minutes.")
+		}
+		schedule := recording.Schedule{StationID: stationID}
+		if err := r.resolveRecordingStation(&schedule, true); err != nil {
+			return err
+		}
+		return r.recorder.StartNow(revision, schedule, time.Duration(minutes)*time.Minute)
 	case "recordingSettings":
 		var settings recording.Settings
 		if err := decodeRecordingField(data, "settings", &settings); err != nil {
@@ -178,17 +195,39 @@ func (r *controller) playRecordingCommand(data map[string]json.RawMessage) error
 	if err := decodeRecordingField(data, "id", &id); err != nil {
 		return err
 	}
+	var fromStart bool
+	if _, ok := data["fromStart"]; ok {
+		if err := decodeRecordingField(data, "fromStart", &fromStart); err != nil {
+			return err
+		}
+	}
 	item, path, err := r.recorder.RecordingPath(id)
 	if err != nil {
 		return err
 	}
 	r.stop()
+	// Stopping may have just checkpointed this same recording.
+	item, path, err = r.recorder.RecordingPath(id)
+	if err != nil {
+		return err
+	}
+	if fromStart {
+		if err := r.recorder.SetPlaybackPosition(id, 0); err != nil {
+			return err
+		}
+		item.ResumePosition = 0
+	}
+	r.state.PlaybackProgressError = ""
 	r.state.PlaybackKind, r.state.RecordingID = "recording", item.ID
 	r.state.RecordingTitle = item.Label
 	if r.state.RecordingTitle == "" {
 		r.state.RecordingTitle = item.StationName
 	}
 	r.state.Duration, r.recordingPath = item.DurationSeconds, path
+	r.recordingStart = item.ResumePosition
+
+	r.state.PlaybackSpeed = 1
+	r.lastCheckpoint = time.Time{}
 	r.startRecordingPlayback()
 	return nil
 }
@@ -206,9 +245,11 @@ func (r *controller) startRecordingPlayback() {
 }
 
 func (r *controller) selectLivePlayback() {
+	r.state.PlaybackProgressError = ""
 	r.state.PlaybackKind = "live"
 	r.state.RecordingID, r.state.RecordingTitle, r.recordingPath = "", "", ""
 	r.state.Duration = 0
+	r.state.PlaybackSpeed, r.recordingStart = 1, 0
 }
 
 func (r *controller) seekRecordingCommand(data map[string]json.RawMessage) error {
@@ -249,4 +290,96 @@ func (r *controller) fileTicker() {
 	if r.dvrTicker == nil {
 		r.dvrTicker = time.NewTicker(r.cfg.DVRPollInterval)
 	}
+}
+
+// Progress belongs to the current player and is written only by the manager.
+func (r *controller) checkpoint(force, completed bool) {
+	if r.recorder == nil || r.player == nil || r.state.PlaybackKind != "recording" || r.state.RecordingID == "" {
+		return
+	}
+	now := time.Now()
+	if r.cfg.Now != nil {
+		now = r.cfg.Now()
+	}
+	if !force && !r.lastCheckpoint.IsZero() && now.Sub(r.lastCheckpoint) < 10*time.Second {
+		return
+	}
+	position := r.currentPosition()
+	if completed || (r.state.Duration > 0 && position >= math.Max(0, r.state.Duration-2)) {
+		position = 0
+	}
+	if err := r.recorder.SetPlaybackPosition(r.state.RecordingID, position); err != nil {
+		r.state.PlaybackProgressError = head("Unable to save playback position: "+err.Error(), 240)
+		return
+	}
+	r.state.PlaybackProgressError = ""
+	r.recordingStart = position
+	r.lastCheckpoint = now
+	r.refreshRecordings()
+}
+
+func (r *controller) speedCommand(data map[string]json.RawMessage) error {
+	var value float64
+	if err := decodeRecordingField(data, "value", &value); err != nil {
+		return err
+	}
+	if value != .75 && value != 1 && value != 1.25 && value != 1.5 && value != 2 {
+		return errors.New("Choose a supported playback speed.")
+	}
+	if r.state.PlaybackKind != "recording" || !r.state.Wanted {
+		return errors.New("Play a recording before changing speed.")
+	}
+	if err := r.ipc([]any{"set_property", "speed", value}); err != nil {
+		return err
+	}
+	r.state.PlaybackSpeed = value
+	return nil
+}
+
+func (r *controller) sleepCommand(data map[string]json.RawMessage) error {
+	var minutes int
+	if err := decodeRecordingField(data, "minutes", &minutes); err != nil {
+		return err
+	}
+	if minutes < 0 || minutes > 240 {
+		return errors.New("Sleep timer must be between 0 and 240 minutes.")
+	}
+	r.cancelSleep()
+	if minutes == 0 {
+		return nil
+	}
+	now := time.Now()
+	if r.cfg.Now != nil {
+		now = r.cfg.Now()
+	}
+	r.sleepDeadline = now.Add(time.Duration(minutes) * time.Minute)
+	r.state.SleepRemaining = minutes * 60
+	r.sleepTicker = time.NewTicker(time.Second)
+	return nil
+}
+
+func (r *controller) cancelSleep() {
+	if r.sleepTicker != nil {
+		r.sleepTicker.Stop()
+		r.sleepTicker = nil
+	}
+	r.sleepDeadline = time.Time{}
+	r.state.SleepRemaining = 0
+}
+
+func (r *controller) updateSleep() {
+	if r.sleepDeadline.IsZero() {
+		return
+	}
+	now := time.Now()
+	if r.cfg.Now != nil {
+		now = r.cfg.Now()
+	}
+	remaining := r.sleepDeadline.Sub(now)
+	if remaining <= 0 {
+		r.cancelSleep()
+		r.stop()
+		return
+	}
+	r.state.SleepRemaining = int(math.Ceil(remaining.Seconds()))
 }

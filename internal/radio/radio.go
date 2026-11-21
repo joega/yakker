@@ -57,6 +57,7 @@ type Status struct {
 	RecordingMutationSerial int64               `json:"recordingMutationSerial"`
 	RecordingMutationOK     bool                `json:"recordingMutationOK"`
 	RecordingError          string              `json:"recordingError"`
+	PlaybackProgressError   string              `json:"playbackProgressError"`
 	SchedulePreview         *recording.Schedule `json:"schedulePreview,omitempty"`
 	SchedulePreviewSerial   int64               `json:"schedulePreviewSerial"`
 	SchedulePreviewError    string              `json:"schedulePreviewError"`
@@ -64,6 +65,8 @@ type Status struct {
 	RecordingID             string              `json:"recordingId"`
 	RecordingTitle          string              `json:"recordingTitle"`
 	Duration                float64             `json:"duration"`
+	PlaybackSpeed           float64             `json:"playbackSpeed"`
+	SleepRemaining          int                 `json:"sleepRemaining"`
 }
 
 // Config overrides are used by the standalone CLI and tests; normal plugin
@@ -84,6 +87,7 @@ type Config struct {
 	DVRWindow             time.Duration
 	DVRPollInterval       time.Duration
 	DVRBytes              int64
+	Now                   func() time.Time
 }
 
 func LoadStations(path string) ([]Station, error) {
@@ -120,6 +124,9 @@ func LoadStations(path string) ([]Station, error) {
 }
 
 func (c *Config) defaults() error {
+	if c.Now == nil {
+		c.Now = time.Now
+	}
 	if c.StationFile == "" {
 		executable, err := os.Executable()
 		if err != nil {
@@ -227,25 +234,29 @@ type inputLine struct {
 }
 
 type controller struct {
-	cfg           Config
-	state         Status
-	stations      []Station
-	bundled       []Station
-	custom        []CustomStation
-	customPath    string
-	customLoadErr error
-	socket        string
-	mpris         string
-	player        *player
-	events        chan playerEvent
-	timer         *time.Timer
-	timerKind     string
-	output        *json.Encoder
-	logs          io.Writer
-	writeErr      error
-	dvrTicker     *time.Ticker
-	recorder      *recording.Manager
-	recordingPath string
+	cfg            Config
+	state          Status
+	stations       []Station
+	bundled        []Station
+	custom         []CustomStation
+	customPath     string
+	customLoadErr  error
+	socket         string
+	mpris          string
+	player         *player
+	events         chan playerEvent
+	timer          *time.Timer
+	timerKind      string
+	output         *json.Encoder
+	logs           io.Writer
+	writeErr       error
+	dvrTicker      *time.Ticker
+	recorder       *recording.Manager
+	recordingPath  string
+	recordingStart float64
+	lastCheckpoint time.Time
+	sleepDeadline  time.Time
+	sleepTicker    *time.Ticker
 }
 
 func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Writer) error {
@@ -282,11 +293,12 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 	}
 	defer lock.Close()
 	r := &controller{cfg: cfg, stations: stations, bundled: bundled, custom: custom, customPath: customPath, customLoadErr: customErr, socket: filepath.Join(dir, "mpv.sock"), events: make(chan playerEvent, 64), output: json.NewEncoder(output), logs: logs,
-		state: Status{State: "stopped", PlaybackKind: "live", Volume: 65, Station: Station{}, Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
+		state: Status{State: "stopped", PlaybackKind: "live", PlaybackSpeed: 1, Volume: 65, Station: Station{}, Stations: stations, BufferMinutes: int(cfg.DVRWindow / time.Minute)}}
 	if customErr != nil {
 		r.state.CustomStationError = "Unable to load custom stations; repair the file and restart Yakker."
 	}
 	defer r.cleanup()
+	defer r.cancelSleep()
 	defer r.clearTimer()
 	if useRecordings {
 		r.openRecorder()
@@ -329,6 +341,10 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 		if r.dvrTicker != nil {
 			dvrTick = r.dvrTicker.C
 		}
+		var sleepTick <-chan time.Time
+		if r.sleepTicker != nil {
+			sleepTick = r.sleepTicker.C
+		}
 		var recordingUpdates <-chan struct{}
 		if r.recorder != nil {
 			recordingUpdates = r.recorder.Updates()
@@ -356,9 +372,13 @@ func Run(ctx context.Context, cfg Config, input io.Reader, output, logs io.Write
 			if quit {
 				return nil
 			}
+		case <-sleepTick:
+			r.updateSleep()
+			_ = r.publish()
 		case <-dvrTick:
 			if r.state.PlaybackKind == "recording" {
 				r.state.Position = r.currentPosition()
+				r.checkpoint(false, false)
 				_ = r.publish()
 			} else {
 				r.updateDVR()
@@ -441,10 +461,14 @@ func (r *controller) command(raw []byte) (bool, error) {
 	switch action {
 	case "previewSchedule":
 		r.previewScheduleCommand(data)
-	case "recordingSettings", "upsertSchedule", "deleteSchedule", "stopRecording", "deleteRecording":
+	case "startRecording", "recordingSettings", "upsertSchedule", "deleteSchedule", "stopRecording", "deleteRecording":
 		r.recordingCommand(action, data)
 	case "playRecording":
 		return false, r.playRecordingCommand(data)
+	case "speed":
+		return false, r.speedCommand(data)
+	case "sleepTimer":
+		return false, r.sleepCommand(data)
 	case "seekRecording":
 		return false, r.seekRecordingCommand(data)
 	case "upsertStation", "deleteStation":
@@ -564,6 +588,7 @@ func (r *controller) command(raw []byte) (bool, error) {
 		}
 		return false, r.setPaused(false)
 	case "stop":
+		r.cancelSleep()
 		r.stop()
 	case "volume":
 		var value float64
@@ -609,6 +634,7 @@ func (r *controller) play() {
 	r.start()
 }
 func (r *controller) stop() {
+	r.checkpoint(true, false)
 	r.state.Wanted = false
 	r.state.Paused = false
 	r.state.TemporaryBuffer = false
@@ -675,6 +701,9 @@ func (r *controller) start() {
 	args = append(args, "--no-config", "--load-scripts=no", "--no-video", "--no-audio-display", "--idle=no", "--terminal=no", "--input-terminal=no", "--keep-open=no",
 		"--cache="+cacheEnabled, fmt.Sprintf("--cache-secs=%g", cacheSeconds), fmt.Sprintf("--demuxer-max-bytes=%d", bytes), fmt.Sprintf("--demuxer-max-back-bytes=%d", backBytes), "--demuxer-donate-buffer=no", "--demuxer-seekable-cache=yes", "--cache-on-disk=no", "--network-timeout=15", "--msg-level=all=warn",
 		"--input-ipc-server="+r.socket, fmt.Sprintf("--volume=%d", r.state.Volume), "--mute="+map[bool]string{true: "yes", false: "no"}[r.state.Muted], "--force-media-title="+title)
+	if r.state.PlaybackKind == "recording" {
+		args = append(args, fmt.Sprintf("--start=%g", r.recordingStart), fmt.Sprintf("--speed=%g", r.state.PlaybackSpeed), "--audio-pitch-correction=yes")
+	}
 	if r.mpris != "" {
 		args = append(args, "--script="+r.mpris)
 	}
@@ -695,6 +724,7 @@ func (r *controller) start() {
 		return
 	}
 	p := &player{cmd: cmd, done: make(chan struct{}), closed: make(chan struct{}), logs: logs, started: time.Now(), socketDeadline: time.Now().Add(5 * time.Second)}
+	p.position.Store(math.Float64bits(r.recordingStart))
 	r.player = p
 	r.state.PlayerPID = cmd.Process.Pid
 	go func() { _ = cmd.Wait(); close(p.done) }()
@@ -719,6 +749,12 @@ func (r *controller) connect() {
 	// latest preferences before observing initial player values.
 	for _, command := range [][]any{{"set_property", "volume", r.state.Volume}, {"set_property", "mute", r.state.Muted}, {"set_property", "pause", r.state.Paused}} {
 		if err := r.ipc(command); err != nil {
+			r.fail(err.Error())
+			return
+		}
+	}
+	if r.state.PlaybackKind == "recording" {
+		if err := r.ipc([]any{"set_property", "speed", r.state.PlaybackSpeed}); err != nil {
 			r.fail(err.Error())
 			return
 		}
@@ -782,6 +818,7 @@ func (r *controller) fail(message string) {
 	if r.player != nil && time.Since(r.player.started) > r.cfg.ResetAfter && (r.state.State == "playing" || r.state.State == "paused") {
 		r.state.Retry = 0
 	}
+	r.checkpoint(true, false)
 	r.cleanup()
 	r.clearTimer()
 	if !r.state.Wanted {
@@ -858,6 +895,12 @@ func (r *controller) event(event mpvEvent) {
 	if kind == "end-file" {
 		reason := event.Reason
 		if reason == "stop" || (r.state.PlaybackKind == "recording" && reason == "eof") {
+			if reason == "eof" {
+				r.checkpoint(true, true)
+				if r.player != nil {
+					r.player.position.Store(0)
+				}
+			}
 			r.stop()
 			_ = r.publish()
 			return
@@ -932,6 +975,9 @@ func (r *controller) event(event mpvEvent) {
 					break
 				}
 				r.state.Paused = paused
+				if paused {
+					r.checkpoint(true, false)
+				}
 				if paused {
 					r.state.State = "paused"
 				} else if r.state.State == "paused" {

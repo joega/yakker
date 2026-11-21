@@ -124,6 +124,9 @@ func (r *controller) setPaused(paused bool) error {
 		r.after("deadline", r.cfg.StallTimeout)
 	}
 	r.state.Paused = paused
+	if paused {
+		r.checkpoint(true, false)
+	}
 	r.state.Position = r.currentPosition()
 	if paused {
 		r.state.State = "paused"

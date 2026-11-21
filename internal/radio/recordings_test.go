@@ -255,13 +255,16 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 		t.Fatal(state.RecordingError)
 	}
 	now := time.Now().UTC()
-	for i := 0; i < 2; i++ {
-		rule := recording.Schedule{Label: []string{"First", "Second"}[i], StationID: "one", Weekdays: []int{int(now.Weekday())}, StartTime: now.Format("15:04"), EndTime: now.Add(3 * time.Minute).Format("15:04"), Timezone: "UTC", Enabled: true}
-		serial = h.send("upsertSchedule", "revision", state.Recordings.Revision, "schedule", rule)
-		state = h.wait(func(s Status) bool { return s.RecordingMutationSerial == serial })
-		if !state.RecordingMutationOK {
-			t.Fatal(state.RecordingError)
-		}
+	serial = h.send("startRecording", "revision", state.Recordings.Revision, "stationId", "one", "durationMinutes", 15, "stationName", "Spoofed", "streamUrl", "file:///spoofed")
+	state = h.wait(func(s Status) bool { return s.RecordingMutationSerial == serial })
+	if !state.RecordingMutationOK || len(state.Recordings.Schedules) != 0 || len(state.Recordings.Recordings) != 1 || state.Recordings.Recordings[0].StationName != "One" {
+		t.Fatal("record now did not use catalogue station", state)
+	}
+	rule := recording.Schedule{Label: "Second", StationID: "one", Weekdays: []int{int(now.Weekday())}, StartTime: now.Format("15:04"), EndTime: now.Add(3 * time.Minute).Format("15:04"), Timezone: "UTC", Enabled: true}
+	serial = h.send("upsertSchedule", "revision", state.Recordings.Revision, "schedule", rule)
+	state = h.wait(func(s Status) bool { return s.RecordingMutationSerial == serial })
+	if !state.RecordingMutationOK {
+		t.Fatal(state.RecordingError)
 	}
 	state = h.wait(func(s Status) bool { return s.Recordings != nil && s.Recordings.ActiveCount == 2 })
 	if state.Wanted {
@@ -275,6 +278,8 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 		t.Fatal("foreground changes affected captures", state)
 	}
 	state = h.wait(func(s Status) bool { return s.Recordings.ActiveCount == 2 && s.Recordings.UsedBytes > 0 })
+	// Retain enough media to exercise a nonterminal resume point.
+	time.Sleep(5 * time.Second)
 	id := state.Recordings.Recordings[0].ID
 	serial = h.send("stopRecording", "revision", state.Recordings.Revision, "id", id)
 	state = h.wait(func(s Status) bool { return s.RecordingMutationSerial == serial })
@@ -301,6 +306,11 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 	if file.RecordingID != id || file.Duration <= 0 || file.DVR || file.Recordings.ActiveCount != 1 {
 		t.Fatal("file playback not independent", file)
 	}
+	serial = h.send("speed", "value", 1.5)
+	file = h.wait(func(s Status) bool { return s.Serial == serial })
+	if file.PlaybackSpeed != 1.5 {
+		t.Fatal("speed change failed", file)
+	}
 	h.send("pause")
 	paused := h.wait(func(s Status) bool { return s.Paused && s.State == "paused" })
 	if paused.TemporaryBuffer || paused.BufferMinutes != 0 || paused.Recordings.ActiveCount != 1 {
@@ -317,8 +327,24 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 	h.wait(func(s Status) bool { return s.PlaybackKind == "recording" && s.State == "playing" })
 	serial = h.send("configure", "stationId", "two")
 	returned := h.wait(func(s Status) bool { return s.Serial == serial && s.PlaybackKind == "live" && s.State == "playing" })
-	if returned.Station["id"] != "two" || returned.Recordings.ActiveCount != 1 {
+	if returned.Station["id"] != "two" || returned.Recordings.ActiveCount != 1 || returned.PlaybackSpeed != 1 {
 		t.Fatal("return to live affected capture or selection", returned)
+	}
+
+	serial = h.send("playRecording", "id", id)
+	resumed := h.wait(func(s Status) bool {
+		return s.Serial == serial && s.PlaybackKind == "recording" && s.State == "playing"
+	})
+	resumed = h.wait(func(s Status) bool { return s.Serial == serial && s.Position > 1.5 })
+	if resumed.Position < 1.5 {
+		t.Fatal("recording did not resume", resumed)
+	}
+	serial = h.send("playRecording", "id", id, "fromStart", true)
+	restarted := h.wait(func(s Status) bool {
+		return s.Serial == serial && s.PlaybackKind == "recording" && s.State == "playing"
+	})
+	if restarted.Position > 1.5 {
+		t.Fatal("recording did not restart", restarted)
 	}
 	h.stop()
 	h.send("quit")
@@ -352,5 +378,102 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 		if item.Status == "recording" {
 			t.Fatal("shutdown left an active persisted capture", item)
 		}
+	}
+}
+
+func TestSleepAndSpeedCommands(t *testing.T) {
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	r := &controller{cfg: Config{Now: func() time.Time { return now }}, state: Status{PlaybackKind: "live", PlaybackSpeed: 1}}
+	command := func(s string) error { _, err := r.command([]byte(s)); return err }
+	for _, s := range []string{`{"action":"sleepTimer","minutes":-1}`, `{"action":"sleepTimer","minutes":241}`, `{"action":"sleepTimer","minutes":1.5}`, `{"action":"sleepTimer","minutes":null}`, `{"action":"speed","value":1.5}`} {
+		if command(s) == nil {
+			t.Fatalf("accepted %s", s)
+		}
+	}
+	if err := command(`{"action":"sleepTimer","minutes":15}`); err != nil {
+		t.Fatal(err)
+	}
+	defer r.cancelSleep()
+	now = now.Add(14*time.Minute + 59*time.Second)
+	r.updateSleep()
+	if r.state.SleepRemaining != 1 {
+		t.Fatal(r.state.SleepRemaining)
+	}
+	now = now.Add(time.Second)
+	r.updateSleep()
+	if r.state.SleepRemaining != 0 || r.state.State != "stopped" {
+		t.Fatal(r.state)
+	}
+	r.state.PlaybackKind, r.state.Wanted = "recording", true
+	if err := command(`{"action":"speed","value":1.5}`); err != nil || r.state.PlaybackSpeed != 1.5 {
+		t.Fatal(err, r.state.PlaybackSpeed)
+	}
+	for _, s := range []string{`{"action":"speed","value":1.1}`, `{"action":"speed","value":"2"}`, `{"action":"speed","value":null}`} {
+		if command(s) == nil {
+			t.Fatalf("accepted %s", s)
+		}
+	}
+	r.selectLivePlayback()
+	if r.state.PlaybackSpeed != 1 {
+		t.Fatal(r.state.PlaybackSpeed)
+	}
+	if err := command(`{"action":"sleepTimer","minutes":1}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := command(`{"action":"stop"}`); err != nil || !r.sleepDeadline.IsZero() {
+		t.Fatal(err, r.sleepDeadline)
+	}
+}
+
+func TestStartRecordingInputValidation(t *testing.T) {
+	base := t.TempDir()
+	manager, err := recording.Open(recording.Config{DataDir: filepath.Join(base, "data"), DefaultFolder: filepath.Join(base, "media"), PollInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close()
+	r := &controller{recorder: manager, stations: []Station{{"id": "one", "name": "Real", "streamUrl": "https://example.test/audio"}}}
+	revision := manager.Snapshot().Revision
+	for _, data := range []string{`{"stationId":"one","durationMinutes":0}`, `{"stationId":"one","durationMinutes":721}`, `{"stationId":"one","durationMinutes":1.5}`, `{"stationId":"unknown","durationMinutes":15}`} {
+		var fields map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(data), &fields); err != nil {
+			t.Fatal(err)
+		}
+		fields["revision"], _ = json.Marshal(revision)
+		if err := r.applyRecordingCommand("startRecording", fields); err == nil {
+			t.Fatalf("accepted %s", data)
+		}
+	}
+	if len(manager.Snapshot().Recordings) != 0 {
+		t.Fatal("invalid request created capture")
+	}
+}
+
+func TestCheckpointUsesCurrentPlayerAndReportsStorageFailure(t *testing.T) {
+	base := t.TempDir()
+	manager, err := recording.Open(recording.Config{DataDir: filepath.Join(base, "data"), DefaultFolder: filepath.Join(base, "media"), PollInterval: time.Hour})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Close(); err != nil {
+		t.Fatal(err)
+	}
+	old, current := &player{}, &player{}
+	old.position.Store(math.Float64bits(70))
+	current.position.Store(math.Float64bits(12))
+	r := &controller{recorder: manager, player: current, state: Status{PlaybackKind: "recording", RecordingID: "current", Duration: 100}}
+	// An old socket reader updates only its own atomic progress field.
+	old.consumeProgress(mpvEvent{Event: "property-change", Name: "time-pos", Data: float64(95)})
+	if r.currentPosition() != 12 {
+		t.Fatal("stale player changed current progress")
+	}
+	r.checkpoint(true, false)
+	if r.state.PlaybackProgressError == "" {
+		t.Fatal("checkpoint failure was not exposed")
+	}
+	r.state.Error = "unrelated playback error"
+	r.selectLivePlayback()
+	if r.state.PlaybackProgressError != "" || r.state.Error != "unrelated playback error" {
+		t.Fatal("selecting live did not isolate progress errors", r.state)
 	}
 }
