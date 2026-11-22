@@ -1,9 +1,10 @@
 # Yakker
 
-A native sports-radio player with **pause, rewind, padded recording schedules, and a polished Focus interface**.
+A native player for curated sports, news and talk radio, with **pause, rewind, padded recording schedules, and a polished Focus interface**.
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
-Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
+Thirty-seven stations across the US, Canada, UK and Ireland—24 sports stations
+and 13 news/public-radio additions—streamed through headless mpv.
 Choose a station on first launch; Yakker remembers your last choice. A fresh
 install has no preselected station. If a saved station disappears, choose another.
 No browser required. The widget starts playback only when you press Play.
@@ -71,6 +72,14 @@ timing limits and validation coverage.
 
 ## Stations
 
+Use **Change station → All / Sports / News** to browse the curated catalogue.
+**Favorites** narrows the current category; search works alongside both filters.
+Custom stations remain available under All and Favorites. Browsing and filtering
+never changes playback until you select a station. Public-radio news feeds also
+carry interviews, culture and other scheduled programs.
+
+**Sports**
+
 | Country | City | Station | CLI station ID |
 | --- | --- | --- | --- |
 | US | Atlanta | 92.9 The Game | `wzgc-fm` |
@@ -97,6 +106,24 @@ timing limits and validation coverage.
 | UK | London | talkSPORT | `talksport` |
 | UK | London | talkSPORT 2 | `talksport-2` |
 | Ireland | Dublin | Off The Ball | `off-the-ball` |
+
+**News and public radio**
+
+| Country | City | Station | CLI station ID |
+| --- | --- | --- | --- |
+| US | Boston | WBUR 90.9 | `wbur` |
+| US | Boston | WBZ NewsRadio 1030 | `wbz-am` |
+| US | Chicago | WBBM Newsradio | `wbbm-am` |
+| US | Denver | CPR News | `kcfr` |
+| US | Detroit | WWJ Newsradio 950 | `wwj-am` |
+| US | Los Angeles | KNX News 1070 | `knx-am` |
+| US | Los Angeles | LAist 89.3 | `kpcc` |
+| US | Minneapolis | MPR News | `know` |
+| US | New York | 1010 WINS / 92.3 FM | `wins` |
+| US | New York | WNYC 93.9 | `wnyc-fm` |
+| US | Philadelphia | KYW Newsradio | `kyw-am` |
+| US | San Diego | KPBS 89.5 | `kpbs` |
+| US | Seattle | KUOW 94.9 | `kuow` |
 
 ## Requirements
 
@@ -623,7 +650,7 @@ test a URL until you play it.
 
 Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
 
-Use the heart beside the station title to add or remove the selected station from favorites. Open **Change station → Favorites** to browse saved stations, including custom stations, with search and scrolling for longer lists. The **All** tab shows every station with favorites first. Arrow keys browse, Enter selects, F toggles the highlighted favorite, and Escape closes. Selecting a favorite changes the stream while listening and selects without starting playback while stopped. Saving favorites never adds a row beneath the player.
+Use the heart beside the station title to add or remove the selected station from favorites. Open **Change station → Favorites** to browse saved stations, including custom stations, with search and scrolling for longer lists. **All / Sports / News** selects the category; Favorites can be toggled on or off within that category. All includes custom stations without a category. Favorites appear first, and the picker opens with All and Favorites off. Left/Right on a category button switches categories; Up/Down browses results, Enter selects, F toggles the highlighted favorite, and Escape closes. Selecting a favorite changes the stream while listening and selects without starting playback while stopped. Saving favorites never adds a row beneath the player.
 
 The selected station, favorites, volume, mute and listening buffer length are saved through Quattro's inline entry persistence in
 `~/.config/omarchy/shell.json`. The widget entry also accepts:
@@ -656,6 +683,7 @@ The standalone terminal modes keep their session independent of saved widget set
 
 `showName` adds a compact “Radio” label on horizontal bars. `stations.json`
 contains station ID, name, subtitle, HTTP(S) stream URL, optional city/country/website,
+optional `category` (`sports` or `news`),
 optional local `artwork` path, optional `artworkBackground` color for logo contrast,
 and an optional fallback Nerd Font `icon`. Both the bar and terminal player read
 this catalogue. After editing station data, rebuild/reinstall and restart the shell.

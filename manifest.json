@@ -5,7 +5,7 @@
   "version": "1.7.0",
   "author": "Yakker contributors",
   "license": "MIT",
-  "description": "Sports radio with the Focus player, pause and rewind, padded recording schedules, recovery, and saved-show playback.",
+  "description": "Curated sports, news and talk radio with the Focus player, pause and rewind, recording schedules, recovery, and saved-show playback.",
   "kinds": [
     "bar-widget"
   ],

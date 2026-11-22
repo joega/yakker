@@ -74,10 +74,11 @@ Item {
     const favorites = [], others = []
     for (const item of stations) {
       const favorite = root.favoriteIds.indexOf(item.id) !== -1
-      const option = {value: item.id, name: item.name, city: item.city || "", favorite: favorite, station: item,
+      const category = item.category === "sports" ? "Sports" : item.category === "news" ? "News" : ""
+      const option = {value: item.id, name: item.name, city: item.city || "", category: item.category || "", categoryLabel: category, favorite: favorite, station: item,
         countryName: ({US:"United States", CA:"Canada", GB:"United Kingdom", IE:"Ireland"})[item.country] || item.country || "",
         label: (favorite ? "♥ " : "") + (item.city ? item.city + " · " : "") + item.name,
-        description: (root.countryNames[item.country] || item.country || "") + (item.subtitle ? " · " + item.subtitle : "")}
+        description: [root.countryNames[item.country] || item.country || "", category, item.subtitle || ""].filter(function(part) { return !!part }).join(" · ")}
       if (favorite) favorites.push(option); else others.push(option)
     }
     return favorites.concat(others)

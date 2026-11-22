@@ -17,6 +17,7 @@ Item {
   property real popupWidth: width
   property real popupX: 0
   property bool favoritesOnly: false
+  property string categoryFilter: "all"
   property string highlightedValue: ""
   property var sessionOrder: []
   readonly property bool popupOpen: popup.opened
@@ -25,7 +26,8 @@ Item {
     const terms = search.text.trim().toLowerCase().split(/\s+/).filter(function(term) { return !!term })
     const rows = options.filter(function(option) {
       const detail = [option.name, option.label, option.description, option.city, option.countryName, option.station ? option.station.country : ""].join(" ").toLowerCase()
-      return (!root.favoritesOnly || option.favorite === true) && terms.every(function(term) { return detail.indexOf(term) >= 0 })
+      return (root.categoryFilter === "all" || option.category === root.categoryFilter)
+        && (!root.favoritesOnly || option.favorite === true) && terms.every(function(term) { return detail.indexOf(term) >= 0 })
     })
     // Keep rows in place while hearts change. Reapply favorite-first order on
     // the next opening, so a click never moves a different station under it.
@@ -46,13 +48,34 @@ Item {
   function nameFor(option) { return String(option.name || option.label || "Station") }
   function detailsFor(option) {
     if (!option.station) return String(option.description || "")
-    const location = [option.city, option.countryName].filter(function(part) { return !!part }).join(" · ")
+    const location = [option.categoryLabel, option.city, option.countryName].filter(function(part) { return !!part }).join(" · ")
     return location + (option.station.custom ? (location ? " · " : "") + "Custom" : "")
   }
   function setCurrent(index) {
     list.currentIndex = filtered.length ? Math.max(0, Math.min(filtered.length - 1, index)) : -1
     highlightedValue = list.currentIndex >= 0 ? String(filtered[list.currentIndex].value) : ""
     if (list.currentIndex >= 0) list.positionViewAtIndex(list.currentIndex, ListView.Contain)
+  }
+  function chooseCategory(value) { categoryFilter = value; setCurrent(0) }
+  function moveCategory(direction) {
+    const categories = ["all", "sports", "news"], controls = [allFilter, sportsFilter, newsFilter]
+    const index = (categories.indexOf(categoryFilter) + direction + categories.length) % categories.length
+    chooseCategory(categories[index]); controls[index].forceActiveFocus()
+  }
+  component CategoryButton: FocusButton {
+    required property string category
+    width: (categoryFilters.width - categoryFilters.columnSpacing * (categoryFilters.columns - 1)) / categoryFilters.columns
+    horizontalPadding: Style.space(6)
+    fontSize: Style.fontPx(1)
+    foreground: root.foreground
+    selected: root.categoryFilter === category
+    focusable: true
+    Accessible.checkable: true
+    Accessible.checked: selected
+    tooltipText: category === "all" ? "All station categories" : text + " stations"
+    onClicked: root.chooseCategory(category)
+    Keys.onLeftPressed: root.moveCategory(-1)
+    Keys.onRightPressed: root.moveCategory(1)
   }
   function restoreCurrent() {
     if (!popup.opened) return
@@ -99,7 +122,7 @@ Item {
     closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
     onOpened: {
       root.sessionOrder = root.options.map(function(option) { return String(option.value) })
-      root.favoritesOnly = false; search.text = ""
+      root.favoritesOnly = false; root.categoryFilter = "all"; search.text = ""
       root.highlightedValue = root.value
       Qt.callLater(function() { if (popup.opened) { root.restoreCurrent(); search.forceActiveFocus() } })
     }
@@ -136,12 +159,27 @@ Item {
           }
           FocusButton { id: clearSearch; visible: !!search.text; width: Style.space(28); height: Style.space(32); anchors.verticalCenter: parent.verticalCenter; iconName: "close"; iconSize: Style.space(14); tooltipText: "Clear search"; foreground: root.foreground; focusable: true; onClicked: { search.text = ""; search.forceActiveFocus() } }
         }
-        Row {
+        Grid {
+          id: categoryFilters
           width: parent.width
-          spacing: Style.space(6)
-          FocusButton { id: allFilter; text: "All"; fontSize: Style.fontPx(1); foreground: root.foreground; selected: !root.favoritesOnly; focusable: true; onClicked: { root.favoritesOnly = false; root.setCurrent(0) } }
-          FocusButton { id: favoritesFilter; text: "Favorites"; iconName: "heart"; iconSize: Style.space(14); fontSize: Style.fontPx(1); foreground: root.foreground; selected: root.favoritesOnly; focusable: true; onClicked: { root.favoritesOnly = true; root.setCurrent(0) } }
-          Text { width: Math.max(0, parent.width - allFilter.width - favoritesFilter.width - parent.spacing * 2); anchors.verticalCenter: parent.verticalCenter; text: root.filtered.length + (root.filtered.length === 1 ? " station" : " stations"); horizontalAlignment: Text.AlignRight; textFormat: Text.PlainText; color: Qt.alpha(root.foreground, 0.65); font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(1) }
+          columns: width >= Math.max(allFilter.implicitWidth, sportsFilter.implicitWidth, newsFilter.implicitWidth, favoritesFilter.implicitWidth) * 4 + columnSpacing * 3 ? 4 : 2
+          columnSpacing: Style.space(6)
+          rowSpacing: Style.space(4)
+          CategoryButton { id: allFilter; text: "All"; category: "all" }
+          CategoryButton { id: sportsFilter; text: "Sports"; category: "sports" }
+          CategoryButton { id: newsFilter; text: "News"; category: "news" }
+          FocusButton {
+            id: favoritesFilter
+            width: (parent.width - parent.columnSpacing * (parent.columns - 1)) / parent.columns
+            horizontalPadding: Style.space(6)
+            text: "Favorites"; iconName: "heart"; iconSize: Style.space(14)
+            fontSize: Style.fontPx(1); foreground: root.foreground
+            selected: root.favoritesOnly; focusable: true
+            Accessible.checkable: true
+            Accessible.checked: selected
+            tooltipText: "Show only favorite stations in this category"
+            onClicked: { root.favoritesOnly = !root.favoritesOnly; root.setCurrent(0) }
+          }
         }
       }
       ListView {
@@ -225,10 +263,12 @@ Item {
         StateCard {
           id: pickerEmpty
           width: parent.width
-          title: root.favoritesOnly && !root.favoriteCount ? "No favorites yet" : !root.options.length ? "Stations unavailable" : "No matching stations"
+          title: root.favoritesOnly && !root.favoriteCount ? "No favorites yet" : !root.options.length ? "Stations unavailable"
+            : root.favoritesOnly && !search.text ? "No favorites in this category" : "No matching stations"
           description: root.favoritesOnly && !root.favoriteCount ? "Save stations using the hearts in All stations."
             : !root.options.length ? "The station list hasn’t loaded. Close the picker and try again after reconnecting."
-            : root.favoritesOnly ? "Try another search, or switch to All stations." : "Try a station name, city or country."
+            : root.favoritesOnly ? "Try another category or search, or turn off Favorites."
+            : root.categoryFilter !== "all" ? "Try another search, or show all stations." : "Try a station name, city or country."
           iconName: "search"
           foreground: root.foreground
           actionText: !root.options.length ? "Close picker" : root.favoritesOnly && !root.favoriteCount ? "Show all stations" : search.text ? "Clear search" : "Show all stations"
@@ -239,13 +279,13 @@ Item {
           }
           onAction: {
             if (!root.options.length) { root.close(); return }
-            if (!search.text || !root.favoriteCount) root.favoritesOnly = false
+            if (!search.text || !root.favoriteCount) { root.favoritesOnly = false; root.categoryFilter = "all" }
             search.text = ""; root.setCurrent(0)
             Qt.callLater(function() { if (popup.opened) search.forceActiveFocus() })
           }
         }
       }
-      Text { id: pickerFooter; width: parent.width; text: "↑↓ Browse · Enter Select · F Favorite · Esc Close"; textFormat: Text.PlainText; color: Qt.alpha(root.foreground, 0.6); font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(0.833); wrapMode: Text.Wrap }
+      Text { id: pickerFooter; width: parent.width; text: root.filtered.length + (root.filtered.length === 1 ? " station" : " stations") + " · ↑↓ Browse · Enter Select · F Favorite · Esc Close"; textFormat: Text.PlainText; color: Qt.alpha(root.foreground, 0.6); font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(0.833); wrapMode: Text.Wrap }
     }
   }
 }

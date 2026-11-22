@@ -435,6 +435,71 @@ ShellRoot {
           panel.showPlayer()
         }
       }
+      function checkStationCategories() {
+        const picker = panel.testStationPicker, radio = panel.radio
+        const savedFavorites = radio.favoriteIds, savedStations = radio.stations, savedId = radio.stationId
+        const savedWidth = window.width, savedHeight = window.height
+        try {
+          radio.favoriteIds = ["wfan", "wbur"]
+          picker.open(); tryVerify(function() { return picker.testSearch.activeFocus },2000)
+          compare(picker.categoryFilter,"all"); compare(picker.filtered.length,37)
+          picker.testNews.clicked(); compare(picker.filtered.length,13)
+          verify(picker.filtered.every(function(o) { return o.category === "news" }))
+          verify(picker.filtered.every(function(o) { return picker.detailsFor(o).indexOf("News · ") === 0 }))
+          picker.testSports.clicked(); compare(picker.filtered.length,24)
+          picker.testSearch.text = "Boston"; compare(picker.filtered.length,2)
+          picker.testNews.clicked(); compare(picker.filtered.length,2)
+          picker.testClear.clicked()
+          picker.testFavorites.clicked(); compare(picker.filtered.length,1)
+          compare(picker.filtered[0].value,"wbur"); verify(picker.testNews.selected && picker.testFavorites.selected)
+          capture("stations-news-favorite")
+          picker.testSports.clicked(); compare(picker.filtered.length,1); compare(picker.filtered[0].value,"wfan")
+          picker.testFavorites.clicked(); compare(picker.filtered.length,24)
+          picker.testSports.forceActiveFocus(); keyClick(Qt.Key_Right)
+          compare(picker.categoryFilter,"news"); verify(picker.testNews.activeFocus)
+          keyClick(Qt.Key_Left); compare(picker.categoryFilter,"sports")
+          picker.testNews.clicked(); picker.testSearch.text = "WNYC New York"
+          compare(picker.filtered.length,1)
+          picker.testList.forceActiveFocus(); keyClick(Qt.Key_Return)
+          tryCompare(radio,"stationId","wnyc-fm",3000)
+          verify(!radio.wanted,"Browsing to a news station started stopped playback")
+          picker.open(); tryVerify(function() { return picker.testSearch.activeFocus },2000)
+          compare(picker.categoryFilter,"all"); verify(!picker.favoritesOnly)
+          picker.testNews.clicked()
+          capture("stations-news")
+          // A remaining sports favorite must not turn an empty News subset into
+          // a claim that the user has no favorites anywhere.
+          radio.favoriteIds = ["wfan"]
+          picker.testFavorites.clicked(); compare(picker.filtered.length,0)
+          compare(picker.testEmpty.title,"No favorites in this category")
+          picker.testEmpty.primaryControl.clicked()
+          compare(picker.categoryFilter,"all"); verify(!picker.favoritesOnly)
+          compare(picker.filtered.length,37)
+          radio.stations = savedStations.concat([{id:"category-custom",name:"My local station",city:"Boston",country:"US",custom:true,streamUrl:"http://127.0.0.1:1/fixture"}])
+          picker.testSearch.text = "My local station"; compare(picker.filtered.length,1)
+          picker.testSports.clicked(); compare(picker.filtered.length,0)
+          picker.testNews.clicked(); compare(picker.filtered.length,0)
+          picker.testAll.clicked(); compare(picker.filtered.length,1)
+          radio.favoriteIds = ["category-custom"]; picker.testFavorites.clicked(); compare(picker.filtered.length,1)
+          picker.testFavorites.clicked(); radio.stations = savedStations
+          picker.testSearch.text = ""; picker.testNews.clicked()
+          window.width=320;window.height=300;wait(60)
+          verify(picker.testCategories.columns === 2,"Compact category labels were squeezed onto one row")
+          for (const control of [picker.testAll,picker.testSports,picker.testNews,picker.testFavorites])
+            verify(control.width + 1 >= control.implicitWidth,"Category label clipped: "+control.text)
+          picker.testNews.forceActiveFocus(); keyClick(Qt.Key_Right)
+          compare(picker.categoryFilter,"all"); verify(picker.testAll.activeFocus)
+          picker.testNews.clicked(); picker.testSearch.text="KUOW"
+          compare(picker.filtered.length,1)
+          capture("stations-news-small")
+          keyClick(Qt.Key_Escape); tryVerify(function() { return !picker.popupOpen },2000)
+          radio.selectStation(savedId); tryCompare(radio,"stationId",savedId,3000)
+          console.log("QA: station categories, favorites intersection and news selection")
+        } finally {
+          picker.close(); radio.favoriteIds=savedFavorites; radio.stations=savedStations
+          window.width=savedWidth;window.height=savedHeight
+        }
+      }
       function checkRecordingGroups() {
         const view = panel.testView, radio = panel.radio
         const saved = radio.recordings
@@ -644,6 +709,7 @@ ShellRoot {
           keyClick(Qt.Key_M, Qt.ControlModifier)
           compare(panel.radio.muted, navigationMuted, "Modified shortcut toggled mute")
           console.log("QA: station picker search and hearts")
+          checkStationCategories()
           panel.radio.favoriteIds = []
           panel.testStationPicker.open()
           tryVerify(function() { return panel.testStationPicker.testSearch.activeFocus }, 2000)

@@ -150,9 +150,26 @@ ShellRoot {
             }
             reset(index++); panel.testStationPicker.open()
             tryVerify(function() { return panel.testStationPicker.testSearch.activeFocus },2000)
+            // Opening restores focus on the next event turn. Let that queued
+            // work settle before deliberately moving focus onto a filter.
+            wait(50)
             popupFits(panel.testStationPicker.testPopup,"Station picker")
+            for (const control of [panel.testStationPicker.testAll,panel.testStationPicker.testSports,panel.testStationPicker.testNews,panel.testStationPicker.testFavorites])
+              verify(control.width + 1 >= control.implicitWidth,"Clipped station-category label: "+control.text)
+            panel.testStationPicker.testNews.clicked()
+            compare(panel.testStationPicker.filtered.length,13)
+            panel.testStationPicker.testNews.forceActiveFocus(); keyClick(Qt.Key_Left)
+            compare(panel.testStationPicker.categoryFilter,"sports")
+            tryVerify(function() { return panel.testStationPicker.testSports.activeFocus },2000,"Category arrow failed to retain focus at font size "+font)
+            panel.testStationPicker.testNews.clicked()
+            panel.testStationPicker.testSearch.text="MPR"
+            compare(panel.testStationPicker.filtered.length,1)
+            wait(40); popupFits(panel.testStationPicker.testPopup,"News category")
+            capture("news-filter-padded-"+font)
+            panel.testStationPicker.testAll.clicked()
             panel.testStationPicker.testSearch.text="WFAN New York"
             compare(panel.testStationPicker.filtered.length,1)
+            panel.testStationPicker.testSearch.forceActiveFocus()
             keyClick(Qt.Key_Down); keyClick(Qt.Key_Up)
             verify(panel.testStationPicker.testSearch.activeFocus)
             panel.testStationPicker.testSearch.text="No station matches"
