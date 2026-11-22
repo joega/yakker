@@ -726,17 +726,20 @@ fixtures and null audio; they do not contact
 broadcasters or change the installed widget. GitHub Actions runs these checks
 and builds Linux amd64 and arm64 archives.
 
+The developer audits below run from a source checkout; their guides link to the
+source repository so they are also accessible from compiled-archive documentation.
+
 For an isolated investigation of audio duration and scheduled boundaries, see
-the [recording timing audit](tools/recording-audit/README.md). It compares decoded
+the [recording timing audit](https://github.com/joega/yakker/blob/main/tools/recording-audit/README.md). It compares decoded
 audio with time-coded local fixtures and can optionally sample selected stations.
-The [matched-source quality comparison](tools/recording-quality/README.md)
+The [matched-source quality comparison](https://github.com/joega/yakker/blob/main/tools/recording-quality/README.md)
 prepares randomized 24/48 kbit/s samples from local reference audio for listening
 checks, with full-rate decode measurements. It does not change the recording bitrate.
 For a live acceptance run across several stations, the
-[scheduled recording audit](tools/scheduled-recordings-audit.md) checks real padded
+[scheduled recording audit](https://github.com/joega/yakker/blob/main/tools/scheduled-recordings-audit.md) checks real padded
 schedules, decoded head/tail audio, silent playback and persisted resume using
 isolated data. It requires explicit station selection and contacts those broadcasters.
-The [recovery audit](tools/recording-recovery-audit.md) uses a controlled loopback
+The [recovery audit](https://github.com/joega/yakker/blob/main/tools/recording-recovery-audit.md) uses a controlled loopback
 source to test disconnects, stalls, controller loss, bounded retries and linked
 remainders without changing the installed library or connecting to broadcasters.
 
