@@ -25,6 +25,28 @@ short audit is limited to 60 seconds per side. The real scheduler uses its norma
 one-second poll and three-capture limit. Allow several minutes for scheduling,
 capture, independent references, content matching, and playback tests.
 
+For a longer run with staggered, overlapping shows and an independent foreground
+station in the same controller:
+
+```sh
+python3 -u tools/test-scheduled-recordings.py \
+  --controller ~/.config/omarchy/plugins/io.github.joega.yakker/yakker-controller \
+  --stations weei-fm,bbc-radio-5-live,kiro-am \
+  --minutes 5,6,7 --offsets 0,1,2 --padding 15:30,30:45,45:60 \
+  --listen-station wbns-fm \
+  --output build/planning/long-scheduled-station-check
+```
+
+`--minutes` accepts 1–30 program minutes and `--offsets` accepts 0–10 minutes
+after the first start. Either accepts a single value for all stations or one per
+station. The optional listening station must differ from all recording stations.
+It makes a real mpv connection with silent output. The report samples its state,
+station, player PID, progress and concurrent capture count once per second;
+an error, reconnect or player replacement fails the foreground check. Foreground
+playback stops before testing recorded-file playback. Reports and progress messages
+are checkpointed every 30 seconds while captures run. The example takes about
+12 minutes plus content matching and playback checks.
+
 Each station gets an additional longer reference connection. The check:
 
 - Creates real one-time schedules, waits through post-roll and finalization,

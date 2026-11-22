@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local checks for the live audit's content-matching confidence logic."""
 import importlib.util
+import datetime as dt
 from pathlib import Path
 import random
 import unittest
@@ -11,6 +12,21 @@ spec.loader.exec_module(audit)
 
 
 class MatchingTests(unittest.TestCase):
+    def test_duration_and_offset_values_are_bounded_and_match_stations(self):
+        self.assertEqual(audit.minute_values("5", 3, 1, 30, "minutes"), [5,5,5])
+        self.assertEqual(audit.minute_values("0,1,2", 3, 0, 10, "offsets"), [0,1,2])
+        for raw in ("0", "31", "5,6", "bad", "1,2,3,4"):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                audit.minute_values(raw, 3, 1, 30, "minutes")
+
+    def test_staggered_windows_keep_padding_lead_and_cross_midnight(self):
+        now = dt.datetime(2026,11,22,23,58,55,tzinfo=dt.timezone.utc)
+        windows = audit.schedule_windows(now, [5,6,7], [0,1,2], [(15,30),(30,45),(45,60)])
+        self.assertGreaterEqual((windows[0][0]-now).total_seconds(), 60)
+        self.assertEqual(windows[0][0], dt.datetime(2026,11,23,0,0,tzinfo=dt.timezone.utc))
+        self.assertEqual([(b-a).total_seconds()/60 for a,b in windows], [5,6,7])
+        self.assertEqual([(a-windows[0][0]).total_seconds()/60 for a,b in windows], [0,1,2])
+
     def test_known_offset_and_gain(self):
         rng = random.Random(91)
         reference = [rng.uniform(.1, 2) for _ in range(1800)]

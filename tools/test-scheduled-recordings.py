@@ -36,6 +36,21 @@ def timestamp(value):
     return dt.datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
 
 
+def minute_values(raw, count, minimum, maximum, label):
+    values = list(map(int, raw.split(",")))
+    if len(values) == 1:
+        values *= count
+    if len(values) != count or any(v < minimum or v > maximum for v in values):
+        raise ValueError(f"{label}: provide one value or one per station, from {minimum} to {maximum}")
+    return values
+
+
+def schedule_windows(now, minutes, offsets, padding):
+    base = (now+dt.timedelta(seconds=max(p[0] for p in padding)+15)).replace(second=0, microsecond=0)+dt.timedelta(minutes=1)
+    return [(base+dt.timedelta(minutes=offset), base+dt.timedelta(minutes=offset+length))
+            for length, offset in zip(minutes, offsets)]
+
+
 def write_json(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n")
 
@@ -320,6 +335,9 @@ def main():
     parser.add_argument("--controller", type=Path, default=ROOT/"yakker-controller")
     parser.add_argument("--stations", required=True, help="one to three comma-separated bundled station IDs")
     parser.add_argument("--padding", default="10:15,20:10,30:20", help="pre:post seconds per station; defaults vary by station")
+    parser.add_argument("--minutes", default="1", help="program minutes: one value or one per station, from 1 to 30")
+    parser.add_argument("--offsets", default="0", help="start offsets in minutes: one value or one per station, from 0 to 10")
+    parser.add_argument("--listen-station", help="different bundled station to play silently during scheduled captures")
     parser.add_argument("--output", type=Path, required=True, help="new private evidence directory")
     args = parser.parse_args()
     os.umask(0o077)
@@ -327,7 +345,14 @@ def main():
     catalogue = {s["id"]:s for s in json.loads((ROOT/"stations.json").read_text())}
     if len(ids) > 3 or len(set(ids)) != len(ids) or any(i not in catalogue for i in ids):
         parser.error("choose one to three distinct bundled station IDs")
-    padding = [tuple(map(int, p.split(":"))) for p in args.padding.split(",")]
+    if args.listen_station and (args.listen_station not in catalogue or args.listen_station in ids):
+        parser.error("--listen-station must be a different bundled station")
+    try:
+        padding = [tuple(map(int, p.split(":"))) for p in args.padding.split(",")]
+        minutes = minute_values(args.minutes, len(ids), 1, 30, "--minutes")
+        offsets = minute_values(args.offsets, len(ids), 0, 10, "--offsets")
+    except ValueError as exc:
+        parser.error(str(exc))
     if len(padding) < len(ids) or any(len(p)!=2 or any(x<0 or x>60 for x in p) for p in padding):
         parser.error("provide pre:post padding from 0 to 60 seconds for each station")
     output = args.output.resolve()
@@ -338,7 +363,7 @@ def main():
     executable = bundle/"yakker-controller"
     shutil.copy2(args.controller, executable)
     stations = [catalogue[i] for i in ids]
-    write_json(bundle/"stations.json", stations)
+    write_json(bundle/"stations.json", stations+([catalogue[args.listen_station]] if args.listen_station else []))
     mpv = shutil.which("mpv")
     if not mpv:
         raise SystemExit("mpv is required")
@@ -359,22 +384,30 @@ def main():
             settings = dict(controller.latest["recordings"]["settings"], folder=str(output/"media"))
             controller.mutate("recordingSettings", settings=settings)
             now = dt.datetime.now(UTC)
-            start = (now+dt.timedelta(seconds=max(p[0] for p in padding[:len(ids)])+15)).replace(second=0,microsecond=0)+dt.timedelta(minutes=1)
-            end = start+dt.timedelta(minutes=1)
-            report.update(programStart=start.isoformat(),programEnd=end.isoformat())
-            print(f"One-minute show: {start.isoformat()}–{end.isoformat()}", flush=True)
-            for station, (pre, post) in zip(stations, padding):
+            windows = schedule_windows(now, minutes, offsets, padding[:len(ids)])
+            report.update(programStart=min(w[0] for w in windows).isoformat(),programEnd=max(w[1] for w in windows).isoformat())
+            for station, (pre, post), (start, end) in zip(stations, padding, windows):
                 references.append(Reference(station, output))
                 schedule = {"stationId":station["id"],"kind":"once","date":start.strftime("%Y-%m-%d"),
                             "startTime":start.strftime("%H:%M"),"endTime":end.strftime("%H:%M"),"timezone":"UTC",
                             "label":"Scheduled audit · "+station["name"],"enabled":True,"preRollSeconds":pre,"postRollSeconds":post}
                 controller.mutate("upsertSchedule", schedule=schedule)
-                report["stations"].append({"id":station["id"],"name":station["name"],"preRollSeconds":pre,"postRollSeconds":post})
-                print(f"Scheduled {station['name']}: {pre}s before, {post}s after", flush=True)
+                report["stations"].append({"id":station["id"],"name":station["name"],"preRollSeconds":pre,"postRollSeconds":post,
+                                           "programStart":start.isoformat(),"programEnd":end.isoformat()})
+                print(f"Scheduled {station['name']}: {start.isoformat()}–{end.isoformat()}, {pre}s before, {post}s after", flush=True)
+            if args.listen_station:
+                controller.command("configure", stationId=args.listen_station)
+                controller.command("play")
+                playing = controller.wait(lambda s:s.get("state")=="playing" and s.get("stationId")==args.listen_station, timeout=35)
+                report["foreground"] = {"stationId":args.listen_station,"playerPid":playing["playerPid"],"samples":[]}
+                print("Playing separate foreground station with null audio: "+catalogue[args.listen_station]["name"], flush=True)
             write_json(output/"report.json", report)
-            deadline = end.timestamp()+max(p[1] for p in padding[:len(ids)])+25
+            last_capture_end = max(end.timestamp()+post for (_, end), (_, post) in zip(windows, padding))
+            deadline = last_capture_end+25
             previous = None
             max_active = 0
+            next_sample = 0
+            next_heartbeat = time.monotonic()+30
             while True:
                 snapshot = controller.latest["recordings"]
                 active = snapshot["activeCount"]
@@ -384,12 +417,31 @@ def main():
                     previous = active
                 if snapshot.get("error"):
                     raise RuntimeError(snapshot["error"])
-                if len(snapshot["recordings"]) >= len(ids) and not active and time.time() >= end.timestamp()+max(p[1] for p in padding[:len(ids)]):
+                if args.listen_station and time.monotonic() >= next_sample:
+                    state = controller.command("status")
+                    sample = {k:state.get(k) for k in ("state","stationId","playerPid","position","retry","error")}
+                    sample.update(wallTime=time.time(), activeCount=state["recordings"]["activeCount"])
+                    report["foreground"]["samples"].append(sample)
+                    if state["state"] != "playing" or state["stationId"] != args.listen_station or state["playerPid"] != report["foreground"]["playerPid"] or state.get("error") or state.get("retry"):
+                        raise RuntimeError("foreground listening was interrupted; inspect foreground samples and controller logs")
+                    next_sample = time.monotonic()+1
+                if time.monotonic() >= next_heartbeat:
+                    print(f"Recording audit running: {active} captures, {max(0, deadline-time.time()):.0f}s until final deadline", flush=True)
+                    write_json(output/"report.json", report)
+                    next_heartbeat = time.monotonic()+30
+                if len(snapshot["recordings"]) >= len(ids) and not active and time.time() >= last_capture_end:
                     break
                 if time.time() > deadline:
                     raise RuntimeError("scheduled captures did not finish by their bounded deadline")
                 time.sleep(.2)
             report["maximumConcurrentCaptures"] = max_active
+            if args.listen_station:
+                samples = report["foreground"]["samples"]
+                report["foreground"]["maximumConcurrentCaptures"] = max(s["activeCount"] for s in samples)
+                report["foreground"]["positionAdvancedSeconds"] = samples[-1]["position"]-samples[0]["position"]
+                if report["foreground"]["positionAdvancedSeconds"] < 1:
+                    raise RuntimeError("foreground playback did not advance")
+                controller.command("stop")
             recordings = controller.latest["recordings"]["recordings"]
             for result in report["stations"]:
                 items = [r for r in recordings if r["stationId"]==result["id"]]
@@ -398,20 +450,22 @@ def main():
                     report["failures"].append(result["id"]+": expected one playable capture")
                     continue
                 item = items[0]
+                if item["status"] != "complete":
+                    report["failures"].append(result["id"]+": capture ended "+item["status"]+"; "+item.get("reason", ""))
                 path = Path(item["folder"])/item["filename"]
                 ffmpeg("-i", path, "-f", "null", "-")
                 result["fullDecode"] = True
                 result["finalizedOggEOS"] = ogg_eos(path)
                 result["startDelaySeconds"] = timestamp(item["startedAt"])-timestamp(item["captureStart"])
                 result["endDelaySeconds"] = timestamp(item["endedAt"])-timestamp(item["captureEnd"])
-                result["processSurroundedProgram"] = timestamp(item["startedAt"])<start.timestamp() and timestamp(item["endedAt"])>=end.timestamp()
+                result["processSurroundedProgram"] = timestamp(item["startedAt"])<timestamp(result["programStart"]) and timestamp(item["endedAt"])>=timestamp(result["programEnd"])
                 if not result["finalizedOggEOS"] or not result["processSurroundedProgram"]:
                     report["failures"].append(result["id"]+": capture boundary or finalization check failed")
                 for label, position in (("head",0),("tail",max(0,item["durationSeconds"]-8))):
                     ffmpeg("-ss", position, "-i", path, "-t", 8, "-ac", 1, "-ar", 16000, output/(result["id"]+"-"+label+".wav"))
                 result["playback"] = save_resume(controller, item)
                 print(result["id"]+": decode, head/tail extraction, pause, seek and saved position passed", flush=True)
-            while time.time() < end.timestamp()+max(p[1] for p in padding[:len(ids)])+8:
+            while time.time() < last_capture_end+8:
                 time.sleep(.2)
             for reference in references:
                 reference.close()
@@ -422,7 +476,8 @@ def main():
                     continue
                 item = result["recordings"][0]
                 result["playback"].update(check_resume(controller, item, result["playback"]["savedPosition"]))
-                result["boundaries"] = compare_boundaries(Path(item["folder"])/item["filename"], reference.path, reference.progress, start.timestamp(), end.timestamp())
+                result["boundaries"] = compare_boundaries(Path(item["folder"])/item["filename"], reference.path, reference.progress,
+                                                          timestamp(result["programStart"]), timestamp(result["programEnd"]))
                 if result["boundaries"].get("coversReferenceDeliveryBoundaries") is False:
                     report["failures"].append(result["id"]+": saved audio did not cover independent reference delivery boundaries")
                 print(result["id"]+": persisted resume, pause/resume and ending playback passed; reference match "+str(result["boundaries"]["available"]), flush=True)
