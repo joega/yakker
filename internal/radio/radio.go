@@ -115,6 +115,9 @@ func LoadStations(path string) ([]Station, error) {
 			return nil, errors.New("Station IDs must be unique")
 		}
 		seen[id] = true
+		if category, present := station["category"]; present && category != "sports" && category != "news" {
+			return nil, errors.New("Station category must be sports or news")
+		}
 		u, err := url.Parse(station["streamUrl"].(string))
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
 			return nil, errors.New("Station streamUrl must use HTTP or HTTPS")

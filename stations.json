@@ -8,7 +8,8 @@
     "icon": "󰐹",
     "artwork": "assets/sports-hub.png",
     "city": "Boston",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "wzgc-fm",
@@ -20,7 +21,8 @@
     "websiteUrl": "https://www.audacy.com/929thegame",
     "icon": "󰐹",
     "artwork": "assets/wzgc-fm.webp",
-    "artworkBackground": "#171b23"
+    "artworkBackground": "#171b23",
+    "category": "sports"
   },
   {
     "id": "weei-fm",
@@ -32,7 +34,8 @@
     "icon": "󰐹",
     "artwork": "assets/weei-fm.png",
     "artworkBackground": "#171b23",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "wscr",
@@ -44,7 +47,8 @@
     "icon": "󰐹",
     "artwork": "assets/wscr.webp",
     "artworkBackground": "#171b23",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "wkrk-fm",
@@ -56,7 +60,8 @@
     "websiteUrl": "https://www.audacy.com/923thefan",
     "icon": "󰐹",
     "artwork": "assets/wkrk-fm.webp",
-    "artworkBackground": "#171b23"
+    "artworkBackground": "#171b23",
+    "category": "sports"
   },
   {
     "id": "wbns-fm",
@@ -67,7 +72,8 @@
     "streamUrl": "https://radiohio.streamguys1.com/cols/wbnsfm-linktree.mp3",
     "websiteUrl": "https://www.971thefan.com/",
     "icon": "󰐹",
-    "artwork": "assets/wbns-fm.png"
+    "artwork": "assets/wbns-fm.png",
+    "category": "sports"
   },
   {
     "id": "krld-fm",
@@ -79,7 +85,8 @@
     "websiteUrl": "https://www.audacy.com/1053thefan",
     "icon": "󰐹",
     "artwork": "assets/krld-fm.webp",
-    "artworkBackground": "#171b23"
+    "artworkBackground": "#171b23",
+    "category": "sports"
   },
   {
     "id": "kkfn-fm",
@@ -90,7 +97,8 @@
     "streamUrl": "https://bonneville.cdnstream1.com/2612_48.aac",
     "websiteUrl": "https://denversports.com/",
     "icon": "󰐹",
-    "artwork": "assets/kkfn-fm.webp"
+    "artwork": "assets/kkfn-fm.webp",
+    "category": "sports"
   },
   {
     "id": "wxyt-fm",
@@ -102,7 +110,8 @@
     "icon": "󰐹",
     "artwork": "assets/wxyt-fm.webp",
     "artworkBackground": "#171b23",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "klac",
@@ -114,7 +123,8 @@
     "websiteUrl": "https://am570lasports.iheart.com/",
     "icon": "󰐹",
     "artwork": "assets/klac.png",
-    "artworkBackground": "#ffffff"
+    "artworkBackground": "#ffffff",
+    "category": "sports"
   },
   {
     "id": "kfan",
@@ -126,7 +136,8 @@
     "websiteUrl": "https://kfan.iheart.com/",
     "icon": "󰐹",
     "artwork": "assets/kfan.png",
-    "artworkBackground": "#ffffff"
+    "artworkBackground": "#ffffff",
+    "category": "sports"
   },
   {
     "id": "espn-new-york",
@@ -138,7 +149,8 @@
     "icon": "󰐹",
     "artwork": "assets/espn-new-york.png",
     "artworkBackground": "#ffffff",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "wfan",
@@ -150,7 +162,8 @@
     "icon": "󰐹",
     "artwork": "assets/wfan.webp",
     "artworkBackground": "#171b23",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "wip-fm",
@@ -162,7 +175,8 @@
     "icon": "󰐹",
     "artwork": "assets/wip-fm.webp",
     "artworkBackground": "#171b23",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "kdka-fm",
@@ -174,7 +188,8 @@
     "icon": "󰐹",
     "artwork": "assets/kdka-fm.png",
     "artworkBackground": "#171b23",
-    "country": "US"
+    "country": "US",
+    "category": "sports"
   },
   {
     "id": "kwfn-fm",
@@ -186,7 +201,8 @@
     "websiteUrl": "https://www.audacy.com/973thefansd",
     "icon": "󰐹",
     "artwork": "assets/kwfn-fm.webp",
-    "artworkBackground": "#171b23"
+    "artworkBackground": "#171b23",
+    "category": "sports"
   },
   {
     "id": "kiro-am",
@@ -197,7 +213,8 @@
     "streamUrl": "https://bonneville.cdnstream1.com/2642_48.aac",
     "websiteUrl": "https://tuner.bonneville.com/live/KIRO-AM",
     "icon": "󰐹",
-    "artwork": "assets/kiro-am.webp"
+    "artwork": "assets/kiro-am.webp",
+    "category": "sports"
   },
   {
     "id": "tsn-690",
@@ -208,7 +225,8 @@
     "streamUrl": "https://playerservices.streamtheworld.com/api/livestream-redirect/CKGMAMAAC.aac",
     "websiteUrl": "https://www.iheart.com/live/tsn-690-7450/",
     "icon": "󰐹",
-    "artwork": "assets/tsn-690.png"
+    "artwork": "assets/tsn-690.png",
+    "category": "sports"
   },
   {
     "id": "sportsnet-590",
@@ -219,7 +237,8 @@
     "streamUrl": "https://rogers-hls.leanstream.co/rogers/tor590.stream/48k/playlist.m3u8",
     "websiteUrl": "https://www.sportsnet.ca/590/",
     "icon": "󰐹",
-    "artwork": "assets/sportsnet-590.png"
+    "artwork": "assets/sportsnet-590.png",
+    "category": "sports"
   },
   {
     "id": "tsn-1050",
@@ -230,7 +249,8 @@
     "websiteUrl": "https://www.iheart.com/live/tsn-1050-7495/",
     "icon": "󰐹",
     "artwork": "assets/tsn-1050.png",
-    "country": "CA"
+    "country": "CA",
+    "category": "sports"
   },
   {
     "id": "bbc-radio-5-live",
@@ -241,7 +261,8 @@
     "streamUrl": "https://as-hls-ww-live.akamaized.net/pool_89021708/live/ww/bbc_radio_five_live/bbc_radio_five_live.isml/bbc_radio_five_live-audio%3d128000.norewind.m3u8",
     "websiteUrl": "https://www.bbc.co.uk/sounds/play/live/bbc_radio_five_live",
     "icon": "󰐹",
-    "artwork": "assets/bbc-radio-5-live.png"
+    "artwork": "assets/bbc-radio-5-live.png",
+    "category": "sports"
   },
   {
     "id": "talksport",
@@ -253,7 +274,8 @@
     "websiteUrl": "https://talksport.com/",
     "icon": "󰐹",
     "artwork": "assets/talksport.png",
-    "artworkBackground": "#171b23"
+    "artworkBackground": "#171b23",
+    "category": "sports"
   },
   {
     "id": "talksport-2",
@@ -265,7 +287,8 @@
     "websiteUrl": "https://talksport.com/play/",
     "icon": "󰐹",
     "artwork": "assets/talksport-2.png",
-    "artworkBackground": "#171b23"
+    "artworkBackground": "#171b23",
+    "category": "sports"
   },
   {
     "id": "off-the-ball",
@@ -276,6 +299,176 @@
     "streamUrl": "https://live-bauerie.sharp-stream.com/OTB",
     "websiteUrl": "https://www.offtheball.com/",
     "icon": "󰐹",
-    "artwork": "assets/off-the-ball.png"
+    "artwork": "assets/off-the-ball.png",
+    "category": "sports"
+  },
+  {
+    "id": "wbz-am",
+    "name": "WBZ NewsRadio 1030",
+    "subtitle": "WBZ-AM · Boston",
+    "city": "Boston",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://stream.revma.ihrhls.com/zc7729",
+    "websiteUrl": "https://www.iheart.com/live/wbz-newsradio-1030-7729/",
+    "icon": "󰐹",
+    "artwork": "assets/wbz-am.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "wbur",
+    "name": "WBUR 90.9",
+    "subtitle": "WBUR · Boston",
+    "city": "Boston",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://fm909.wbur.org/wbur_www",
+    "websiteUrl": "https://www.wbur.org/about",
+    "icon": "󰐹",
+    "artwork": "assets/wbur.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "wins",
+    "name": "1010 WINS / 92.3 FM",
+    "subtitle": "WINS / WINS-FM · New York",
+    "city": "New York",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://live.amperwave.net/direct/audacy-winsamaac-imc",
+    "websiteUrl": "https://www.audacy.com/1010wins",
+    "icon": "󰐹",
+    "artwork": "assets/wins.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "wnyc-fm",
+    "name": "WNYC 93.9",
+    "subtitle": "WNYC-FM · New York",
+    "city": "New York",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://fm939.wnyc.org/wnycfm",
+    "websiteUrl": "https://wnyc.org/home",
+    "icon": "󰐹",
+    "artwork": "assets/wnyc-fm.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "knx-am",
+    "name": "KNX News 1070",
+    "subtitle": "KNX-AM · Los Angeles",
+    "city": "Los Angeles",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://live.amperwave.net/direct/audacy-knxamaac-imc",
+    "websiteUrl": "https://www.audacy.com/knxnews",
+    "icon": "󰐹",
+    "artwork": "assets/knx-am.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "kpcc",
+    "name": "LAist 89.3",
+    "subtitle": "KPCC · Los Angeles",
+    "city": "Los Angeles",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://laist.streamguys1.com/kpcc-mp3?aw_0_1st.playerId=laist",
+    "websiteUrl": "https://laist.com/listen",
+    "icon": "󰐹",
+    "artwork": "assets/kpcc.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "wbbm-am",
+    "name": "WBBM Newsradio",
+    "subtitle": "WBBM-AM / WCFS-FM · Chicago",
+    "city": "Chicago",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://live.amperwave.net/direct/audacy-wbbmamaac-imc",
+    "websiteUrl": "https://www.audacy.com/wbbm780",
+    "icon": "󰐹",
+    "artwork": "assets/wbbm-am.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "kyw-am",
+    "name": "KYW Newsradio",
+    "subtitle": "KYW-AM / WPHI-FM · Philadelphia",
+    "city": "Philadelphia",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://live.amperwave.net/direct/audacy-kywamaac-imc",
+    "websiteUrl": "https://www.audacy.com/kywnewsradio",
+    "icon": "󰐹",
+    "artwork": "assets/kyw-am.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "wwj-am",
+    "name": "WWJ Newsradio 950",
+    "subtitle": "WWJ-AM · Detroit",
+    "city": "Detroit",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://live.amperwave.net/direct/audacy-wwjamaac-imc",
+    "websiteUrl": "https://www.audacy.com/wwjnewsradio",
+    "icon": "󰐹",
+    "artwork": "assets/wwj-am.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "kcfr",
+    "name": "CPR News",
+    "subtitle": "KCFR · Denver",
+    "city": "Denver",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://stream1.cprnetwork.org/cpr1_lo",
+    "websiteUrl": "https://www.cpr.org/streaming-help/",
+    "icon": "󰐹",
+    "artwork": "assets/kcfr.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "know",
+    "name": "MPR News",
+    "subtitle": "KNOW · Minneapolis",
+    "city": "Minneapolis",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://nis.stream.publicradio.org/nis.mp3",
+    "websiteUrl": "https://www.mprnews.org/about",
+    "icon": "󰐹",
+    "artwork": "assets/know.png",
+    "artworkBackground": "#171b23"
+  },
+  {
+    "id": "kuow",
+    "name": "KUOW 94.9",
+    "subtitle": "KUOW · Seattle",
+    "city": "Seattle",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://playerservices.streamtheworld.com/api/livestream-redirect/KUOWFM_HIGH_MP3.mp3",
+    "websiteUrl": "https://www.kuow.org/about/",
+    "icon": "󰐹",
+    "artwork": "assets/kuow.png",
+    "artworkBackground": "#ffffff"
+  },
+  {
+    "id": "kpbs",
+    "name": "KPBS 89.5",
+    "subtitle": "KPBS · San Diego",
+    "city": "San Diego",
+    "country": "US",
+    "category": "news",
+    "streamUrl": "https://kpbs.streamguys1.com/kpbs.mp3",
+    "websiteUrl": "https://www.kpbs.org/radio",
+    "icon": "󰐹",
+    "artwork": "assets/kpbs.png",
+    "artworkBackground": "#ffffff"
   }
 ]

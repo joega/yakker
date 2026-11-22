@@ -18,11 +18,20 @@ func TestBundledStationCatalogue(t *testing.T) {
 		"krld-fm": true, "kfan": true, "kiro-am": true, "sportsnet-590": true, "tsn-690": true,
 		"wbns-fm": true, "wkrk-fm": true, "kwfn-fm": true, "wzgc-fm": true, "kkfn-fm": true,
 		"talksport": true, "talksport-2": true, "bbc-radio-5-live": true, "off-the-ball": true,
+		"wbz-am": true, "wbur": true, "wins": true, "wnyc-fm": true, "knx-am": true,
+		"kpcc": true, "wbbm-am": true, "kyw-am": true, "wwj-am": true, "kcfr": true,
+		"know": true, "kuow": true, "kpbs": true,
 	}
+	categories := map[string]int{}
 	if len(stations) != len(want) || stations[0]["id"] != "wbz-fm" {
 		t.Fatal("expected the full catalogue in its established order")
 	}
 	for _, station := range stations {
+		category, _ := station["category"].(string)
+		if category != "sports" && category != "news" {
+			t.Errorf("bundled station %s needs a Sports or News category", station["id"])
+		}
+		categories[category]++
 		if !want[station["id"].(string)] {
 			t.Errorf("unexpected station %s", station["id"])
 		}
@@ -41,6 +50,31 @@ func TestBundledStationCatalogue(t *testing.T) {
 	}
 	if len(want) > 0 {
 		t.Errorf("missing requested stations: %v", want)
+	}
+	if categories["sports"] != 24 || categories["news"] != 13 {
+		t.Fatalf("wrong curated category coverage: %v", categories)
+	}
+}
+
+func TestExternalStationCategoriesRemainOptional(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stations.json")
+	for _, category := range []string{"", `,"category":"news"`, `,"category":"sports"`} {
+		data := `[{"id":"legacy","name":"My station","subtitle":"Local","streamUrl":"https://example.test/live"` + category + `}]`
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadStations(path); err != nil {
+			t.Fatal("valid external catalogue rejected", err)
+		}
+	}
+	for _, category := range []string{`"music"`, `true`, `[]`, `{}`, `null`} {
+		data := `[{"id":"bad","name":"Bad category","subtitle":"Local","streamUrl":"https://example.test/live","category":` + category + `}]`
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadStations(path); err == nil {
+			t.Fatal("invalid category accepted", category)
+		}
 	}
 }
 
