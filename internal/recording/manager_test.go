@@ -894,6 +894,28 @@ func TestCaptureEndTimeSurvivesDelayedFinalization(t *testing.T) {
 	}
 }
 
+func TestCaptureStopTimeoutExplainsMissingTail(t *testing.T) {
+	m, now, _ := engineFixture(t)
+	saveRule(t, m, rule("stalled"))
+	*now = now.Add(time.Hour)
+	end := now.Add(time.Hour)
+	m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+		if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+			return nil, err
+		}
+		result := CaptureResult{Bytes: 40, DurationSeconds: 5, EndedAt: end, Err: errCaptureStopTimeout}
+		return &finishedCapture{result: result, done: resultChannel(result)}, nil
+	}
+	tick(m)
+	*now = end.Add(time.Second)
+	m.lastNow = *now
+	tick(m)
+	row := m.Snapshot().Recordings[0]
+	if row.Status != "partial" || !strings.Contains(row.Reason, "ending audio may be missing") {
+		t.Fatalf("stalled encoder did not explain its partial output: %+v", row)
+	}
+}
+
 func TestPersistenceFailureReapsActiveCapturesWithoutWaitingForShutdown(t *testing.T) {
 	for _, afterRename := range []bool{false, true} {
 		t.Run(fmt.Sprint(afterRename), func(t *testing.T) {

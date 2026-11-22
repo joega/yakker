@@ -815,7 +815,14 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	if job.reason != "" {
 		r.Reason = job.reason
 	}
-	if result.Err != nil && r.Reason == "" {
+	if errors.Is(result.Err, errCaptureStopTimeout) {
+		const warning = "recording could not finish cleanly; ending audio may be missing"
+		if r.Reason == "" {
+			r.Reason = warning
+		} else {
+			r.Reason += "; " + warning
+		}
+	} else if result.Err != nil && r.Reason == "" {
 		r.Reason = "stream or encoder interrupted"
 	}
 	if job.reason == "" && early && now.Before(parseTime(r.PlannedEnd)) {

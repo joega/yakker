@@ -18,7 +18,7 @@ import (
 )
 
 // A paced, effectively unbounded PCM stream resembles a live radio source.
-func liveWAV(t *testing.T) string {
+func liveWAV(t *testing.T, stallAfter ...time.Duration) string {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "audio/wav")
@@ -42,6 +42,10 @@ func liveWAV(t *testing.T) string {
 		defer ticker.Stop()
 		sample := 0
 		for {
+			if len(stallAfter) > 0 && time.Duration(sample)*time.Second/48000 >= stallAfter[0] {
+				<-r.Context().Done()
+				return
+			}
 			select {
 			case <-r.Context().Done():
 				return
@@ -294,4 +298,55 @@ func TestAbruptEncoderLossRetainsPlayablePartial(t *testing.T) {
 	}
 	r.Err = nil
 	verifyPlayback(t, path, r)
+}
+
+func TestCaptureDeadlineFlushesStalledInput(t *testing.T) {
+	mediaTools(t)
+	end := time.Now().Add(4 * time.Second)
+	path := filepath.Join(t.TempDir(), "stalled.partial")
+	capture, err := StartCapture(context.Background(), CaptureOptions{URL: liveWAV(t, 3*time.Second), Path: path, End: end, StopGrace: 1500 * time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := receive(t, capture)
+	verifyPlayback(t, path, result)
+	if result.EndedAt.After(end.Add(time.Second)) {
+		t.Fatalf("stalled input exceeded stop deadline: %s", result.EndedAt.Sub(end))
+	}
+	if result.DurationSeconds < 2.8 || result.DurationSeconds > 3.1 {
+		t.Fatalf("stalled input was not flushed: %+v", result)
+	}
+}
+
+// HLS may block while reloading an unchanged live playlist. A bounded hard
+// stop must retain recoverable audio and report the failed flush, never success.
+func TestCaptureStalledHLSRetainsPartialWithinStopBound(t *testing.T) {
+	mediaTools(t)
+	dir := t.TempDir()
+	playlist := filepath.Join(dir, "stream.m3u8")
+	if out, err := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=5.9", "-c:a", "aac", "-f", "hls", "-hls_time", "2", "-hls_list_size", "0", "-hls_flags", "omit_endlist", playlist).CombinedOutput(); err != nil {
+		t.Fatalf("HLS fixture: %v: %s", err, out)
+	}
+	server := httptest.NewServer(http.FileServer(http.Dir(dir)))
+	defer server.Close()
+	end := time.Now().Add(2800 * time.Millisecond)
+	path := filepath.Join(t.TempDir(), "stalled-hls.partial")
+	capture, err := StartCapture(context.Background(), CaptureOptions{URL: server.URL + "/stream.m3u8", Path: path, End: end, StopGrace: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := receive(t, capture)
+	if result.EndedAt.After(end.Add(1500 * time.Millisecond)) {
+		t.Fatalf("HLS stop exceeded bound: %s", result.EndedAt.Sub(end))
+	}
+	if result.Err == nil {
+		if result.DurationSeconds < 5.7 {
+			t.Fatalf("unflushed HLS tail reported success: %+v", result)
+		}
+	} else if !strings.Contains(result.Err.Error(), "gracefully") {
+		t.Fatalf("unexpected stalled HLS error: %+v", result)
+	}
+	// Interrupted audio remains usable; the manager must keep its partial status.
+	result.Err = nil
+	verifyPlayback(t, path, result)
 }

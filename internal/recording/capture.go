@@ -21,6 +21,8 @@ import (
 const captureBitrate = "24k"
 const defaultStopGrace = 5 * time.Second
 
+var errCaptureStopTimeout = errors.New("capture: encoder did not stop gracefully")
+
 type CaptureOptions struct {
 	FFmpeg, FFprobe, URL, Path string
 	End                        time.Time
@@ -151,7 +153,7 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 			_ = cmd.Process.Kill()
 			exit = <-exited
 			if reason == nil {
-				reason = errors.New("capture: encoder did not stop gracefully")
+				reason = errCaptureStopTimeout
 			}
 		}
 	}
