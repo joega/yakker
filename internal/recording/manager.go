@@ -204,8 +204,10 @@ func (m *Manager) Snapshot() Snapshot {
 		r.Weekdays = append([]int{}, r.Weekdays...)
 		s.Schedules = append(s.Schedules, preview(r, m.config.Now()))
 	}
+	showIDs := recordingShowIDs(m.state.Recordings)
 	for _, r := range m.state.Recordings {
 		rec := r.Recording
+		rec.ShowID = showIDs[r.ID]
 		rec.Playable = false
 		if info, _, err := managedInfo(r); err == nil {
 			rec.Bytes = info.Size()
@@ -322,6 +324,12 @@ func (m *Manager) StartNow(revision int64, station Schedule, duration time.Durat
 
 // SetPlaybackPosition checkpoints progress without invalidating editing drafts.
 func (m *Manager) SetPlaybackPosition(id string, seconds float64) error {
+	return m.SetPlaybackProgress(id, seconds, false)
+}
+
+// SetPlaybackProgress distinguishes an unstarted part from one that finished.
+// Playback bookmarks do not change the scheduler's optimistic revision.
+func (m *Manager) SetPlaybackProgress(id string, seconds float64, completed bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.closed {
@@ -343,10 +351,19 @@ func (m *Manager) SetPlaybackPosition(id string, seconds float64) error {
 			return errors.New("recording is not available for playback")
 		}
 		seconds = math.Max(0, math.Min(seconds, r.DurationSeconds))
-		if r.ResumePosition == seconds {
-			return nil
+		if completed {
+			seconds = 0
 		}
 		r.ResumePosition = seconds
+		r.PlaybackCompleted = completed
+		// Keep ordering deterministic even for rapid switches or a clock correction.
+		playedAt := m.config.Now().UTC().Truncate(time.Millisecond)
+		for _, other := range s.Recordings {
+			if previous := parseTime(other.LastPlayedAt); !playedAt.After(previous) {
+				playedAt = previous.Add(time.Millisecond)
+			}
+		}
+		r.LastPlayedAt = playedAt.Format(time.RFC3339Nano)
 		if err := m.checkpointLocked(s); err != nil {
 			return err
 		}

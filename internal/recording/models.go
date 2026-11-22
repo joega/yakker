@@ -50,7 +50,11 @@ type Recording struct {
 	Folder          string  `json:"folder"`
 	Filename        string  `json:"filename"`
 	ParentID        string  `json:"parentId,omitempty"`
-	Playable        bool    `json:"playable"`
+	// ShowID is derived for snapshots; the index retains the original occurrence.
+	ShowID            string `json:"showId,omitempty"`
+	LastPlayedAt      string `json:"lastPlayedAt,omitempty"`
+	PlaybackCompleted bool   `json:"playbackCompleted,omitempty"`
+	Playable          bool   `json:"playable"`
 }
 
 // Older indexes have only the program interval. Keep their timing unchanged.

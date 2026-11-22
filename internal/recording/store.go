@@ -84,6 +84,9 @@ func validateState(s diskState) error {
 	}
 	ids = map[string]bool{}
 	for _, r := range s.Recordings {
+		if r.LastPlayedAt != "" && parseTime(r.LastPlayedAt).IsZero() {
+			return errors.New("invalid recording playback bookmark")
+		}
 		if r.Failures < 0 || r.Failures > 3 || (r.ResumeAfter != "" && parseTime(r.ResumeAfter).IsZero()) {
 			return errors.New("invalid recording retry state")
 		}

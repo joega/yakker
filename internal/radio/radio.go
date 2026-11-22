@@ -634,7 +634,13 @@ func (r *controller) play() {
 	r.start()
 }
 func (r *controller) stop() {
-	r.checkpoint(true, false)
+	r.stopWithCompletion(false)
+}
+func (r *controller) stopWithCompletion(completed bool) {
+	r.checkpoint(true, completed)
+	if completed && r.player != nil {
+		r.player.position.Store(0)
+	}
 	r.state.Wanted = false
 	r.state.Paused = false
 	r.state.TemporaryBuffer = false
@@ -895,13 +901,7 @@ func (r *controller) event(event mpvEvent) {
 	if kind == "end-file" {
 		reason := event.Reason
 		if reason == "stop" || (r.state.PlaybackKind == "recording" && reason == "eof") {
-			if reason == "eof" {
-				r.checkpoint(true, true)
-				if r.player != nil {
-					r.player.position.Store(0)
-				}
-			}
-			r.stop()
+			r.stopWithCompletion(reason == "eof")
 			_ = r.publish()
 			return
 		}

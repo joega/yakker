@@ -346,7 +346,19 @@ func TestRealRecordingLifecycleAndForegroundIndependence(t *testing.T) {
 	if restarted.Position > 1.5 {
 		t.Fatal("recording did not restart", restarted)
 	}
+	h.send("seekRecording", "value", math.Max(0, restarted.Duration-.4))
+	finished := h.wait(func(s Status) bool { return !s.Wanted && s.State == "stopped" })
+	for _, part := range finished.Recordings.Recordings {
+		if part.ID == id && (!part.PlaybackCompleted || part.ResumePosition != 0 || part.LastPlayedAt == "") {
+			t.Fatal("EOF lost the completed-part bookmark", part)
+		}
+	}
 	h.stop()
+	for _, part := range h.barrier().Recordings.Recordings {
+		if part.ID == id && !part.PlaybackCompleted {
+			t.Fatal("Stop after EOF erased part completion", part)
+		}
+	}
 	h.send("quit")
 	select {
 	case err := <-h.done:

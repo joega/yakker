@@ -306,9 +306,10 @@ func (r *controller) checkpoint(force, completed bool) {
 	}
 	position := r.currentPosition()
 	if completed || (r.state.Duration > 0 && position >= math.Max(0, r.state.Duration-2)) {
+		completed = true
 		position = 0
 	}
-	if err := r.recorder.SetPlaybackPosition(r.state.RecordingID, position); err != nil {
+	if err := r.recorder.SetPlaybackProgress(r.state.RecordingID, position, completed); err != nil {
 		r.state.PlaybackProgressError = head("Unable to save playback position: "+err.Error(), 240)
 		return
 	}
