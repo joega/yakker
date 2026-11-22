@@ -414,12 +414,14 @@ connection setup adds further delay before audio arrives. Exact broadcast
 boundaries depend on the source: buffered feeds and HLS segments can contain
 audio from before the connection, so a file's audio duration can exceed the
 scheduled interval. **Duration** measures retained audio; the **Recorded** range
-tracks the encoder process, excluding later file inspection and finalization.
+tracks the stream-reader process, excluding the writer's drain and later file inspection.
 Details also show the intended **Capture window** when padding is enabled,
 separately from the show's scheduled interval and the recorded process times.
 Neither guarantees the broadcaster's program-clock boundaries. Early cutoffs
-are retained as partial recordings. A forced encoder stop also warns that ending
-audio may be missing, even when the remaining file is playable. Audio quality
+are retained as partial recordings. The stream reader and Opus writer use a
+bounded in-memory pipe, so the writer can finish received audio even if an HLS
+reader stalls. A forced reader stop still leaves a partial-recording note;
+a writer failure warns that ending audio may be missing. Audio quality
 depends on the source and the recording codec.
 
 Dates use a consistent format such as **Fri Nov 20 2026 02:30PM**. Library dates
@@ -711,6 +713,9 @@ and builds Linux amd64 and arm64 archives.
 For an isolated investigation of audio duration and scheduled boundaries, see
 the [recording timing audit](tools/recording-audit/README.md). It compares decoded
 audio with time-coded local fixtures and can optionally sample selected stations.
+The [matched-source quality comparison](tools/recording-quality/README.md)
+prepares randomized 24/48 kbit/s samples from local reference audio for listening
+checks, with full-rate decode measurements. It does not change the recording bitrate.
 
 Optional native UI checks (installed Omarchy controls required):
 

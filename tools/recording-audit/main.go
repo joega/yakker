@@ -23,25 +23,27 @@ import (
 const sampleRate = 16000
 
 type measurement struct {
-	EncoderStartedAt string  `json:"encoderStartedAt,omitempty"`
-	EncoderEndedAt   string  `json:"encoderEndedAt,omitempty"`
-	Status           string  `json:"status,omitempty"`
-	Source           string  `json:"source"`
-	WindowSeconds    float64 `json:"windowSeconds"`
-	FinishedSeconds  float64 `json:"finishedSeconds"`
-	ReportedSeconds  float64 `json:"reportedSeconds"`
-	DecodedSeconds   float64 `json:"decodedSeconds"`
-	RequestSeconds   float64 `json:"requestSeconds,omitempty"`
-	FirstWrite       float64 `json:"firstWriteSeconds,omitempty"`
-	FirstSource      float64 `json:"firstSourceSecond,omitempty"`
-	LastSource       float64 `json:"lastSourceSecond,omitempty"`
-	SourceSamples    int     `json:"sourceSamplesDelivered,omitempty"`
-	RMSDB            float64 `json:"rmsDB"`
-	PeakDB           float64 `json:"peakDB"`
-	ClippedSamples   int     `json:"clippedSamples"`
-	Bytes            int64   `json:"bytes"`
-	Error            string  `json:"error,omitempty"`
-	DecodeError      string  `json:"decodeError,omitempty"`
+	CaptureStartedAt   string  `json:"captureStartedAt,omitempty"`
+	CaptureEndedAt     string  `json:"captureEndedAt,omitempty"`
+	Status             string  `json:"status,omitempty"`
+	Source             string  `json:"source"`
+	WindowSeconds      float64 `json:"windowSeconds"`
+	FinishedSeconds    float64 `json:"finishedSeconds"`
+	ReportedSeconds    float64 `json:"reportedSeconds"`
+	DecodedSeconds     float64 `json:"decodedSeconds"`
+	RequestSeconds     float64 `json:"requestSeconds,omitempty"`
+	FirstWrite         float64 `json:"firstWriteSeconds,omitempty"`
+	FirstSource        float64 `json:"firstSourceSecond,omitempty"`
+	LastSource         float64 `json:"lastSourceSecond,omitempty"`
+	SourceSamples      int     `json:"sourceSamplesDelivered,omitempty"`
+	RMSDB              float64 `json:"rmsDB"`
+	PeakDB             float64 `json:"peakDB"`
+	ClippedSamples     int     `json:"clippedSamples"`
+	Bytes              int64   `json:"bytes"`
+	ProgramStartSecond float64 `json:"programStartSecond,omitempty"`
+	ProgramEndSecond   float64 `json:"programEndSecond,omitempty"`
+	Error              string  `json:"error,omitempty"`
+	DecodeError        string  `json:"decodeError,omitempty"`
 }
 
 type fixture struct {
@@ -176,8 +178,8 @@ wait:
 	}
 	r.FinishedSeconds, r.ReportedSeconds, r.Bytes = time.Since(start).Seconds(), captured.DurationSeconds, captured.Bytes
 	if !captured.StartedAt.IsZero() {
-		r.EncoderStartedAt = captured.StartedAt.Format(time.RFC3339Nano)
-		r.EncoderEndedAt = captured.EndedAt.Format(time.RFC3339Nano)
+		r.CaptureStartedAt = captured.StartedAt.Format(time.RFC3339Nano)
+		r.CaptureEndedAt = captured.EndedAt.Format(time.RFC3339Nano)
 	}
 	if captured.Err != nil {
 		r.Error = captured.Err.Error()
@@ -220,11 +222,13 @@ func analyzeAudio(r measurement, path string, f *fixture, start time.Time) measu
 
 // scheduledAudit exercises the actual one-minute rule and default scheduler
 // poll, with a source whose chirp position is tied to the planned wall clock.
-func scheduledAudit(output string) measurement {
-	start := time.Now().UTC().Truncate(time.Minute).Add(time.Minute)
+func scheduledAudit(output string, padding time.Duration) measurement {
+	start := time.Now().UTC().Add(padding + 2*time.Second).Truncate(time.Minute).Add(time.Minute)
 	end := start.Add(time.Minute)
+	captureStart, captureEnd := start.Add(-padding), end.Add(padding)
 	fmt.Printf("Scheduled boundary audit: %s to %s\n", start.Format(time.RFC3339), end.Format(time.RFC3339))
-	server, fixture := source(0, 0, start)
+	fmt.Printf("Capture window: %s to %s\n", captureStart.Format(time.RFC3339), captureEnd.Format(time.RFC3339))
+	server, fixture := source(0, 0, captureStart)
 	defer server.Close()
 	root, err := filepath.Abs(output)
 	if err != nil {
@@ -236,12 +240,13 @@ func scheduledAudit(output string) measurement {
 	}
 	defer manager.Close()
 	rule := recording.Schedule{ID: "boundary-audit", Kind: "once", Date: start.Format("2006-01-02"), StationID: "fixture", StationName: "Time-coded local audio", StreamURL: server.URL, StartTime: start.Format("15:04"), EndTime: end.Format("15:04"), Timezone: "UTC", Enabled: true}
+	rule.PreRollSeconds, rule.PostRollSeconds = int(padding.Seconds()), int(padding.Seconds())
 	if err := manager.UpsertSchedule(manager.Snapshot().Revision, rule); err != nil {
 		panic(err)
 	}
 	ticker := time.NewTicker(50 * time.Millisecond)
 	defer ticker.Stop()
-	deadline := time.NewTimer(time.Until(end.Add(15 * time.Second)))
+	deadline := time.NewTimer(time.Until(captureEnd.Add(15 * time.Second)))
 	defer deadline.Stop()
 	for {
 		select {
@@ -256,7 +261,7 @@ func scheduledAudit(output string) measurement {
 				continue
 			}
 			row := snapshot.Recordings[0]
-			r := measurement{Source: "scheduled", WindowSeconds: 60, FinishedSeconds: time.Since(start).Seconds(), ReportedSeconds: row.DurationSeconds, Bytes: row.Bytes, Status: row.Status, EncoderStartedAt: row.StartedAt, EncoderEndedAt: row.EndedAt, Error: row.Reason}
+			r := measurement{Source: "scheduled", WindowSeconds: captureEnd.Sub(captureStart).Seconds(), ProgramStartSecond: padding.Seconds(), ProgramEndSecond: padding.Seconds() + 60, FinishedSeconds: time.Since(captureStart).Seconds(), ReportedSeconds: row.DurationSeconds, Bytes: row.Bytes, Status: row.Status, CaptureStartedAt: row.StartedAt, CaptureEndedAt: row.EndedAt, Error: row.Reason}
 			if !row.Playable {
 				return r
 			}
@@ -264,7 +269,7 @@ func scheduledAudit(output string) measurement {
 			if err != nil {
 				panic(err)
 			}
-			return analyzeAudio(r, path, fixture, start)
+			return analyzeAudio(r, path, fixture, captureStart)
 		}
 	}
 }
@@ -273,11 +278,15 @@ func main() {
 	duration := flag.Duration("duration", 12*time.Second, "capture window (2s to 2m)")
 	output := flag.String("output", "build/planning/recording-audit", "new output directory")
 	scheduled := flag.Bool("scheduled", false, "exercise a real one-minute schedule at the next UTC minute boundary")
+	padding := flag.Duration("schedule-padding", 0, "padding on each side of the scheduled audit (whole seconds, 0s to 30s)")
 	fixtures := flag.Bool("fixtures", true, "include local paced, burst and delayed fixtures")
 	stationIDs := flag.String("stations", "", "optional comma-separated bundled stations; connects to those broadcasters")
 	flag.Parse()
 	if *duration < 2*time.Second || *duration > 2*time.Minute {
 		panic("duration must be between 2s and 2m")
+	}
+	if *padding < 0 || *padding > 30*time.Second || *padding%time.Second != 0 || (!*scheduled && *padding != 0) {
+		panic("schedule-padding requires --scheduled and whole seconds from 0s to 30s")
 	}
 	if err := os.MkdirAll(filepath.Dir(*output), 0700); err != nil {
 		panic(err)
@@ -327,7 +336,7 @@ func main() {
 		}
 	}
 	if *scheduled {
-		r := scheduledAudit(*output)
+		r := scheduledAudit(*output, *padding)
 		reports = append(reports, r)
 		data, _ := json.Marshal(r)
 		fmt.Println(string(data))
