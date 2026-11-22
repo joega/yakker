@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
@@ -254,6 +255,58 @@ func TestCaptureTimestampsExcludeProbeDelay(t *testing.T) {
 	}
 }
 
+func TestReaderStopsCooperativelyBeforeHardKill(t *testing.T) {
+	if needed := os.Getenv("YAKKER_TEST_READER_SIGNALS"); needed != "" {
+		interrupts := make(chan os.Signal, 4)
+		signal.Notify(interrupts, os.Interrupt)
+		if err := os.WriteFile(os.Getenv("YAKKER_TEST_READER_READY"), []byte("ready"), 0600); err != nil {
+			os.Exit(1)
+		}
+		<-interrupts
+		if needed == "two" {
+			<-interrupts
+		}
+		os.Exit(0)
+	}
+	for _, needed := range []string{"one", "two"} {
+		t.Run(needed, func(t *testing.T) {
+			ready := filepath.Join(t.TempDir(), "ready")
+			cmd := exec.Command(os.Args[0], "-test.run=^TestReaderStopsCooperativelyBeforeHardKill$")
+			cmd.Env = append(os.Environ(), "YAKKER_TEST_READER_SIGNALS="+needed, "YAKKER_TEST_READER_READY="+ready, "GORACE=atexit_sleep_ms=0")
+			if err := cmd.Start(); err != nil {
+				t.Fatal(err)
+			}
+			done := watchCaptureProcess(cmd)
+			finished := false
+			defer func() {
+				if !finished {
+					_ = cmd.Process.Kill()
+					<-done
+				}
+			}()
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if _, err := os.Stat(ready); err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("reader helper did not become ready")
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			start := time.Now()
+			exit, killed := stopCaptureReader(cmd, done, 600*time.Millisecond)
+			finished = true
+			if killed || exit.err != nil {
+				t.Fatalf("%s-interrupt reader needed a hard kill: %+v", needed, exit)
+			}
+			if time.Since(start) > time.Second {
+				t.Fatal("cooperative reader stop exceeded its budget")
+			}
+		})
+	}
+}
+
 func TestCaptureEscalatesAndReaps(t *testing.T) {
 	dir := t.TempDir()
 	encoder := filepath.Join(dir, "stubborn")
@@ -404,18 +457,15 @@ func TestCaptureStalledHLSDrainsTailWithinStopBound(t *testing.T) {
 	if result.EndedAt.After(end.Add(1500 * time.Millisecond)) {
 		t.Fatalf("HLS stop exceeded bound: %s", result.EndedAt.Sub(end))
 	}
-	// Some FFmpeg versions interrupt an HLS reload cleanly. Others need the
-	// bounded reader kill; either way the independent writer must drain fully.
-	if result.Err != nil && !errors.Is(result.Err, errCaptureReaderTimeout) {
-		t.Fatalf("unexpected stalled-reader result: %+v", result)
+	// FFmpeg needs a second interrupt to abort some initialized HLS reads.
+	// Reissue it inside the existing budget before resorting to a hard kill.
+	if result.Err != nil {
+		t.Fatalf("HLS reload required a hard reader stop: %+v", result)
 	}
 	if result.DurationSeconds < 5.85 || result.DurationSeconds > 6.1 {
 		t.Fatalf("received HLS tail was lost: %+v", result)
 	}
 	assertOggEOS(t, path)
-	// A forced reader stop remains partial in the manager; its finalized audio
-	// must be usable just like the clean-stop result.
-	result.Err = nil
 	verifyPlayback(t, path, result)
 }
 

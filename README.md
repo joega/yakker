@@ -436,7 +436,8 @@ separately from the show's scheduled interval and the recorded process times.
 Neither guarantees the broadcaster's program-clock boundaries. Early cutoffs
 are retained as partial recordings. The stream reader and Opus writer use a
 bounded in-memory pipe, so the writer can finish received audio even if an HLS
-reader stalls. A forced reader stop still leaves a partial-recording note;
+reader stalls. HLS reads get a second cooperative interrupt within the existing
+shutdown budget before a hard kill. A hard reader stop still leaves a partial-recording note;
 a writer failure warns that ending audio may be missing. Audio quality
 depends on the source and the recording codec.
 

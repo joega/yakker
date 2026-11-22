@@ -161,6 +161,23 @@ func waitCaptureProcess(cmd *exec.Cmd, done <-chan captureExit, grace time.Durat
 	}
 }
 
+// FFmpeg's initialized input interrupt callback needs two signals to abort a
+// blocked read. Give the first signal time to finish normally, then interrupt
+// the read cooperatively before using the remaining reader budget for a kill.
+func stopCaptureReader(cmd *exec.Cmd, done <-chan captureExit, grace time.Duration) (captureExit, bool) {
+	deadline := time.Now().Add(grace)
+	_ = cmd.Process.Signal(os.Interrupt)
+	timer := time.NewTimer(max(0, grace/2))
+	defer timer.Stop()
+	select {
+	case exit := <-done:
+		return exit, false
+	case <-timer.C:
+		_ = cmd.Process.Signal(os.Interrupt)
+		return waitCaptureProcess(cmd, done, time.Until(deadline))
+	}
+}
+
 func (c *Capture) run(ctx context.Context, reader, cmd *exec.Cmd, options CaptureOptions) {
 	defer close(c.finished)
 	defer close(c.done)
@@ -192,9 +209,8 @@ func (c *Capture) run(ctx context.Context, reader, cmd *exec.Cmd, options Captur
 	// encoder to consume buffered PCM, close the final page and write EOS.
 	deadline := time.Now().Add(options.StopGrace)
 	if !inputFinished {
-		_ = reader.Process.Signal(os.Interrupt)
 		var killed bool
-		inputExit, killed = waitCaptureProcess(reader, readerDone, options.StopGrace*2/3)
+		inputExit, killed = stopCaptureReader(reader, readerDone, options.StopGrace*2/3)
 		if killed {
 			reason = errors.Join(reason, errCaptureReaderTimeout)
 		}

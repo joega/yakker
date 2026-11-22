@@ -79,8 +79,11 @@ The automated capture tests additionally cover early EOF observed after the
 deadline, delayed probing, expired capture deadlines, stalled PCM input, and a
 stalled HLS playlist. Source decoding and Opus writing use separate processes
 connected by a bounded float PCM pipe. A stalled reader can be stopped without
-interrupting the writer's drain and final Ogg page. Reader stalls still retain a
-partial status because missing source audio cannot be ruled out; writer failures
+interrupting the writer's drain and final Ogg page. An initialized FFmpeg input
+can need a second interrupt to abort an HLS read; the reader gets that cooperative
+interrupt before a hard kill, within the same total shutdown budget. A reader
+that still needs a hard kill retains a partial status because missing source
+audio cannot be ruled out; writer failures
 warn separately about an unclean ending. Tests verify received HLS tail retention,
 the final EOS page, reader crashes, writer crashes and both children's cleanup.
 Run these with `go test ./internal/recording` or
