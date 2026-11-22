@@ -215,6 +215,8 @@ Ui.BarWidget {
           station: root.radio.wanted && (root.radio.playbackState === "playing" || root.radio.playbackPaused)
             ? root.radio.playbackStation : ({})
           fallbackColor: button.foreground
+          // Use the shell's glyph size, rather than filling the artwork canvas.
+          fallbackIconSize: Style.bar.iconSize
         }
         Rectangle {
           visible: root.vertical

@@ -6,6 +6,7 @@ Item {
   id: root
   property var station: ({})
   property color fallbackColor: Commons.Color.foreground
+  property real fallbackIconSize: Math.min(width, height)
   readonly property string artwork: station.artwork || ""
 
   Rectangle {
@@ -34,6 +35,6 @@ Item {
     textFormat: Text.PlainText
     color: root.fallbackColor
     font.family: Style.font.family
-    font.pixelSize: Math.min(root.width, root.height)
+    font.pixelSize: Math.min(root.width, root.height, root.fallbackIconSize)
   }
 }
