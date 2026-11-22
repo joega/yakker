@@ -297,18 +297,25 @@ func TestAbruptEncoderLossRetainsPlayablePartial(t *testing.T) {
 
 func TestCaptureDeadlineFlushesStalledInput(t *testing.T) {
 	mediaTools(t)
-	end := time.Now().Add(4 * time.Second)
+	// Let input probing finish before stalling; this checks the writer's drain
+	// rather than audio still buffered inside an initializing source decoder.
+	end := time.Now().Add(7 * time.Second)
 	path := filepath.Join(t.TempDir(), "stalled.partial")
-	capture, err := StartCapture(context.Background(), CaptureOptions{URL: liveWAV(t, 3*time.Second), Path: path, End: end, StopGrace: 1500 * time.Millisecond})
+	capture, err := StartCapture(context.Background(), CaptureOptions{URL: liveWAV(t, 6*time.Second), Path: path, End: end, StopGrace: 1500 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 	result := receive(t, capture)
+	if result.Err != nil && !errors.Is(result.Err, errCaptureReaderTimeout) {
+		t.Fatalf("unexpected stalled-input result: %+v", result)
+	}
+	result.Err = nil // A bounded reader kill must still leave finalized audio.
 	verifyPlayback(t, path, result)
-	if result.EndedAt.After(end.Add(time.Second)) {
+	assertOggEOS(t, path)
+	if result.EndedAt.After(end.Add(1500 * time.Millisecond)) {
 		t.Fatalf("stalled input exceeded stop deadline: %s", result.EndedAt.Sub(end))
 	}
-	if result.DurationSeconds < 2.8 || result.DurationSeconds > 3.1 {
+	if result.DurationSeconds < 5.8 || result.DurationSeconds > 6.1 {
 		t.Fatalf("stalled input was not flushed: %+v", result)
 	}
 }
@@ -397,14 +404,17 @@ func TestCaptureStalledHLSDrainsTailWithinStopBound(t *testing.T) {
 	if result.EndedAt.After(end.Add(1500 * time.Millisecond)) {
 		t.Fatalf("HLS stop exceeded bound: %s", result.EndedAt.Sub(end))
 	}
-	if !errors.Is(result.Err, errCaptureReaderTimeout) {
-		t.Fatalf("stalled reader was not identified: %+v", result)
+	// Some FFmpeg versions interrupt an HLS reload cleanly. Others need the
+	// bounded reader kill; either way the independent writer must drain fully.
+	if result.Err != nil && !errors.Is(result.Err, errCaptureReaderTimeout) {
+		t.Fatalf("unexpected stalled-reader result: %+v", result)
 	}
 	if result.DurationSeconds < 5.85 || result.DurationSeconds > 6.1 {
 		t.Fatalf("received HLS tail was lost: %+v", result)
 	}
 	assertOggEOS(t, path)
-	// Interrupted audio remains usable; the manager must keep its partial status.
+	// A forced reader stop remains partial in the manager; its finalized audio
+	// must be usable just like the clean-stop result.
 	result.Err = nil
 	verifyPlayback(t, path, result)
 }

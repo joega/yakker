@@ -139,6 +139,14 @@ shared singleton and helper process load the new code. It refuses to overwrite
 unmanaged installations or edits made directly in the installed files. Replaced
 managed installations are retained under `~/.config/omarchy/plugin-backups/`.
 
+Before upgrading, back up `~/.local/share/yakker/recordings.json` (or
+`$XDG_DATA_HOME/yakker/recordings.json` when configured) while recordings are
+idle. This build reads older indexes and preserves existing schedule timing.
+Once padded schedules or new recordings are saved, the index contains fields
+that v1.6.0 cannot read. Keep the index backup with the previous plugin for a
+rollback; plugin backups contain code, not recording metadata. Recordings added
+after that backup will not appear in a restored older index.
+
 The source checkout must be built before installation; `omarchy plugin add`
 clones source without compiling the controller. Update a local installation by
 rebuilding and rerunning the installer from the same checkout path. The installer
