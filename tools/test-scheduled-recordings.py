@@ -167,14 +167,22 @@ def confident(match):
 def match_delivery_boundary(saved, reference, bounds):
     if not bounds:
         return {"confirmed": False, "reason": "reference progress does not bracket this boundary"}
-    lo = max(0, math.floor((bounds[0]-4)*50))
-    hi = min(len(reference), math.ceil((bounds[1]+4)*50))
-    if hi < bounds[1]*50 or lo > bounds[0]*50:
-        return {"confirmed": False, "reason": "reference audio does not span this boundary"}
-    match = find_match(saved, reference[lo:hi])
-    result = {"confirmed": confident(match), "match": match, "referenceIntervalSeconds": [lo/50, hi/50]}
-    if result["confirmed"]:
-        result["savedDeliveryBounds"] = [match["referenceSecond"]+value-lo/50 for value in bounds]
+    wider = None
+    for context in (4, 2):
+        lo = max(0, math.floor((bounds[0]-context)*50))
+        hi = min(len(reference), math.ceil((bounds[1]+context)*50))
+        if hi < bounds[1]*50 or lo > bounds[0]*50:
+            return {"confirmed": False, "reason": "reference audio does not span this boundary"}
+        match = find_match(saved, reference[lo:hi])
+        result = {"confirmed": confident(match), "match": match, "referenceIntervalSeconds": [lo/50, hi/50],
+                  "contextSeconds": context}
+        if wider:
+            result["widerContextMatch"] = wider
+        if result["confirmed"]:
+            result["savedDeliveryBounds"] = [match["referenceSecond"]+value-lo/50 for value in bounds]
+            return result
+        if wider is None:
+            wider = result
     return result
 
 

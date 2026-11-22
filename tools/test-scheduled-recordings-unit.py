@@ -102,6 +102,31 @@ class MatchingTests(unittest.TestCase):
         self.assertFalse(audit.match_delivery_boundary(reference[300:600], reference, [30,30.2])["confirmed"])
         self.assertFalse(audit.match_delivery_boundary(reference, reference, [90,91])["confirmed"])
 
+    def test_different_outer_context_does_not_hide_a_preserved_boundary(self):
+        rng = random.Random(132)
+        reference = [rng.random() for _ in range(3500)]
+        saved = reference[300:2800].copy()
+        # Different content 2–4 seconds either side, but the entire boundary
+        # interval plus two seconds on each side is preserved.
+        for first, last in [(21,23), (27.2,29.2)]:
+            lo, hi = round(first*50)-300, round(last*50)-300
+            saved[lo:hi] = [rng.random() for _ in range(hi-lo)]
+        result = audit.match_delivery_boundary(saved, reference, [25,25.2])
+        self.assertTrue(result["confirmed"])
+        self.assertEqual(result["contextSeconds"], 2)
+        self.assertFalse(result["widerContextMatch"]["confirmed"])
+        self.assertAlmostEqual(result["savedDeliveryBounds"][0], 19)
+        self.assertAlmostEqual(result["savedDeliveryBounds"][1], 19.2)
+
+    def test_narrower_context_still_rejects_repeated_boundary_content(self):
+        rng = random.Random(133)
+        reference = [rng.random() for _ in range(3500)]
+        core = reference[23*50:round(27.2*50)]
+        saved = [rng.random() for _ in range(500)]+core+[rng.random() for _ in range(500)]+core
+        result = audit.match_delivery_boundary(saved, reference, [25,25.2])
+        self.assertFalse(result["confirmed"])
+        self.assertLess(result["match"]["ambiguityMargin"], .05)
+
 
 if __name__ == "__main__":
     unittest.main()

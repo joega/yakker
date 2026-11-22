@@ -67,6 +67,13 @@ Each station gets an additional longer reference connection. The check:
   checked separately: different content in extra post-roll does not prove the
   original show ending was missed.
 
+Boundary matching first uses four seconds of context on each side of the entire
+reference delivery range. If that fails, it tries two seconds on each side;
+independent connections can differ in surrounding content without losing the
+boundary itself. Both attempts use the same correlation and ambiguity thresholds.
+The report preserves a failed wider-context result when the narrower one succeeds.
+It never confirms only adjacent content that excludes the requested delivery range.
+
 `report.json`, controller logs, isolated indexes, complete recordings, references
 and head/tail clips remain under the output directory. Samples from broadcasters
 are for local inspection; do not commit or redistribute them. `build/planning/`
