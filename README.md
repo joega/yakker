@@ -724,6 +724,9 @@ For a live acceptance run across several stations, the
 [scheduled recording audit](tools/scheduled-recordings-audit.md) checks real padded
 schedules, decoded head/tail audio, silent playback and persisted resume using
 isolated data. It requires explicit station selection and contacts those broadcasters.
+The [recovery audit](tools/recording-recovery-audit.md) uses a controlled loopback
+source to test disconnects, stalls, controller loss, bounded retries and linked
+remainders without changing the installed library or connecting to broadcasters.
 
 Optional native UI checks (installed Omarchy controls required):
 
