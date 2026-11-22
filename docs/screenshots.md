@@ -55,6 +55,8 @@ states should be internally consistent; avoid retaining a previous example's
 buffering or timer state in an unrelated view.
 
 The 1.7 gallery shows padded schedule windows and a recovered partial recording.
+The current player keeps favorites behind a compact dropdown beside the station
+picker, so the saved-station list does not change the player's vertical layout.
 Its unknown capture end is deliberate: a forced controller exit cannot supply a
 precise end timestamp. The editor's preview timer is paused only in the temporary
 screenshot wrapper, so illustrative preview text is not replaced by a disconnected
