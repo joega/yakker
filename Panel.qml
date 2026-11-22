@@ -37,9 +37,6 @@ Ui.Panel {
   readonly property bool compactDock: auxiliaryView && panel.contentHeight < Style.space(400)
   readonly property real navigationFontSize: compactNavigation ? Math.min(13, Style.fontPx(1)) : Style.fontPx(1.083)
   readonly property real navigationPadding: Style.space(compactNavigation ? 3 : 8)
-  readonly property var favoritePresets: radio.favoriteIds.map(function(id) {
-    return root.radio.stations.find(function(station) { return station.id === id })
-  }).filter(function(station) { return !!station }).slice(0, 6)
   readonly property bool seekable: radio.wanted && (radio.playbackState === "playing" || radio.paused)
     && (radio.playbackKind === "recording" ? radio.duration > 0 : radio.dvr)
   readonly property bool canRewind: seekable && radio.position > (radio.playbackKind === "recording" ? 0 : radio.bufferStart) + 0.5
@@ -346,9 +343,8 @@ Ui.Panel {
       if (dockRetry.visible) order.push(53)
     } else {
       order.push(0)
+      if (stationPicker.favoritesControl.visible) order.push(25)
       if (favoriteButton.visible && favoriteButton.enabled) order.push(13)
-      if (radio.playbackKind !== "recording")
-        for (let i = 0; i < favoritePresets.length; i++) order.push(100 + i)
       if (connectionState.visible) {
         order.push(50)
         if (connectionState.secondaryText) order.push(51)
@@ -375,8 +371,8 @@ Ui.Panel {
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, root.settingsOpen ? settingsCloseButton : settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
-                     addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
-    ensureItemVisible(cursor === 58 ? captureIndicator : cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 100 ? presetRepeater.itemAt(cursor - 100) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
+                     addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton, stationPicker.favoritesControl]
+    ensureItemVisible(cursor === 58 ? captureIndicator : cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
   Connections {
     target: keyCatcher.Window.window
@@ -428,6 +424,7 @@ Ui.Panel {
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
     else if (cursor === 24) backFromSettings()
+    else if (cursor === 25 && stationPicker.favoritesControl.visible) stationPicker.toggleFavorites()
     else if (cursor === 58 && settingsOpen && captureIndicator.visible) captureIndicator.clicked()
     else if (cursor >= 54 && cursor <= 57 && auxiliaryView) {
       const target = [dockBack, dockPlay, dockForward, dockStop][cursor - 54]
@@ -440,7 +437,6 @@ Ui.Panel {
     }
     else if (cursor >= 40 && cursor <= 43 && settingsOpen) bufferPresets.itemAt(cursor - 40).clicked()
     else if (cursor >= 30 && cursor <= 33) selectSettingsTab(["listening", "storage", "alerts", "stations"][cursor - 30])
-    else if (cursor >= 100 && cursor < 100 + favoritePresets.length) radio.selectStation(favoritePresets[cursor - 100].id)
   }
   function openRecordings(storage, keepTabFocus) {
     if (storage) { openSettingsStorage(); return }
@@ -1030,69 +1026,38 @@ Ui.Panel {
                     emptyText: "No matching stations"
                     value: root.radio.stationId
                     options: root.radio.stationOptions
+                    showFavoritesShortcut: root.radio.playbackKind !== "recording"
+                    favoriteOrder: root.radio.favoriteIds
                     onFavoriteRequested: value => root.radio.toggleFavorite(value)
                     foreground: root.barForeground
                     hasCursor: root.virtualFocus && root.cursor === 0
+                    hasFavoritesCursor: root.virtualFocus && root.cursor === 25
                     onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 0 } }
+                    onFavoritesHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 25 } }
+                    onPopupOpenChanged: if (!popupOpen && root.opened && !root.auxiliaryView) {
+                      if (root.cursor === 25 && !favoritesControl.visible) root.cursor = 0
+                      Qt.callLater(function() { if (root.opened && !root.auxiliaryView) keyCatcher.forceActiveFocus() })
+                    }
                     onChanged: value => { root.radio.selectStation(value); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
                   }
                 }
                 Radio.FocusButton {
                   id: favoriteButton
+                  readonly property bool isFavorite: root.radio.favoriteIds.indexOf(root.radio.stationId) !== -1
                   visible: root.radio.playbackKind !== "recording"
                   width: visible ? implicitWidth : 0
-                  iconName: selected ? "heart-filled" : "heart"
-                  selected: root.radio.favoriteIds.indexOf(root.radio.stationId) !== -1
-                  tooltipText: selected ? "Remove from favorites" : "Add to favorites"
+                  iconName: isFavorite ? "heart-filled" : "heart"
+                  tooltipText: isFavorite ? "Remove from favorites" : "Add to favorites"
                   Accessible.role: Accessible.Button
                   Accessible.name: tooltipText
                   Accessible.checkable: true
-                  Accessible.checked: selected
+                  Accessible.checked: isFavorite
                   enabled: root.radio.hasStation
                   opacity: enabled ? 1 : 0.35
-                  foreground: root.barForeground
+                  foreground: isFavorite ? Commons.Color.accent : root.barForeground
                   hasCursor: root.virtualFocus && root.cursor === 13
                   onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 13 } }
                   onClicked: root.radio.toggleFavorite(root.radio.stationId)
-                }
-              }
-              Column {
-                width: parent.width
-                visible: root.favoritePresets.length > 0 && root.radio.playbackKind !== "recording"
-                spacing: Style.space(6)
-                Text { text: "FAVORITES"; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                Grid {
-                  id: presetGrid
-                  width: parent.width
-                  columns: width < Style.space(340) ? 2 : 3
-                  spacing: Style.space(6)
-                  Repeater {
-                    id: presetRepeater
-                    model: root.favoritePresets
-                    Radio.FocusButton {
-                      required property var modelData
-                      required property int index
-                      width: (presetGrid.width - presetGrid.spacing * (presetGrid.columns - 1)) / presetGrid.columns
-                      height: Style.space(46)
-                      selected: root.radio.stationId === modelData.id
-                      foreground: root.barForeground
-                      tooltipText: modelData.name + (modelData.city ? " · " + modelData.city : "")
-                      Accessible.role: Accessible.Button
-                      Accessible.name: tooltipText
-                      Accessible.checkable: true
-                      Accessible.checked: selected
-                      hasCursor: root.virtualFocus && root.cursor === 100 + index
-                      onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 100 + index } }
-                      onClicked: root.radio.selectStation(modelData.id)
-                      Column {
-                        anchors.fill: parent
-                        anchors.margins: Style.space(7)
-                        spacing: Style.space(2)
-                        Radio.MarqueeText { scrolling: false; width: parent.width; text: modelData.name; textFormat: Text.PlainText; color: root.barForeground; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1) }
-                        Text { width: parent.width; text: modelData.city || modelData.country || ""; textFormat: Text.PlainText; color: root.barForeground; opacity: 0.75; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(0.917); elide: Text.ElideRight }
-                      }
-                    }
-                  }
                 }
               }
               Text {

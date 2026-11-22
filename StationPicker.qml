@@ -14,6 +14,11 @@ Item {
   property string emptyText: "No matching stations"
   property color foreground: Commons.Color.foreground
   property bool hasCursor: false
+  property bool hasFavoritesCursor: false
+  property bool showFavoritesShortcut: false
+  property var favoriteOrder: []
+  property bool quickFavorites: false
+  readonly property Item favoritesControl: favoritesShortcut
   property real popupWidth: width
   property real popupX: 0
   property bool favoritesOnly: false
@@ -40,9 +45,18 @@ Item {
   signal changed(string value)
   signal favoriteRequested(string value)
   signal hovered(bool isHovered)
-  function open() { popup.open() }
+  signal favoritesHovered(bool isHovered)
+  function open(onlyFavorites) {
+    root.quickFavorites = onlyFavorites === true
+    root.favoritesOnly = root.quickFavorites
+    if (popup.opened) {
+      search.text = ""; root.setCurrent(0)
+      if (root.quickFavorites) list.forceActiveFocus(); else search.forceActiveFocus()
+    } else popup.open()
+  }
   function close() { popup.close() }
-  function toggle() { popup.opened ? popup.close() : popup.open() }
+  function toggle() { popup.opened && !root.quickFavorites ? popup.close() : root.open(false) }
+  function toggleFavorites() { popup.opened && root.quickFavorites ? popup.close() : root.open(true) }
   function nameFor(option) { return String(option.name || option.label || "Station") }
   function detailsFor(option) {
     if (!option.station) return String(option.description || "")
@@ -67,12 +81,18 @@ Item {
   function toggleFavorite(value) {
     highlightedValue = value
     favoriteRequested(value)
-    Qt.callLater(function() { if (popup.opened) { root.restoreCurrent(); list.forceActiveFocus() } })
+    Qt.callLater(function() { if (popup.opened) {
+      root.restoreCurrent()
+      if (root.quickFavorites && !root.filtered.length) pickerEmpty.primaryControl.forceActiveFocus()
+      else list.forceActiveFocus()
+    } })
   }
   FocusButton {
+    id: stationTrigger
     height: parent.height
-    width: Math.min(parent.width, implicitWidth + Style.space(20))
-    text: root.triggerLabel
+    width: Math.max(0, Math.min(parent.width - (favoritesShortcut.visible ? favoritesShortcut.width + Style.space(6) : 0), implicitWidth + Style.space(20)))
+    text: favoritesShortcut.visible && root.width < Style.space(240) ? (root.width < Style.space(120) ? "" : "Stations") : root.triggerLabel
+    iconName: text ? "" : "radio"
     leftAlign: true
     fontSize: Style.fontPx(1)
     horizontalPadding: Style.space(6)
@@ -80,25 +100,49 @@ Item {
     foreground: Commons.Color.accent
     hasCursor: root.hasCursor
     tooltipText: "Choose station · Search by station, city or country"
+    Accessible.name: root.triggerLabel
     onHovered: isHovered => root.hovered(isHovered)
     onClicked: root.toggle()
     FocusIcon { name: "down"; foreground: Commons.Color.accent; width: Style.space(14); height: width; anchors.right: parent.right; anchors.rightMargin: Style.space(6); anchors.verticalCenter: parent.verticalCenter }
   }
+  FocusButton {
+    id: favoritesShortcut
+    x: stationTrigger.width + Style.space(6)
+    visible: root.showFavoritesShortcut && root.favoriteCount > 0
+    height: parent.height
+    width: visible ? Math.min(root.width / 2, implicitWidth + Style.space(20)) : 0
+    text: root.width >= Style.space(180) ? "Favorites" : ""
+    iconName: text ? "" : "heart"
+    iconSize: Style.space(14)
+    leftAlign: true
+    fontSize: Style.fontPx(1)
+    horizontalPadding: Style.space(6)
+    verticalPadding: Style.space(3)
+    foreground: Qt.alpha(root.foreground, 0.8)
+    hasCursor: root.hasFavoritesCursor
+    selected: popup.opened && root.quickFavorites
+    tooltipText: "Favorite stations · " + root.favoriteCount + " saved"
+    Accessible.name: "Favorite stations"
+    onHovered: isHovered => root.favoritesHovered(isHovered)
+    onClicked: root.toggleFavorites()
+    FocusIcon { name: "down"; foreground: parent.foreground; width: Style.space(14); height: width; anchors.right: parent.right; anchors.rightMargin: Style.space(6); anchors.verticalCenter: parent.verticalCenter }
+  }
   QQC.Popup {
     id: popup
-    x: root.popupX
+    x: root.quickFavorites ? Math.max(root.popupX, Math.min(favoritesShortcut.x, root.popupX + root.popupWidth - width)) : root.popupX
     y: root.height + Style.space(4)
-    width: Math.min(root.popupWidth, root.Window.window ? Math.max(0, root.Window.window.width - Style.space(16)) : root.popupWidth)
+    width: Math.min(root.quickFavorites ? Math.min(Style.space(300), root.popupWidth) : root.popupWidth, root.Window.window ? Math.max(0, root.Window.window.width - Style.space(16)) : root.popupWidth)
     padding: Style.space(10)
     margins: Style.space(8)
     implicitHeight: Math.min(Style.space(420), pickerHeader.implicitHeight + (list.count ? list.contentHeight : pickerEmpty.implicitHeight) + pickerFooter.implicitHeight + Style.space(36))
     focus: true
     closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
     onOpened: {
-      root.sessionOrder = root.options.map(function(option) { return String(option.value) })
-      root.favoritesOnly = false; search.text = ""
+      const values = root.options.map(function(option) { return String(option.value) })
+      root.sessionOrder = root.quickFavorites ? root.favoriteOrder.concat(values) : values
+      search.text = ""
       root.highlightedValue = root.value
-      Qt.callLater(function() { if (popup.opened) { root.restoreCurrent(); search.forceActiveFocus() } })
+      Qt.callLater(function() { if (popup.opened) { root.restoreCurrent(); if (root.quickFavorites && list.count) list.forceActiveFocus(); else search.forceActiveFocus() } })
     }
     onClosed: { search.text = ""; root.sessionOrder = [] }
     background: Ui.BorderSurface {
@@ -112,8 +156,9 @@ Item {
         id: pickerHeader
         width: parent.width
         spacing: Style.space(8)
-        Text { width: parent.width; text: "Choose station"; textFormat: Text.PlainText; color: root.foreground; font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
+        Text { width: parent.width; text: root.quickFavorites ? "Favorites" : "Choose station"; textFormat: Text.PlainText; color: root.foreground; font.family: "Adwaita Sans"; font.pixelSize: Style.fontPx(1.25); font.weight: Font.DemiBold }
         Row {
+          visible: !root.quickFavorites
           width: parent.width
           spacing: Style.space(6)
           FocusTextField {
@@ -134,6 +179,7 @@ Item {
           FocusButton { id: clearSearch; visible: !!search.text; width: Style.space(28); height: Style.space(32); anchors.verticalCenter: parent.verticalCenter; iconName: "close"; iconSize: Style.space(14); tooltipText: "Clear search"; foreground: root.foreground; focusable: true; onClicked: { search.text = ""; search.forceActiveFocus() } }
         }
         Row {
+          visible: !root.quickFavorites
           width: parent.width
           spacing: Style.space(6)
           FocusButton { id: allFilter; text: "All"; fontSize: Style.fontPx(1); foreground: root.foreground; selected: !root.favoritesOnly; focusable: true; onClicked: { root.favoritesOnly = false; root.setCurrent(0) } }
@@ -153,7 +199,7 @@ Item {
         currentIndex: -1
         boundsBehavior: Flickable.StopAtBounds
         QQC.ScrollBar.vertical: QQC.ScrollBar { policy: QQC.ScrollBar.AsNeeded }
-        Keys.onUpPressed: { if (currentIndex <= 0) search.forceActiveFocus(); else root.setCurrent(currentIndex - 1) }
+        Keys.onUpPressed: { if (currentIndex <= 0) { if (root.quickFavorites) root.setCurrent(0); else search.forceActiveFocus() } else root.setCurrent(currentIndex - 1) }
         Keys.onDownPressed: root.setCurrent(currentIndex + 1)
         Keys.onReturnPressed: root.selectCurrent()
         Keys.onEnterPressed: root.selectCurrent()
@@ -236,6 +282,7 @@ Item {
           }
           onAction: {
             if (!root.options.length) { root.close(); return }
+            if (root.quickFavorites) { root.open(false); return }
             if (!search.text || !root.favoriteCount) root.favoritesOnly = false
             search.text = ""; root.setCurrent(0)
             Qt.callLater(function() { if (popup.opened) search.forceActiveFocus() })

@@ -33,7 +33,7 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, favorite presets, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Clean recording rows with station artwork, listening progress, timed Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Clean recording rows with station artwork, listening progress, timed Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
 
 | Station picker | Upcoming recordings | Listening settings |
 | :---: | :---: | :---: |
@@ -180,7 +180,8 @@ Titles that overflow scroll slowly to the end and back, pausing at both ends.
 Short titles stay still; reduced-motion mode uses an ellipsis and a full-title
 tooltip instead. Preset and playback dock titles also stay on one line, without
 independent animations; playback status can wrap to keep paused/stopped states
-readable. The player includes up to six favorite presets in the order you added them. The **Listen**, **Library**,
+readable. Favorites sit in an on-demand dropdown beside the station picker, keeping
+the player in place when stations are saved. The **Listen**, **Library**,
 and **Schedules** tabs form the first row, with Settings at the right edge. Both
 navigation rows use the same label alignment, hover/focus treatment, and compact
 spacing on narrow panels. Smaller artwork leaves room for station labels; replay
@@ -603,7 +604,7 @@ test a URL until you play it.
 
 Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
 
-Use the heart beside the station title to add or remove the selected station from favorites. The first six favorites appear as presets on Listen; all favorites appear first in the station picker and in matching search results, including custom stations. Selecting a preset follows the same rules as the picker: it changes the stream while listening and selects without starting playback while stopped.
+Use the heart beside the station title to add or remove the selected station from favorites. **Favorites** beside **Change station** opens a compact dropdown in the order you saved stations; all favorites are available, with scrolling for longer lists. On narrow panels the controls shorten to **Stations** and a heart shortcut. Arrow keys browse, Enter selects, F removes the highlighted favorite, and Escape closes. The full station picker also keeps favorites first, including custom stations. Selecting a favorite changes the stream while listening and selects without starting playback while stopped. Saving favorites never adds a row beneath the player.
 
 The selected station, favorites, volume, mute and listening buffer length are saved through Quattro's inline entry persistence in
 `~/.config/omarchy/shell.json`. The widget entry also accepts:

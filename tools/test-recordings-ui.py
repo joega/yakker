@@ -103,7 +103,6 @@ def main():
   property alias testDockForward: dockForward
   property alias testDockStop: dockStop
   property alias testScroller: scroller
-  property alias testPresets: presetRepeater
   property alias testHeading: stationHeading
   property alias testPlayButton: playButton
   property alias testStopButton: stopButton
