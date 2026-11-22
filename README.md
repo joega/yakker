@@ -32,13 +32,39 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 [What’s new in 1.8](#whats-new-in-18) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
-| Live radio | Pause and rewind | Recording library |
-| :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Grouped recovered shows with part counts, Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Live radio</th>
+      <th>Pause and rewind</th>
+      <th>Recording library</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-popup.png"><img src="docs/yakker-popup.png" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-dvr.png"><img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recordings.png"><img src="docs/yakker-recordings.png" alt="Grouped recovered shows with part counts, Resume actions, and persistent playback controls" width="240"></a></td>
+    </tr>
+  </tbody>
+</table>
 
-| Station picker | Upcoming recordings | Listening settings |
-| :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Sports and News category filters with search and Favorites in the station picker" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedules.png" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240">](docs/yakker-schedules.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Station picker</th>
+      <th>Upcoming recordings</th>
+      <th>Listening settings</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-stations.png"><img src="docs/yakker-stations.png" alt="Sports and News category filters with search and Favorites in the station picker" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-schedules.png"><img src="docs/yakker-schedules.png" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-settings.png"><img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
@@ -389,18 +415,40 @@ schedules grouped at the bottom. **Edit schedule** opens the saved values;
 use the enabled switch to pause a schedule or the confirmed delete action to
 remove it. Existing recordings stay in Library.
 
-| Schedule editor | Record now |
-| --- | --- |
-| [<img src="docs/yakker-schedule.png" alt="Schedule editor with Start early and End late padding, timezone, and precise capture-window preview" width="300">](docs/yakker-schedule.png) | [<img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300">](docs/yakker-record-now.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Schedule editor</th>
+      <th>Record now</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-schedule.png"><img src="docs/yakker-schedule.png" alt="Schedule editor with Start early and End late padding, timezone, and precise capture-window preview" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-record-now.png"><img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 For an immediate capture, choose **Record now**, a station, and a duration. It
 defaults to 30 minutes, with 15, 30, and 60 minute presets and a custom range of
 1 to 720 minutes. It uses the same storage and concurrency limits as scheduled
 captures and does not create a repeating schedule.
 
-| Saved-show playback | Recording storage |
-| :---: | :---: |
-| [<img src="docs/yakker-recording-player.png" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300">](docs/yakker-recording-player.png) | [<img src="docs/yakker-storage.png" alt="Storage settings tab with folder picker, library cap, and dedicated save controls" width="300">](docs/yakker-storage.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Saved-show playback</th>
+      <th>Recording storage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-recording-player.png"><img src="docs/yakker-recording-player.png" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-storage.png"><img src="docs/yakker-storage.png" alt="Storage settings tab with folder picker, library cap, and dedicated save controls" width="300"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 Up to **three recordings** can run at once, including while you listen to another
 station. Closing the popup, stopping foreground audio, changing stations, or
@@ -447,9 +495,20 @@ selected part. If that part is unavailable or still recording, the row explains
 why; open Parts to choose other available audio. Deleting one part keeps the
 other parts and their files.
 
-| Recovered show parts | Individual recording details |
-| --- | --- |
-| [<img src="docs/yakker-recording-parts.png" alt="One recovered show with chronological parts, interruption markers, and Resume for part two" width="300">](docs/yakker-recording-parts.png) | [<img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300">](docs/yakker-recording-details.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Recovered show parts</th>
+      <th>Individual recording details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-recording-parts.png"><img src="docs/yakker-recording-parts.png" alt="One recovered show with chronological parts, interruption markers, and Resume for part two" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recording-details.png"><img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 **Play** or **Resume** starts a retained file while keeping the library open.
 An empty library explains how to **Record now** or create a **New schedule**.
@@ -458,9 +517,20 @@ without changing saved audio. Library loading failures are shown separately from
 an empty library. Station search offers a clear-search or Show all stations action
 when no results or favorites are available.
 
-| Empty library | No matching recordings |
-| --- | --- |
-| [<img src="docs/yakker-empty-library.png" alt="Empty recording library with record-now and schedule guidance" width="300">](docs/yakker-empty-library.png) | [<img src="docs/yakker-empty-search.png" alt="No matching recordings with a clear-filters action" width="300">](docs/yakker-empty-search.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Empty library</th>
+      <th>No matching recordings</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-empty-library.png"><img src="docs/yakker-empty-library.png" alt="Empty recording library with record-now and schedule guidance" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-empty-search.png"><img src="docs/yakker-empty-search.png" alt="No matching recordings with a clear-filters action" width="300"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 A fixed playback dock remains available while you scroll recordings, schedules,
 editors, or settings. It uses the same round Pause/Resume control as Listen, with
@@ -644,9 +714,20 @@ settings. Deleting the selected station stops playback and clears its selection.
 Editing its stream URL reconnects if it was playing. Yakker does not fetch or
 test a URL until you play it.
 
-| Notification settings | Custom station editor |
-| --- | --- |
-| [<img src="docs/yakker-notifications.png" alt="Separate Alerts settings tab with immediate notification switches and no storage save actions" width="300">](docs/yakker-notifications.png) | [<img src="docs/yakker-custom-station.png" alt="Custom station editor with permanent labels, required stream fields, and a quieter Cancel action" width="300">](docs/yakker-custom-station.png) |
+<table>
+  <thead>
+    <tr>
+      <th>Notification settings</th>
+      <th>Custom station editor</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td valign="top" align="center"><a href="docs/yakker-notifications.png"><img src="docs/yakker-notifications.png" alt="Separate Alerts settings tab with immediate notification switches and no storage save actions" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-custom-station.png"><img src="docs/yakker-custom-station.png" alt="Custom station editor with permanent labels, required stream fields, and a quieter Cancel action" width="300"></a></td>
+    </tr>
+  </tbody>
+</table>
 
 Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
 
