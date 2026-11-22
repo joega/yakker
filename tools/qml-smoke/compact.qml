@@ -167,8 +167,10 @@ ShellRoot {
             reset(index++); radio.sleepRemaining=900; panel.testSleepPopup.open()
             tryVerify(function() { return panel.testSleepPresets.itemAt(0).activeFocus },2000)
             popupFits(panel.testSleepPopup,"Sleep timer")
-            const cancel=panel.testSleepOff.mapToItem(window.contentItem,0,0)
-            verify(cancel.y+panel.testSleepOff.height<=window.height,"Timer cancel clipped")
+            tryVerify(function() {
+              const cancel=panel.testSleepOff.mapToItem(window.contentItem,0,0)
+              return cancel.y+panel.testSleepOff.height<=window.height
+            },2000,"Timer cancel clipped after popup placement settled")
             capture("sleep-timer-padded-"+font)
             keyClick(Qt.Key_Escape); verify(!panel.testSleepPopup.opened && panel.opened)
           }
