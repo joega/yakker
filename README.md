@@ -42,9 +42,9 @@ The bundled station logos belong to their respective owners; see [artwork attrib
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-popup.png"><img src="docs/yakker-popup.png" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-dvr.png"><img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-recordings.png"><img src="docs/yakker-recordings.png" alt="Grouped recovered shows with part counts, Resume actions, and persistent playback controls" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-popup.png?v=1.8.0"><img src="docs/yakker-popup.png?v=1.8.0" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-dvr.png?v=1.8.0"><img src="docs/yakker-dvr.png?v=1.8.0" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recordings.png?v=1.8.0"><img src="docs/yakker-recordings.png?v=1.8.0" alt="Grouped recovered shows with part counts, Resume actions, and persistent playback controls" width="240"></a></td>
     </tr>
   </tbody>
 </table>
@@ -59,9 +59,9 @@ The bundled station logos belong to their respective owners; see [artwork attrib
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-stations.png"><img src="docs/yakker-stations.png" alt="Sports and News category filters with search and Favorites in the station picker" width="240"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-schedules.png"><img src="docs/yakker-schedules.png" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-settings.png"><img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-stations.png?v=1.8.0"><img src="docs/yakker-stations.png?v=1.8.0" alt="Sports and News category filters with search and Favorites in the station picker" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-schedules.png?v=1.8.0"><img src="docs/yakker-schedules.png?v=1.8.0" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-settings.png?v=1.8.0"><img src="docs/yakker-settings.png?v=1.8.0" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240"></a></td>
     </tr>
   </tbody>
 </table>
@@ -281,9 +281,9 @@ state, replay availability and delay, and active recording names. Saved-show
 playback identifies its original station and elapsed time. Long metadata is
 bounded and displayed as plain text.
 
-![Bar tooltip examples for live, paused buffering, stopped listening with captures, and saved-show playback](docs/yakker-bar-tooltips.png)
+![Bar tooltip examples for live, paused buffering, stopped listening with captures, and saved-show playback](docs/yakker-bar-tooltips.png?v=1.8.0)
 
-![Native bar widget states: live, paused buffering, stopped with background recordings, offline, and paused saved recording](docs/yakker-bar-states.png)
+![Native bar widget states: live, paused buffering, stopped with background recordings, offline, and paused saved recording](docs/yakker-bar-states.png?v=1.8.0)
 
 _Captions explain these examples; the bar itself uses state icons and a separate REC count._
 
@@ -325,7 +325,7 @@ The Sleep menu shows the active countdown, quick duration choices, and a custom
 minute field with a clear **Set timer** action. **Cancel timer** removes an active
 timer without stopping listening. Recording captures continue when the timer ends.
 
-[<img src="docs/yakker-sleep-timer.png" alt="Sleep timer with a clear active countdown, duration presets, custom minutes, and a quiet cancel action" width="300">](docs/yakker-sleep-timer.png)
+[<img src="docs/yakker-sleep-timer.png?v=1.8.0" alt="Sleep timer with a clear active countdown, duration presets, custom minutes, and a quiet cancel action" width="300">](docs/yakker-sleep-timer.png?v=1.8.0)
 
 ## Pause and rewind
 
@@ -385,7 +385,7 @@ station**, with technical information under **Show details**. Automatic retries
 show the countdown; a compact Retry action also stays available in the playback
 dock while browsing other sections.
 
-[<img src="docs/yakker-connection-error.png" alt="Connection failure with clear retry and choose-station recovery actions" width="300">](docs/yakker-connection-error.png)
+[<img src="docs/yakker-connection-error.png?v=1.8.0" alt="Connection failure with clear retry and choose-station recovery actions" width="300">](docs/yakker-connection-error.png?v=1.8.0)
 
 ## Scheduled recordings
 
@@ -424,8 +424,8 @@ remove it. Existing recordings stay in Library.
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-schedule.png"><img src="docs/yakker-schedule.png" alt="Schedule editor with Start early and End late padding, timezone, and precise capture-window preview" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-record-now.png"><img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-schedule.png?v=1.8.0"><img src="docs/yakker-schedule.png?v=1.8.0" alt="Schedule editor with Start early and End late padding, timezone, and precise capture-window preview" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-record-now.png?v=1.8.0"><img src="docs/yakker-record-now.png?v=1.8.0" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300"></a></td>
     </tr>
   </tbody>
 </table>
@@ -444,8 +444,8 @@ captures and does not create a repeating schedule.
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-recording-player.png"><img src="docs/yakker-recording-player.png" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-storage.png"><img src="docs/yakker-storage.png" alt="Storage settings tab with folder picker, library cap, and dedicated save controls" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recording-player.png?v=1.8.0"><img src="docs/yakker-recording-player.png?v=1.8.0" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-storage.png?v=1.8.0"><img src="docs/yakker-storage.png?v=1.8.0" alt="Storage settings tab with folder picker, library cap, and dedicated save controls" width="300"></a></td>
     </tr>
   </tbody>
 </table>
@@ -504,8 +504,8 @@ other parts and their files.
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-recording-parts.png"><img src="docs/yakker-recording-parts.png" alt="One recovered show with chronological parts, interruption markers, and Resume for part two" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-recording-details.png"><img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recording-parts.png?v=1.8.0"><img src="docs/yakker-recording-parts.png?v=1.8.0" alt="One recovered show with chronological parts, interruption markers, and Resume for part two" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recording-details.png?v=1.8.0"><img src="docs/yakker-recording-details.png?v=1.8.0" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300"></a></td>
     </tr>
   </tbody>
 </table>
@@ -526,8 +526,8 @@ when no results or favorites are available.
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-empty-library.png"><img src="docs/yakker-empty-library.png" alt="Empty recording library with record-now and schedule guidance" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-empty-search.png"><img src="docs/yakker-empty-search.png" alt="No matching recordings with a clear-filters action" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-empty-library.png?v=1.8.0"><img src="docs/yakker-empty-library.png?v=1.8.0" alt="Empty recording library with record-now and schedule guidance" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-empty-search.png?v=1.8.0"><img src="docs/yakker-empty-search.png?v=1.8.0" alt="No matching recordings with a clear-filters action" width="300"></a></td>
     </tr>
   </tbody>
 </table>
@@ -723,8 +723,8 @@ test a URL until you play it.
   </thead>
   <tbody>
     <tr>
-      <td valign="top" align="center"><a href="docs/yakker-notifications.png"><img src="docs/yakker-notifications.png" alt="Separate Alerts settings tab with immediate notification switches and no storage save actions" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-custom-station.png"><img src="docs/yakker-custom-station.png" alt="Custom station editor with permanent labels, required stream fields, and a quieter Cancel action" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-notifications.png?v=1.8.0"><img src="docs/yakker-notifications.png?v=1.8.0" alt="Separate Alerts settings tab with immediate notification switches and no storage save actions" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-custom-station.png?v=1.8.0"><img src="docs/yakker-custom-station.png?v=1.8.0" alt="Custom station editor with permanent labels, required stream fields, and a quieter Cancel action" width="300"></a></td>
     </tr>
   </tbody>
 </table>
