@@ -942,7 +942,9 @@ func (m *Manager) recoverLocked() {
 			cancel()
 			r.Status = "partial"
 			r.Reason = "plugin interrupted; recovered retained audio"
-			r.EndedAt = timestamp(m.config.Now())
+			// Recovery happens after the reader died. Its restart/probe time is
+			// not the capture end. Preserve a durable end if present; otherwise
+			// leave it unknown instead of inventing audio coverage during downtime.
 			r.Bytes = info.Size()
 			r.DurationSeconds = result.DurationSeconds
 			r.Resume = true

@@ -673,6 +673,56 @@ func TestEngineRecoveryProbesFinalNameAfterInterruptedPublish(t *testing.T) {
 	}
 }
 
+func TestCrashRecoveryDoesNotSubstituteRestartForCaptureEnd(t *testing.T) {
+	for _, knownEnd := range []bool{false, true} {
+		for _, expired := range []bool{false, true} {
+			t.Run(fmt.Sprintf("known=%v/expired=%v", knownEnd, expired), func(t *testing.T) {
+				m, now, _ := engineFixture(t)
+				saveRule(t, m, rule("crash-time"))
+				*now = now.Add(time.Hour)
+				tick(m)
+				if err := m.Close(); err != nil {
+					t.Fatal(err)
+				}
+				s := m.state.clone()
+				s.Recordings[0].Status = "recording"
+				s.Recordings[0].Resume = false
+				want := ""
+				if knownEnd {
+					want = timestamp(now.Add(5 * time.Second))
+				}
+				s.Recordings[0].EndedAt = want
+				if err := persistState(m.path, s); err != nil {
+					t.Fatal(err)
+				}
+				probe := filepath.Join(t.TempDir(), "probe")
+				script := "#!/bin/sh\nprintf '%s\\n' '{\"streams\":[{\"codec_name\":\"opus\",\"channels\":1}],\"format\":{\"duration\":\"5\",\"format_name\":\"ogg\"}}'\n"
+				if err := os.WriteFile(probe, []byte(script), 0700); err != nil {
+					t.Fatal(err)
+				}
+				*now = now.Add(30 * time.Second)
+				if expired {
+					*now = now.Add(2 * time.Hour)
+				}
+				config := m.config
+				config.FFprobe = probe
+				reopened, err := Open(config)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer reopened.Close()
+				recovered := reopened.Snapshot().Recordings[0]
+				if recovered.EndedAt != want {
+					t.Fatalf("recovery invented an end: got %q, want %q (restart %s)", recovered.EndedAt, want, *now)
+				}
+				if recovered.Status != "partial" || !recovered.Playable {
+					t.Fatalf("end-time fix lost retained audio: %+v", recovered)
+				}
+			})
+		}
+	}
+}
+
 func TestEngineDeletionIntentSurvivesFinalIndexFailure(t *testing.T) {
 	m, now, _ := engineFixture(t)
 	saveRule(t, m, rule("a"))

@@ -370,6 +370,10 @@ the shell, or shutting down the helper interrupts captures. Recoverable output i
 retained as partial; when the plugin returns during the scheduled interval it can
 capture a linked remainder. Unexpected stream failures can retry twice within
 the remaining interval, retaining separate segments. There is no wake timer or separate recording service.
+After a forced controller exit, the previous segment's exact end time may be
+unavailable; recovery keeps a saved end time when present and does not substitute
+the restart time. Retained audio and the original padded capture window remain
+available for recovery.
 
 Recordings use **mono Opus at 24 kbit/s VBR** in `.opus` files: roughly **3.6 MB
 per 20 minutes** or **10.8 MB per hour**, plus container overhead, with sizes
