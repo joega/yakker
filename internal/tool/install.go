@@ -27,7 +27,7 @@ var installFiles = []string{
 	"assets/kiro-am.webp", "assets/sportsnet-590.png", "assets/tsn-690.png",
 	"assets/talksport.png", "assets/talksport-2.png", "assets/bbc-radio-5-live.png",
 	"assets/off-the-ball.png", "assets/README.md", "yakker-controller",
-	"stations.json", "README.md", "LICENSE", "docs/releases/1.6.0.md",
+	"stations.json", "README.md", "LICENSE", "docs/releases/1.6.0.md", "docs/releases/1.7.0.md",
 	"docs/yakker-popup.png", "docs/yakker-stations.png", "docs/yakker-dvr.png",
 	"docs/yakker-recordings.png", "docs/yakker-schedule.png", "docs/yakker-settings.png",
 	"docs/yakker-recording-player.png", "docs/yakker-storage.png", "docs/screenshots.md",

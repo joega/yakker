@@ -1,6 +1,6 @@
 # Yakker
 
-A native sports-radio player with **pause, rewind, scheduled recordings, and a polished Focus interface**.
+A native sports-radio player with **pause, rewind, padded recording schedules, and a polished Focus interface**.
 
 Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
 Twenty-four stations across the US, Canada, UK and Ireland, streamed through headless mpv.
@@ -21,13 +21,15 @@ its tooltip gives the full status.
 
 **Save a show for later.** Record now or schedule a show once or weekly, keep
 compact Opus files in `~/Music/Yakker`, and resume them inside Yakker. Choose your recording folder
-and storage cap. Favorite stations stay at the top of search,
+and storage cap. Start early and end late to protect a show's boundaries;
+interrupted captures retain playable partials and linked remainders.
+Favorite stations stay at the top of search,
 and you can add your own stream URLs.
 
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
 
-[What’s new in 1.6](#whats-new-in-16) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+[What’s new in 1.7](#whats-new-in-17) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
@@ -35,35 +37,37 @@ The bundled station logos belong to their respective owners; see [artwork attrib
 
 | Station picker | Upcoming recordings | Listening settings |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedules.png" alt="Upcoming recordings with Next up highlighted and paused schedules grouped below" width="240">](docs/yakker-schedules.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
+| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedules.png" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240">](docs/yakker-schedules.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
 
 Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
 _Select any screenshot to enlarge it. Screens show the current native UI with
 illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
 
-## What’s new in 1.6
+## What’s new in 1.7
 
-The **Focus interface** puts listening first, with a compact tab row, favorite
-presets, proportional typography, and a clear **Record · Stop · Sleep** row.
+**Schedule padding and recording recovery** make saved shows more dependable.
 
-- **Playback stays within reach.** Library, Schedules, and Settings keep a
-  persistent player with the same Pause/Stop hierarchy as Listen.
-- **A clearer library and schedule flow.** Listening progress, timed Resume
-  actions, grouped recording details, upcoming order, and next-recording previews
-  make saved shows and schedules easier to manage.
-- **Settings has four focused tabs.** Listening, Storage, Alerts, and Stations
-  share a compact header. Storage has its own Save/Reset controls; notification
-  switches apply immediately.
-- **Consistent controls at smaller sizes.** Search, dropdowns, sliders, hover,
-  focus, and keyboard navigation share one treatment. Controls reflow when needed,
-  focused fields scroll into view, and Settings restores your browsing position.
-- **A quieter bar with clearer status.** Smaller station artwork and state icons
-  keep it compact; the tooltip explains playback, buffering, and active captures.
-  New widgets start in `centerEnd`; existing widgets keep their position.
+- **Protect the beginning and ending.** Start early or end late by up to ten
+  minutes. New schedules suggest 30 seconds early and one minute late; existing
+  schedules keep their timing. Previews and upcoming rows show the capture window.
+- **Retain more audio when a stream stalls.** The stream reader and Opus writer
+  shut down independently, allowing received audio to finish even when an HLS
+  reader needs a forced stop.
+- **Capture times describe capture.** File inspection no longer stretches the
+  recorded range or disguises an early cutoff. Crash recovery leaves an unknown
+  end unavailable instead of replacing it with the restart time.
+- **Recover with clear partials and linked remainders.** Backoff, retry limits and
+  original padded windows survive controller restarts. Recording notes explain
+  interrupted audio; explicit Stop and expired windows prevent further captures.
+- **Repeatable recording checks.** New isolated audits cover real padded schedules,
+  saved-position resume, controlled drops/stalls and controller recovery. Audio
+  remains mono Opus at 24 kbit/s VBR.
 
-See the [1.6.0 release notes](docs/releases/1.6.0.md) for upgrade details and
-validation coverage.
+The Focus interface introduced in [1.6](docs/releases/1.6.0.md) carries forward,
+including favorite presets, persistent playback controls and tabbed Settings.
+See the [1.7.0 release notes](docs/releases/1.7.0.md) for upgrade/rollback details,
+timing limits and validation coverage.
 
 ## Stations
 
@@ -357,7 +361,7 @@ remove it. Existing recordings stay in Library.
 
 | Schedule editor | Record now |
 | --- | --- |
-| [<img src="docs/yakker-schedule.png" alt="Schedule editor with labeled fields, weekly or one-time timing, an enabled switch, and a next-recording preview" width="300">](docs/yakker-schedule.png) | [<img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300">](docs/yakker-record-now.png) |
+| [<img src="docs/yakker-schedule.png" alt="Schedule editor with Start early and End late padding, timezone, and precise capture-window preview" width="300">](docs/yakker-schedule.png) | [<img src="docs/yakker-record-now.png" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300">](docs/yakker-record-now.png) |
 
 For an immediate capture, choose **Record now**, a station, and a duration. It
 defaults to 30 minutes, with 15, 30, and 60 minute presets and a custom range of
@@ -398,7 +402,7 @@ and recorded time ranges in local time, and any recording note. **Play from star
 and **Delete** are quiet secondary actions. Delete shows what will be removed and
 requires confirmation; Cancel or Hide details clears that confirmation.
 
-[<img src="docs/yakker-recording-details.png" alt="Expanded recording details with grouped metadata, scheduled and actual capture times, and quiet restart and delete actions" width="300">](docs/yakker-recording-details.png)
+[<img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300">](docs/yakker-recording-details.png)
 
 **Play** or **Resume** starts a retained file while keeping the library open.
 An empty library explains how to **Record now** or create a **New schedule**.
