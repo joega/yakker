@@ -745,6 +745,9 @@ func (m *Manager) startLocked(rule Schedule, o occurrence, now time.Time, parent
 		r.StartedAt = timestamp(now)
 		if now.Sub(o.captureStart()) > 2*time.Second {
 			r.Reason = "started after scheduled beginning"
+			if o.captureStart().Before(o.Start) {
+				r.Reason = "started after capture window began"
+			}
 		}
 	}
 	s := m.state.clone()
@@ -807,6 +810,9 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 		r.StartedAt = timestamp(result.StartedAt)
 		if result.StartedAt.Sub(r.captureStart()) > 2*time.Second && r.Reason == "" {
 			r.Reason = "started after scheduled beginning"
+			if r.captureStart().Before(parseTime(r.PlannedStart)) {
+				r.Reason = "started after capture window began"
+			}
 		}
 	}
 	early := endedAt.Before(r.captureEnd().Add(-2 * time.Second))
@@ -816,8 +822,15 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	if job.reason != "" {
 		r.Reason = job.reason
 	}
-	if errors.Is(result.Err, errCaptureStopTimeout) {
+	if errors.Is(result.Err, errCaptureStopTimeout) || errors.Is(result.Err, errCaptureEncoderFailed) {
 		const warning = "recording could not finish cleanly; ending audio may be missing"
+		if r.Reason == "" {
+			r.Reason = warning
+		} else {
+			r.Reason += "; " + warning
+		}
+	} else if errors.Is(result.Err, errCaptureReaderTimeout) {
+		const warning = "stream reader stalled; saved audio was finalized but the ending may be incomplete"
 		if r.Reason == "" {
 			r.Reason = warning
 		} else {
@@ -844,6 +857,9 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 			r.Status = "partial"
 			if r.Reason == "" {
 				r.Reason = "recording ended before scheduled end"
+				if r.captureEnd().After(parseTime(r.PlannedEnd)) {
+					r.Reason = "recording ended before capture window finished"
+				}
 			}
 		}
 		if info, path, err := managedInfo(*r); err == nil && info.Size() > 0 {

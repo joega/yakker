@@ -995,6 +995,34 @@ func TestCaptureStopTimeoutExplainsMissingTail(t *testing.T) {
 	}
 }
 
+func TestReaderTimeoutRetainsFinalizedAudioAsPartial(t *testing.T) {
+	for _, writerFailed := range []bool{false, true} {
+		t.Run(fmt.Sprint(writerFailed), func(t *testing.T) {
+			m, now, _ := engineFixture(t)
+			saveRule(t, m, rule("stalled-reader"))
+			*now = now.Add(time.Hour)
+			m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+				if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+					return nil, err
+				}
+				result := CaptureResult{Bytes: 40, DurationSeconds: 5, EndedAt: now.Add(time.Hour), Err: errCaptureReaderTimeout}
+				if writerFailed {
+					result.Err = errors.Join(result.Err, errCaptureEncoderFailed)
+				}
+				return &finishedCapture{result: result, done: resultChannel(result)}, nil
+			}
+			tick(m)
+			*now = now.Add(time.Hour + time.Second)
+			m.lastNow = *now
+			tick(m)
+			row := m.Snapshot().Recordings[0]
+			if row.Status != "partial" || strings.Contains(row.Reason, "saved audio was finalized") == writerFailed || !row.Playable {
+				t.Fatalf("reader stall did not retain its finalized partial: %+v", row)
+			}
+		})
+	}
+}
+
 func TestPersistenceFailureReapsActiveCapturesWithoutWaitingForShutdown(t *testing.T) {
 	for _, afterRename := range []bool{false, true} {
 		t.Run(fmt.Sprint(afterRename), func(t *testing.T) {

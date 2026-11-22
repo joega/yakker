@@ -84,8 +84,10 @@ func receive(t *testing.T, c *Capture) CaptureResult {
 		if _, ok = <-c.Done(); ok {
 			t.Fatal("multiple results")
 		}
-		if err := syscall.Kill(c.pid, 0); !errors.Is(err, syscall.ESRCH) {
-			t.Fatalf("encoder process still exists after completion: %v", err)
+		for _, pid := range []int{c.pid, c.readerPID} {
+			if err := syscall.Kill(pid, 0); !errors.Is(err, syscall.ESRCH) {
+				t.Fatalf("capture process %d still exists after completion: %v", pid, err)
+			}
 		}
 		return r
 	case <-time.After(15 * time.Second):
@@ -230,20 +232,13 @@ func TestCaptureTimestampsExcludeProbeDelay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("YAKKER_CAPTURE_TEST_CLIP", clip)
 	t.Setenv("YAKKER_CAPTURE_TEST_PROBE", probe)
-	encoder := filepath.Join(dir, "encoder")
 	probeWrapper := filepath.Join(dir, "probe")
-	for path, script := range map[string]string{
-		encoder:      "#!/bin/sh\ncat \"$YAKKER_CAPTURE_TEST_CLIP\" >&3\n",
-		probeWrapper: "#!/bin/sh\nsleep 0.5\nexec \"$YAKKER_CAPTURE_TEST_PROBE\" \"$@\"\n",
-	} {
-		if err := os.WriteFile(path, []byte(script), 0700); err != nil {
-			t.Fatal(err)
-		}
+	if err := os.WriteFile(probeWrapper, []byte("#!/bin/sh\nsleep 0.5\nexec \"$YAKKER_CAPTURE_TEST_PROBE\" \"$@\"\n"), 0700); err != nil {
+		t.Fatal(err)
 	}
 	before := time.Now()
-	capture, err := StartCapture(context.Background(), CaptureOptions{FFmpeg: encoder, FFprobe: probeWrapper, URL: "fixture", Path: filepath.Join(dir, "capture.partial")})
+	capture, err := StartCapture(context.Background(), CaptureOptions{FFprobe: probeWrapper, URL: clip, Path: filepath.Join(dir, "capture.partial")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,9 +313,72 @@ func TestCaptureDeadlineFlushesStalledInput(t *testing.T) {
 	}
 }
 
+func TestReaderCrashStillFinalizesReceivedAudio(t *testing.T) {
+	mediaTools(t)
+	path := filepath.Join(t.TempDir(), "reader-crash.partial")
+	capture, err := StartCapture(context.Background(), CaptureOptions{URL: liveWAV(t), Path: path, StopGrace: 2 * time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Wait for encoded audio, not just the Ogg headers. Killing a reader during
+	// its initial input probe can legitimately leave no decoded PCM to recover.
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		info, err := os.Stat(path)
+		if err == nil && info.Size() > 512 {
+			break
+		}
+		if time.Now().After(deadline) {
+			capture.Stop()
+			t.Fatal("reader never delivered audio")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := syscall.Kill(capture.readerPID, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	result := receive(t, capture)
+	if result.Err == nil {
+		t.Fatal("reader crash reported success")
+	}
+	assertOggEOS(t, path)
+	result.Err = nil
+	verifyPlayback(t, path, result)
+}
+
+func TestReaderCrashBeforeAudioReportsNoRecoverableDuration(t *testing.T) {
+	mediaTools(t)
+	requested := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case requested <- struct{}{}:
+		default:
+		}
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	capture, err := StartCapture(context.Background(), CaptureOptions{URL: server.URL, Path: filepath.Join(t.TempDir(), "no-audio.partial"), StopGrace: time.Second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-requested:
+	case <-time.After(3 * time.Second):
+		capture.Stop()
+		t.Fatal("source request did not arrive")
+	}
+	if err := syscall.Kill(capture.readerPID, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	result := receive(t, capture)
+	if result.Err == nil || result.DurationSeconds != 0 {
+		t.Fatalf("empty crash invented recoverable audio: %+v", result)
+	}
+}
+
 // HLS may block while reloading an unchanged live playlist. A bounded hard
-// stop must retain recoverable audio and report the failed flush, never success.
-func TestCaptureStalledHLSRetainsPartialWithinStopBound(t *testing.T) {
+// stop must drain the independent encoder and retain the received ending audio.
+func TestCaptureStalledHLSDrainsTailWithinStopBound(t *testing.T) {
 	mediaTools(t)
 	dir := t.TempDir()
 	playlist := filepath.Join(dir, "stream.m3u8")
@@ -339,14 +397,45 @@ func TestCaptureStalledHLSRetainsPartialWithinStopBound(t *testing.T) {
 	if result.EndedAt.After(end.Add(1500 * time.Millisecond)) {
 		t.Fatalf("HLS stop exceeded bound: %s", result.EndedAt.Sub(end))
 	}
-	if result.Err == nil {
-		if result.DurationSeconds < 5.7 {
-			t.Fatalf("unflushed HLS tail reported success: %+v", result)
-		}
-	} else if !strings.Contains(result.Err.Error(), "gracefully") {
-		t.Fatalf("unexpected stalled HLS error: %+v", result)
+	if !errors.Is(result.Err, errCaptureReaderTimeout) {
+		t.Fatalf("stalled reader was not identified: %+v", result)
 	}
+	if result.DurationSeconds < 5.85 || result.DurationSeconds > 6.1 {
+		t.Fatalf("received HLS tail was lost: %+v", result)
+	}
+	assertOggEOS(t, path)
 	// Interrupted audio remains usable; the manager must keep its partial status.
 	result.Err = nil
 	verifyPlayback(t, path, result)
+}
+
+// A complete final page distinguishes a drained file from playable crash output.
+func assertOggEOS(t *testing.T, path string) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var flags byte
+	for len(data) > 0 {
+		if len(data) < 27 || string(data[:4]) != "OggS" {
+			t.Fatal("invalid Ogg page")
+		}
+		n := int(data[26])
+		if len(data) < 27+n {
+			t.Fatal("incomplete Ogg header")
+		}
+		size := 27 + n
+		for _, length := range data[27 : 27+n] {
+			size += int(length)
+		}
+		if size > len(data) {
+			t.Fatal("incomplete Ogg page")
+		}
+		flags = data[5]
+		data = data[size:]
+	}
+	if flags&4 == 0 {
+		t.Fatal("recording lacks a finalized EOS page")
+	}
 }

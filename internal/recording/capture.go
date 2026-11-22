@@ -22,6 +22,8 @@ const captureBitrate = "24k"
 const defaultStopGrace = 5 * time.Second
 
 var errCaptureStopTimeout = errors.New("capture: encoder did not stop gracefully")
+var errCaptureReaderTimeout = errors.New("capture: stream reader did not stop gracefully")
+var errCaptureEncoderFailed = errors.New("capture: encoder exited unsuccessfully")
 
 type CaptureOptions struct {
 	FFmpeg, FFprobe, URL, Path string
@@ -31,7 +33,7 @@ type CaptureOptions struct {
 type CaptureResult struct {
 	Bytes           int64
 	DurationSeconds float64
-	// Encoder lifetime, separate from the later probe/finalization work. These
+	// Stream-reader lifetime, excluding encoder drain and later probing. These
 	// are local process times, not timestamps of the broadcaster's programme.
 	StartedAt, EndedAt time.Time
 	Err                error
@@ -42,10 +44,11 @@ type Capture struct {
 	done      chan CaptureResult
 	once      sync.Once
 	pid       int
+	readerPID int
 	startedAt time.Time
 }
 
-// StartCapture starts a single encoder writing an exclusively created Ogg file.
+// StartCapture starts a reader and writer with an exclusively created Ogg file.
 func StartCapture(ctx context.Context, options CaptureOptions) (*Capture, error) {
 	if ctx == nil {
 		return nil, errors.New("capture: nil context")
@@ -72,29 +75,53 @@ func StartCapture(ctx context.Context, options CaptureOptions) (*Capture, error)
 	if err != nil {
 		return nil, fmt.Errorf("capture: create output: %w", err)
 	}
-	cmd := exec.Command(options.FFmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-rw_timeout", "15000000", "-i", options.URL, "-map", "0:a:0", "-vn", "-ac", "1", "-c:a", "libopus", "-b:a", captureBitrate, "-vbr", "on", "-f", "ogg", "pipe:3")
+	readPipe, writePipe, err := os.Pipe()
+	if err != nil {
+		_ = f.Close()
+		_ = os.Remove(options.Path)
+		return nil, fmt.Errorf("capture: create audio pipe: %w", err)
+	}
+	// The source reader can stall inside a demuxer (notably HLS reloads).
+	// Give the writer independent EOF so it can drain Opus and write its trailer
+	// even when the reader must be killed. Float PCM avoids an intermediate
+	// lossy encode or integer clipping; the pipe bounds in-memory audio.
+	reader := exec.Command(options.FFmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-rw_timeout", "15000000", "-i", options.URL, "-map", "0:a:0", "-vn", "-ac", "1", "-ar", "48000", "-c:a", "pcm_f32le", "-flush_packets", "1", "-f", "f32le", "pipe:1")
+	reader.Stdout = writePipe
+	cmd := exec.Command(options.FFmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-f", "f32le", "-ar", "48000", "-ac", "1", "-i", "pipe:0", "-c:a", "libopus", "-b:a", captureBitrate, "-vbr", "on", "-page_duration", "200000", "-flush_packets", "1", "-f", "ogg", "pipe:3")
+	cmd.Stdin = readPipe
 	cmd.ExtraFiles = []*os.File{f}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
-	// Diagnostics may contain credential-bearing input URLs. Drain and discard them.
-	cmd.Stderr = io.Discard
+	for _, process := range []*exec.Cmd{reader, cmd} {
+		process.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+		// Diagnostics may contain credential-bearing input URLs.
+		process.Stderr = io.Discard
+	}
 	c := &Capture{stop: make(chan struct{}), finished: make(chan struct{}), done: make(chan CaptureResult, 1)}
 	started := make(chan error, 1)
-	// Linux Pdeathsig tracks the creating thread, so keep that OS thread alive
-	// until the child has been reaped, even if the caller's goroutine moves.
+	// Linux Pdeathsig tracks the creating thread. Keep it alive until both
+	// children have been reaped, even if the caller's goroutine moves.
 	go func() {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
+		closeFiles := func() { _ = f.Close(); _ = readPipe.Close(); _ = writePipe.Close() }
 		if err := cmd.Start(); err != nil {
-			_ = f.Close()
+			closeFiles()
 			_ = os.Remove(options.Path)
 			started <- fmt.Errorf("capture: start encoder: %w", err)
 			return
 		}
-		_ = f.Close()
-		c.pid = cmd.Process.Pid
+		if err := reader.Start(); err != nil {
+			closeFiles()
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+			_ = os.Remove(options.Path)
+			started <- fmt.Errorf("capture: start stream reader: %w", err)
+			return
+		}
+		closeFiles()
+		c.pid, c.readerPID = cmd.Process.Pid, reader.Process.Pid
 		c.startedAt = time.Now()
 		started <- nil
-		c.run(ctx, cmd, options)
+		c.run(ctx, reader, cmd, options)
 	}()
 	if err := <-started; err != nil {
 		return nil, err
@@ -105,34 +132,54 @@ func StartCapture(ctx context.Context, options CaptureOptions) (*Capture, error)
 func (c *Capture) Done() <-chan CaptureResult { return c.done }
 func (c *Capture) Stop()                      { c.once.Do(func() { close(c.stop) }); <-c.finished }
 
-func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions) {
+type captureExit struct {
+	err error
+	at  time.Time
+}
+
+func watchCaptureProcess(cmd *exec.Cmd) <-chan captureExit {
+	done := make(chan captureExit, 1)
+	go func() { err := cmd.Wait(); done <- captureExit{err: err, at: time.Now()} }()
+	return done
+}
+
+// waitCaptureProcess always reaps its child and reports forced termination.
+func waitCaptureProcess(cmd *exec.Cmd, done <-chan captureExit, grace time.Duration) (captureExit, bool) {
+	select {
+	case exit := <-done:
+		return exit, false
+	default:
+	}
+	timer := time.NewTimer(max(0, grace))
+	defer timer.Stop()
+	select {
+	case exit := <-done:
+		return exit, false
+	case <-timer.C:
+		_ = cmd.Process.Kill()
+		return <-done, true
+	}
+}
+
+func (c *Capture) run(ctx context.Context, reader, cmd *exec.Cmd, options CaptureOptions) {
 	defer close(c.finished)
 	defer close(c.done)
-	type exitResult struct {
-		err error
-		at  time.Time
-	}
-	exited := make(chan exitResult, 1)
-	go func() {
-		err := cmd.Wait()
-		exited <- exitResult{err: err, at: time.Now()}
-	}()
+	readerDone, encoderDone := watchCaptureProcess(reader), watchCaptureProcess(cmd)
 	var timer *time.Timer
 	var end <-chan time.Time
 	if !options.End.IsZero() {
-		delay := time.Until(options.End)
-		if delay < 0 {
-			delay = 0
-		}
-		timer = time.NewTimer(delay)
+		timer = time.NewTimer(max(0, time.Until(options.End)))
 		end = timer.C
 		defer timer.Stop()
 	}
-	var exit exitResult
+	var inputExit, outputExit captureExit
+	var inputFinished, outputFinished, stopped bool
 	var reason error
-	stopped := false
 	select {
-	case exit = <-exited:
+	case inputExit = <-readerDone:
+		inputFinished = true
+	case outputExit = <-encoderDone:
+		outputFinished = true
 	case <-c.stop:
 		stopped = true
 	case <-end:
@@ -141,26 +188,34 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 		stopped = true
 		reason = ctx.Err()
 	}
-	if stopped {
-		_ = cmd.Process.Signal(os.Interrupt)
-		grace := time.NewTimer(options.StopGrace)
-		select {
-		case exit = <-exited:
-			if !grace.Stop() {
-				<-grace.C
-			}
-		case <-grace.C:
-			_ = cmd.Process.Kill()
-			exit = <-exited
-			if reason == nil {
-				reason = errCaptureStopTimeout
-			}
+	// One total stop budget, reserving its last third for the independent
+	// encoder to consume buffered PCM, close the final page and write EOS.
+	deadline := time.Now().Add(options.StopGrace)
+	if !inputFinished {
+		_ = reader.Process.Signal(os.Interrupt)
+		var killed bool
+		inputExit, killed = waitCaptureProcess(reader, readerDone, options.StopGrace*2/3)
+		if killed {
+			reason = errors.Join(reason, errCaptureReaderTimeout)
 		}
+	}
+	if !outputFinished {
+		var killed bool
+		outputExit, killed = waitCaptureProcess(cmd, encoderDone, time.Until(deadline))
+		if killed {
+			reason = errors.Join(reason, errCaptureStopTimeout)
+		}
+	}
+	if outputExit.err != nil && !errors.Is(reason, errCaptureStopTimeout) {
+		reason = errors.Join(reason, errCaptureEncoderFailed)
+	}
+	if inputExit.err != nil && !stopped && reason == nil {
+		reason = errors.New("capture: stream reader exited unsuccessfully")
 	}
 	probeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	result, probeErr := ProbeRecording(probeCtx, options.FFprobe, options.Path)
 	cancel()
-	result.StartedAt, result.EndedAt = c.startedAt, exit.at
+	result.StartedAt, result.EndedAt = c.startedAt, inputExit.at
 	if info, err := os.Stat(options.Path); err == nil {
 		result.Bytes = info.Size()
 	}
@@ -168,8 +223,6 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 		result.Err = reason
 	} else if probeErr != nil {
 		result.Err = probeErr
-	} else if exit.err != nil && !stopped {
-		result.Err = errors.New("capture: encoder exited unsuccessfully")
 	}
 	c.done <- result
 }
