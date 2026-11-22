@@ -57,9 +57,9 @@ Item {
     if (list.currentIndex >= 0) list.positionViewAtIndex(list.currentIndex, ListView.Contain)
   }
   function chooseCategory(value) { categoryFilter = value; setCurrent(0) }
-  function moveCategory(direction) {
+  function moveCategory(category, direction) {
     const categories = ["all", "sports", "news"], controls = [allFilter, sportsFilter, newsFilter]
-    const index = (categories.indexOf(categoryFilter) + direction + categories.length) % categories.length
+    const index = (categories.indexOf(category) + direction + categories.length) % categories.length
     chooseCategory(categories[index]); controls[index].forceActiveFocus()
   }
   component CategoryButton: FocusButton {
@@ -74,8 +74,8 @@ Item {
     Accessible.checked: selected
     tooltipText: category === "all" ? "All station categories" : text + " stations"
     onClicked: root.chooseCategory(category)
-    Keys.onLeftPressed: root.moveCategory(-1)
-    Keys.onRightPressed: root.moveCategory(1)
+    Keys.onLeftPressed: root.moveCategory(category, -1)
+    Keys.onRightPressed: root.moveCategory(category, 1)
   }
   function restoreCurrent() {
     if (!popup.opened) return

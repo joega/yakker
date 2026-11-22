@@ -457,6 +457,11 @@ ShellRoot {
           picker.testFavorites.clicked(); compare(picker.filtered.length,24)
           picker.testSports.forceActiveFocus(); keyClick(Qt.Key_Right)
           compare(picker.categoryFilter,"news"); verify(picker.testNews.activeFocus)
+          // Tab can focus a category without selecting it. Arrows must move
+          // from that focused control, rather than the previously selected one.
+          picker.testAll.forceActiveFocus(); keyClick(Qt.Key_Right)
+          compare(picker.categoryFilter,"sports"); verify(picker.testSports.activeFocus)
+          keyClick(Qt.Key_Right); compare(picker.categoryFilter,"news")
           keyClick(Qt.Key_Left); compare(picker.categoryFilter,"sports")
           picker.testNews.clicked(); picker.testSearch.text = "WNYC New York"
           compare(picker.filtered.length,1)
