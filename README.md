@@ -716,6 +716,10 @@ audio with time-coded local fixtures and can optionally sample selected stations
 The [matched-source quality comparison](tools/recording-quality/README.md)
 prepares randomized 24/48 kbit/s samples from local reference audio for listening
 checks, with full-rate decode measurements. It does not change the recording bitrate.
+For a live acceptance run across several stations, the
+[scheduled recording audit](tools/scheduled-recordings-audit.md) checks real padded
+schedules, decoded head/tail audio, silent playback and persisted resume using
+isolated data. It requires explicit station selection and contacts those broadcasters.
 
 Optional native UI checks (installed Omarchy controls required):
 
