@@ -72,6 +72,14 @@ and head/tail clips remain under the output directory. Samples from broadcasters
 are for local inspection; do not commit or redistribute them. `build/planning/`
 is ignored. SIGTERM/normal interruption runs cleanup and retains the report.
 
+If an independent reference reader needs a forced stop, its WAV header may still
+declare an unfinished stream. The audit preserves that original and writes a
+separate `*-reference-recovered.wav` with the received complete 16-bit PCM frames
+and a finalized header. At most an incomplete final sample is discarded; no audio
+is synthesized. The progress report records the recovery and discarded byte count.
+Reference coverage and content confidence still have to pass. This reference-only
+repair does not change the saved Opus file or promote a partial recording to complete.
+
 ## Limits
 
 This does not establish the broadcaster's true program-clock timestamp. Delivery

@@ -24,6 +24,7 @@ import sys
 import tempfile
 import threading
 import time
+import wave
 
 ROOT = Path(__file__).resolve().parent.parent
 UTC = dt.timezone.utc
@@ -80,6 +81,27 @@ def mpv_position(path):
 
 def write_json(path, value):
     path.write_text(json.dumps(value, indent=2) + "\n")
+
+
+def recover_reference_wav(source):
+    """Finalize only received PCM frames; keep the forcibly stopped original."""
+    target = source.with_name(source.stem+"-recovered.wav")
+    frames, discarded = 0, 0
+    with wave.open(str(source), "rb") as reader:
+        if (reader.getnchannels(), reader.getsampwidth(), reader.getframerate(), reader.getcomptype()) != (1, 2, 16000, "NONE"):
+            raise RuntimeError("forced-stop reference has an unexpected PCM format")
+        with target.open("xb") as destination, wave.open(destination, "wb") as writer:
+            writer.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+            while pcm := reader.readframes(65536):
+                tail = len(pcm) % 2
+                discarded += tail
+                if tail:
+                    pcm = pcm[:-tail]
+                writer.writeframesraw(pcm)
+                frames += len(pcm)//2
+    if not frames:
+        raise RuntimeError("forced-stop reference has no complete PCM frames")
+    return target, {"original":source.name,"recovered":target.name,"frames":frames,"discardedTailBytes":discarded}
 
 
 def ffmpeg(*args):
@@ -291,6 +313,7 @@ class Reference:
         self.reader = threading.Thread(target=self.read, daemon=True)
         self.reader.start()
         self.killed = False
+        self.recovery = None
 
     def read(self):
         for line in self.process.stdout:
@@ -311,7 +334,10 @@ class Reference:
                 self.process.wait()
         self.reader.join(timeout=2)
         self.log.close()
-        write_json(self.path.with_suffix(".progress.json"), {"forcedStop":self.killed,"points":self.progress})
+        original = self.path
+        if self.killed:
+            self.path, self.recovery = recover_reference_wav(original)
+        write_json(original.with_suffix(".progress.json"), {"forcedStop":self.killed,"points":self.progress,"wavRecovery":self.recovery})
 
 
 def row(state, recording_id):
@@ -504,6 +530,7 @@ def main():
                 result["playback"].update(check_resume(controller, item, result["playback"]["savedPosition"]))
                 result["boundaries"] = compare_boundaries(Path(item["folder"])/item["filename"], reference.path, reference.progress,
                                                           timestamp(result["programStart"]), timestamp(result["programEnd"]))
+                result["referenceWavRecovery"] = reference.recovery
                 if result["boundaries"].get("coversReferenceDeliveryBoundaries") is False:
                     report["failures"].append(result["id"]+": saved audio did not cover independent reference delivery boundaries")
                 print(result["id"]+": persisted resume, pause/resume and ending playback passed; reference match "+str(result["boundaries"]["available"]), flush=True)

@@ -4,7 +4,10 @@ import importlib.util
 import datetime as dt
 from pathlib import Path
 import random
+import struct
+import tempfile
 import unittest
+import wave
 
 spec = importlib.util.spec_from_file_location("scheduled_audit", Path(__file__).with_name("test-scheduled-recordings.py"))
 audit = importlib.util.module_from_spec(spec)
@@ -12,6 +15,27 @@ spec.loader.exec_module(audit)
 
 
 class MatchingTests(unittest.TestCase):
+    def test_forced_stop_reference_preserves_pcm_and_finalizes_its_header(self):
+        for trailing in (b"", b"x"):
+            with self.subTest(trailing=trailing), tempfile.TemporaryDirectory() as folder:
+                original = Path(folder)/"reference.wav"
+                pcm = struct.pack("<8h", -700, 0, 120, 200, 400, -100, 70, 300)
+                with wave.open(str(original), "wb") as output:
+                    output.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                    output.writeframes(pcm)
+                data = bytearray(original.read_bytes()+trailing)
+                data[4:8] = b"\xff"*4
+                offset = data.index(b"data")+4
+                data[offset:offset+4] = b"\xff"*4
+                original.write_bytes(data)
+                recovered, note = audit.recover_reference_wav(original)
+                self.assertEqual(original.read_bytes(), data)
+                self.assertEqual(note["discardedTailBytes"], len(trailing))
+                self.assertEqual(note["frames"], 8)
+                with wave.open(str(recovered), "rb") as output:
+                    self.assertEqual(output.getnframes(), 8)
+                    self.assertEqual(output.readframes(100), pcm)
+
     def test_foreground_checks_controller_identity_and_reconnects(self):
         state = {"state":"playing", "station":{"id":"other"}, "playerPid":123, "retry":0, "error":""}
         self.assertEqual(audit.foreground_sample(state, "other", 123)["stationId"], "other")
