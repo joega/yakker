@@ -18,6 +18,7 @@ import queue
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -49,6 +50,32 @@ def schedule_windows(now, minutes, offsets, padding):
     base = (now+dt.timedelta(seconds=max(p[0] for p in padding)+15)).replace(second=0, microsecond=0)+dt.timedelta(minutes=1)
     return [(base+dt.timedelta(minutes=offset), base+dt.timedelta(minutes=offset+length))
             for length, offset in zip(minutes, offsets)]
+
+
+def foreground_sample(state, station_id, player_pid):
+    # The controller nests station identity; the widget exposes stationId separately.
+    sample = {k:state.get(k) for k in ("state", "playerPid", "retry", "error")}
+    sample["stationId"] = (state.get("station") or {}).get("id")
+    if sample["state"] != "playing" or sample["stationId"] != station_id or sample["playerPid"] != player_pid or sample["error"] or sample["retry"]:
+        raise RuntimeError("foreground listening was interrupted; inspect foreground samples and controller logs")
+    return sample
+
+
+def mpv_position(path):
+    # Live-only UI position is intentionally zero. Read the actual decoder clock.
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(2)
+        connection.connect(str(path))
+        connection.sendall(b'{"command":["get_property","time-pos"],"request_id":1}\n')
+        with connection.makefile("r") as messages:
+            for line in messages:
+                response = json.loads(line)
+                if response.get("request_id") == 1:
+                    value = response.get("data")
+                    if response.get("error") == "success" and isinstance(value, (int, float)) and math.isfinite(value):
+                        return value
+                    break
+    raise RuntimeError("foreground decoder clock is unavailable")
 
 
 def write_json(path, value):
@@ -398,7 +425,7 @@ def main():
             if args.listen_station:
                 controller.command("configure", stationId=args.listen_station)
                 controller.command("play")
-                playing = controller.wait(lambda s:s.get("state")=="playing" and s.get("stationId")==args.listen_station, timeout=35)
+                playing = controller.wait(lambda s:s.get("state")=="playing" and (s.get("station") or {}).get("id")==args.listen_station, timeout=35)
                 report["foreground"] = {"stationId":args.listen_station,"playerPid":playing["playerPid"],"samples":[]}
                 print("Playing separate foreground station with null audio: "+catalogue[args.listen_station]["name"], flush=True)
             write_json(output/"report.json", report)
@@ -419,11 +446,10 @@ def main():
                     raise RuntimeError(snapshot["error"])
                 if args.listen_station and time.monotonic() >= next_sample:
                     state = controller.command("status")
-                    sample = {k:state.get(k) for k in ("state","stationId","playerPid","position","retry","error")}
+                    sample = foreground_sample(state, args.listen_station, report["foreground"]["playerPid"])
+                    sample["position"] = mpv_position(Path(runtime)/"io.github.joega.yakker/mpv.sock")
                     sample.update(wallTime=time.time(), activeCount=state["recordings"]["activeCount"])
                     report["foreground"]["samples"].append(sample)
-                    if state["state"] != "playing" or state["stationId"] != args.listen_station or state["playerPid"] != report["foreground"]["playerPid"] or state.get("error") or state.get("retry"):
-                        raise RuntimeError("foreground listening was interrupted; inspect foreground samples and controller logs")
                     next_sample = time.monotonic()+1
                 if time.monotonic() >= next_heartbeat:
                     print(f"Recording audit running: {active} captures, {max(0, deadline-time.time()):.0f}s until final deadline", flush=True)

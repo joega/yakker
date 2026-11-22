@@ -12,6 +12,14 @@ spec.loader.exec_module(audit)
 
 
 class MatchingTests(unittest.TestCase):
+    def test_foreground_checks_controller_identity_and_reconnects(self):
+        state = {"state":"playing", "station":{"id":"other"}, "playerPid":123, "retry":0, "error":""}
+        self.assertEqual(audit.foreground_sample(state, "other", 123)["stationId"], "other")
+        for changed in ({"station":{"id":"wrong"}}, {"station":None}, {"playerPid":456},
+                        {"state":"paused"}, {"retry":1}, {"error":"connection failed"}):
+            with self.subTest(changed=changed), self.assertRaises(RuntimeError):
+                audit.foreground_sample(dict(state, **changed), "other", 123)
+
     def test_duration_and_offset_values_are_bounded_and_match_stations(self):
         self.assertEqual(audit.minute_values("5", 3, 1, 30, "minutes"), [5,5,5])
         self.assertEqual(audit.minute_values("0,1,2", 3, 0, 10, "offsets"), [0,1,2])

@@ -41,8 +41,10 @@ python3 -u tools/test-scheduled-recordings.py \
 after the first start. Either accepts a single value for all stations or one per
 station. The optional listening station must differ from all recording stations.
 It makes a real mpv connection with silent output. The report samples its state,
-station, player PID, progress and concurrent capture count once per second;
-an error, reconnect or player replacement fails the foreground check. Foreground
+station, player PID, decoder progress and concurrent capture count once per second;
+the decoder clock is read directly from the isolated mpv socket because the
+controller's live-only UI position intentionally stays at zero.
+An error, reconnect or player replacement fails the foreground check. Foreground
 playback stops before testing recorded-file playback. Reports and progress messages
 are checkpointed every 30 seconds while captures run. The example takes about
 12 minutes plus content matching and playback checks.
