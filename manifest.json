@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.joega.yakker",
   "name": "Yakker",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "author": "Yakker contributors",
   "license": "MIT",
   "description": "Curated sports, news and talk radio with the Focus player, pause and rewind, recording schedules, recovery, and saved-show playback.",

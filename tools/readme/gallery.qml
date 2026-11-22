@@ -68,7 +68,7 @@ ShellRoot {
           Commons.Style.cornerRadius = 8
           Commons.Style.fontFamily = "JetBrainsMono Nerd Font"
           themes = JSON.parse(readFile("themes.json"))
-          compare(Object.keys(themes).length, 18)
+          compare(Object.keys(themes).length, 19)
           radio.stations = JSON.parse(readFile("plugin/stations.json"))
           radio.station = radio.stations[0]
           radio.stationId = radio.station.id
@@ -79,7 +79,7 @@ ShellRoot {
           radio.recordings = snapshot([], [], 0)
           panel.cursor = -1
           panel.open()
-          selectExample("wfan")
+          selectExample("wnyc-fm")
           capture("popup")
 
           radio.bufferMinutes = 15; radio.dvr = true
@@ -90,8 +90,12 @@ ShellRoot {
 
           radio.bufferMinutes = 0; radio.dvr = false; radio.paused = false
           radio.playbackState = "playing"
-          selectExample("tsn-690")
+          selectExample("wins")
           panel.screenshotPicker.open()
+          panel.screenshotPicker.chooseCategory("news")
+          compare(panel.screenshotPicker.filtered.length, 13)
+          panel.screenshotPicker.screenshotSearch.text = "New York"
+          compare(panel.screenshotPicker.filtered.length, 2)
           capture("stations")
           panel.screenshotPicker.close()
 
@@ -101,10 +105,22 @@ ShellRoot {
             plannedStart:"2026-11-19T14:00:00-05:00",plannedEnd:"2026-11-19T14:20:00-05:00",captureStart:"2026-11-19T13:59:30-05:00",captureEnd:"2026-11-19T14:21:00-05:00",startedAt:"2026-11-19T13:59:31-05:00",endedAt:"",reason:"plugin interrupted; recovered retained audio",playable:true,resumePosition:96}
           const active = {id: "capturing", stationId: "kiro-am", label: "Seattle sports", stationName: "Seattle Sports 710", status: "recording", bytes: 1800000,
             plannedStart: "2026-11-20T14:00:00-05:00", plannedEnd: "2026-11-20T14:20:00-05:00", startedAt: "2026-11-20T14:00:01-05:00", playable: false}
-          radio.recordings = snapshot([schedule], [active, recovered, complete], 1)
+          const newsFirst = {id:"news-first",showId:"news-show",stationId:"wbur",label:"Morning Edition",stationName:"WBUR 90.9",status:"partial",bytes:2190000,durationSeconds:730,
+            plannedStart:"2026-11-20T09:00:00-05:00",plannedEnd:"2026-11-20T09:30:00-05:00",captureStart:"2026-11-20T08:59:30-05:00",captureEnd:"2026-11-20T09:31:00-05:00",startedAt:"2026-11-20T08:59:31-05:00",endedAt:"",reason:"plugin interrupted; recovered retained audio",playable:true,resumePosition:0,lastPlayedAt:"2026-11-21T10:00:00Z",playbackCompleted:true}
+          const newsSecond = Object.assign({},newsFirst,{id:"news-second",parentId:"news-first",status:"partial",bytes:3417000,durationSeconds:1139,startedAt:"2026-11-20T09:12:01-05:00",endedAt:"2026-11-20T09:31:00-05:00",reason:"started after capture window began",resumePosition:135,lastPlayedAt:"2026-11-21T10:03:00Z",playbackCompleted:false})
+          radio.recordings = snapshot([schedule], [active, newsSecond, newsFirst, complete], 1)
           selectExample("kiro-am")
           panel.openRecordings(false)
+          compare(panel.screenshotView.filteredRecordings.length,3)
           capture("recordings")
+
+          selectExample("wbur")
+          radio.recordings = snapshot([], [newsSecond,newsFirst], 0)
+          panel.screenshotView.toggleDetails("news-show")
+          compare(panel.screenshotView.filteredRecordings.length,1)
+          compare(panel.screenshotView.filteredRecordings[0].parts.length,2)
+          capture("recording-parts")
+          panel.screenshotView.toggleDetails("news-show")
           selectExample("kdka-fm")
           const detailed = Object.assign({}, recovered, {id:"detailed"})
           radio.recordings = snapshot([], [detailed], 0)

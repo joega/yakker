@@ -1,6 +1,6 @@
 # README screenshots
 
-Refresh the eighteen player/settings screenshots and the two bar previews from
+Refresh the nineteen player/settings screenshots and the two bar previews from
 the repository root:
 
 ```sh
@@ -25,7 +25,7 @@ desktop theme or modify desktop configuration. Images use a two-times display
 scale for sharpness. Review every image after a capture, especially dropdown
 placement, text wrapping, and long editor screens.
 
-The eighteen player/settings screenshots use **Catppuccin Latte** and varied
+The nineteen player/settings screenshots use **Catppuccin Latte** and varied
 stations for a consistent presentation. Player text uses Adwaita Sans; shell
 labels use JetBrainsMono Nerd Font.
 Yakker follows the user's active Omarchy theme; the screenshots are a shared
@@ -48,17 +48,20 @@ size; captions explain states without adding text to the bar itself. The tooltip
 sheet uses the production plain-text string and matching native tooltip surface.
 No desktop screenshots or private listening/recording data are used.
 
-Review all twenty images after capture. Keep the selected station and recording
+Review all twenty-one images after capture. Keep the selected station and recording
 source artwork consistent within each example, and vary stations across examples.
 Schedule names must match the bundled catalogue. Dates, durations, and recording
 states should be internally consistent; avoid retaining a previous example's
 buffering or timer state in an unrelated view.
 
-The 1.7 gallery shows padded schedule windows and a recovered partial recording.
-The current player keeps favorites in the station picker's Favorites filter,
-so the saved-station list does not change the player's vertical layout.
-Its unknown capture end is deliberate: a forced controller exit cannot supply a
-precise end timestamp. The editor's preview timer is paused only in the temporary
+The 1.8 gallery includes the Sports/News picker, a grouped library entry and
+expanded chronological recording parts, alongside padded schedule windows and
+individual recording details. The main player shows WNYC, the News picker uses
+1010 WINS with a New York search, and the grouped-show example uses WBUR.
+Favorites stay inside the station picker, so saved stations do not change the
+player's vertical layout. The recovered part's unknown capture end is deliberate:
+a forced controller exit cannot supply a precise end timestamp. The editor's
+preview timer is paused only in the temporary
 screenshot wrapper, so illustrative preview text is not replaced by a disconnected
 controller message. Production controls and their layout are unchanged.
 

@@ -29,7 +29,7 @@ var bundleFiles = []string{
 	"docs/yakker-bar-states.png", "docs/yakker-bar-tooltips.png",
 	"manifest.json", "qmldir", "BarWidget.qml",
 	"Panel.qml", "RadioService.qml", "RecordingNotices.js", "StationLogo.qml", "RecordingsView.qml", "FocusButton.qml", "FocusIcon.qml", "StationPicker.qml", "MarqueeText.qml", "StateCard.qml", "FocusTextField.qml", "FocusDropdown.qml", "FocusSlider.qml",
-	"stations.json", "README.md", "LICENSE", "docs/releases/1.6.0.md", "docs/releases/1.7.0.md",
+	"stations.json", "README.md", "LICENSE", "docs/releases/1.6.0.md", "docs/releases/1.7.0.md", "docs/releases/1.8.0.md",
 	"assets/wbns-fm.png", "assets/wkrk-fm.webp", "assets/kwfn-fm.webp",
 	"assets/wzgc-fm.webp", "assets/kkfn-fm.webp", "assets/klac.png",
 	"assets/krld-fm.webp", "assets/kfan.png", "assets/kiro-am.webp",
@@ -50,6 +50,7 @@ var bundleFiles = []string{
 	"docs/yakker-custom-station.png", "docs/yakker-sleep-timer.png", "docs/yakker-recording-details.png",
 	"docs/yakker-empty-library.png", "docs/yakker-empty-search.png",
 	"docs/yakker-connection-error.png", "docs/yakker-empty-stations.png",
+	"docs/yakker-recording-parts.png",
 }
 
 type entry struct {

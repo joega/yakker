@@ -30,45 +30,43 @@ and you can add your own stream URLs.
 Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
 The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
 
-[What’s new in 1.7](#whats-new-in-17) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+[What’s new in 1.8](#whats-new-in-18) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
 
 | Live radio | Pause and rewind | Recording library |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Clean recording rows with station artwork, listening progress, timed Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
+| [<img src="docs/yakker-popup.png" alt="Focus player with full station title, on-demand favorites, prominent Play/Pause, and compact volume controls" width="240">](docs/yakker-popup.png) | [<img src="docs/yakker-dvr.png" alt="Paused radio with 15 minutes of history, a seek timeline, and Go live" width="240">](docs/yakker-dvr.png) | [<img src="docs/yakker-recordings.png" alt="Grouped recovered shows with part counts, Resume actions, and persistent playback controls" width="240">](docs/yakker-recordings.png) |
 
 | Station picker | Upcoming recordings | Listening settings |
 | :---: | :---: | :---: |
-| [<img src="docs/yakker-stations.png" alt="Searchable station list with favorites sorted first" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedules.png" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240">](docs/yakker-schedules.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
+| [<img src="docs/yakker-stations.png" alt="Sports and News category filters with search and Favorites in the station picker" width="240">](docs/yakker-stations.png) | [<img src="docs/yakker-schedules.png" alt="Upcoming shows with padded capture windows and paused schedules grouped below" width="240">](docs/yakker-schedules.png) | [<img src="docs/yakker-settings.png" alt="Tabbed settings with Listening, Storage, Alerts, and Stations sections" width="240">](docs/yakker-settings.png) |
 
 Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
 
 _Select any screenshot to enlarge it. Screens show the current native UI with
 illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
 
-## What’s new in 1.7
+## What’s new in 1.8
 
-**Schedule padding and recording recovery** make saved shows more dependable.
+**Grouped recordings and curated news radio** build on the Focus player.
 
-- **Protect the beginning and ending.** Start early or end late by up to ten
-  minutes. New schedules suggest 30 seconds early and one minute late; existing
-  schedules keep their timing. Previews and upcoming rows show the capture window.
-- **Retain more audio when a stream stalls.** The stream reader and Opus writer
-  shut down independently, allowing received audio to finish even when an HLS
-  reader needs a forced stop.
-- **Capture times describe capture.** File inspection no longer stretches the
-  recorded range or disguises an early cutoff. Crash recovery leaves an unknown
-  end unavailable instead of replacing it with the restart time.
-- **Recover with clear partials and linked remainders.** Backoff, retry limits and
-  original padded windows survive controller restarts. Recording notes explain
-  interrupted audio; explicit Stop and expired windows prevent further captures.
-- **Repeatable recording checks.** New isolated audits cover real padded schedules,
-  saved-position resume, controlled drops/stalls and controller recovery. Audio
-  remains mono Opus at 24 kbit/s VBR.
+- **One show, expandable parts.** Recovered segments share a library row, with
+  total saved audio, clear interruption markers and individual part controls.
+  Resume opens the last unfinished part, or selects the next part after completion.
+  Parts still play separately; progress and seeking describe the selected part.
+- **Sports and News in one picker.** All / Sports / News works together with
+  Favorites and search. Thirteen news/public-radio additions bring the curated
+  catalogue to 37 stations, with official artwork bundled locally.
+- **A focused main player.** Favorites stay inside Change station, without a
+  permanent preset row or a separate Favorites dropdown. The idle bar icon is
+  sized to sit more comfortably alongside other shell widgets.
+- **Cleaner HLS shutdown and stronger checks.** A second cooperative reader
+  interrupt helps finalize stalled sources within the existing stop budget.
+  Recording audits verify decoder progress and fail inconclusive boundaries.
 
-The Focus interface introduced in [1.6](docs/releases/1.6.0.md) carries forward,
-including favorite presets, persistent playback controls and tabbed Settings.
-See the [1.7.0 release notes](docs/releases/1.7.0.md) for upgrade/rollback details,
-timing limits and validation coverage.
+Schedule padding and recovery from [1.7](docs/releases/1.7.0.md), and the Focus
+interface from [1.6](docs/releases/1.6.0.md), carry forward. See the
+[1.8.0 release notes](docs/releases/1.8.0.md) for details, validation and the
+**recording-index backup required for rollback to v1.7.0**.
 
 ## Stations
 
@@ -178,9 +176,9 @@ that v1.6.0 cannot read. Keep the index backup with the previous plugin for a
 rollback; plugin backups contain code, not recording metadata. Recordings added
 after that backup will not appear in a restored older index.
 
-Development builds with grouped recording parts also save last-played and
-completion bookmarks. Once playback saves these fields, v1.7.0 cannot read that
-index; retain a pre-upgrade index backup if you need to roll back.
+Version 1.8 also saves last-played and completion bookmarks for recording parts.
+Once playback saves these fields, v1.7.0 cannot read that index; retain a
+pre-upgrade index backup if you need to roll back.
 
 The source checkout must be built before installation; `omarchy plugin add`
 clones source without compiling the controller. Update a local installation by
@@ -449,7 +447,9 @@ selected part. If that part is unavailable or still recording, the row explains
 why; open Parts to choose other available audio. Deleting one part keeps the
 other parts and their files.
 
-[<img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300">](docs/yakker-recording-details.png)
+| Recovered show parts | Individual recording details |
+| --- | --- |
+| [<img src="docs/yakker-recording-parts.png" alt="One recovered show with chronological parts, interruption markers, and Resume for part two" width="300">](docs/yakker-recording-parts.png) | [<img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300">](docs/yakker-recording-details.png) |
 
 **Play** or **Resume** starts a retained file while keeping the library open.
 An empty library explains how to **Record now** or create a **New schedule**.
