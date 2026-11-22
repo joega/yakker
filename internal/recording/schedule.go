@@ -16,6 +16,7 @@ const maxSchedules = 100
 const maxRecordings = 4096
 const maxOccurrences = 8192
 const maxIndexBytes = 8 << 20
+const maxPaddingSeconds = 600
 
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$`)
 
@@ -53,6 +54,9 @@ func clockMinutes(s string) (int, error) {
 }
 
 func validateSchedule(s Schedule) error {
+	if s.PreRollSeconds < 0 || s.PreRollSeconds > maxPaddingSeconds || s.PostRollSeconds < 0 || s.PostRollSeconds > maxPaddingSeconds {
+		return errors.New("schedule padding must be between 0 and 600 seconds on each side")
+	}
 	if !identifier.MatchString(s.ID) || !identifier.MatchString(s.StationID) {
 		return errors.New("invalid schedule or station identifier")
 	}
@@ -131,9 +135,23 @@ func wallInstants(date time.Time, minute int, loc *time.Location) []time.Time {
 }
 
 type occurrence struct {
-	Key        string
-	Start, End time.Time
-	Reason     string
+	Key                      string
+	Start, End               time.Time
+	Reason                   string
+	CaptureStart, CaptureEnd time.Time
+}
+
+func (o occurrence) captureStart() time.Time {
+	if !o.CaptureStart.IsZero() {
+		return o.CaptureStart
+	}
+	return o.Start
+}
+func (o occurrence) captureEnd() time.Time {
+	if !o.CaptureEnd.IsZero() {
+		return o.CaptureEnd
+	}
+	return o.End
 }
 
 func occurrenceOn(s Schedule, date time.Time) occurrence {
@@ -185,6 +203,10 @@ func occurrenceOn(s Schedule, date time.Time) occurrence {
 		o.End = o.Start
 		o.Reason = "end time does not exist or is not after start"
 	}
+	if o.Reason == "" {
+		o.CaptureStart = o.Start.Add(-time.Duration(s.PreRollSeconds) * time.Second)
+		o.CaptureEnd = o.End.Add(time.Duration(s.PostRollSeconds) * time.Second)
+	}
 	return o
 }
 
@@ -203,6 +225,7 @@ func chosenDay(s Schedule, day time.Time) bool {
 func preview(s Schedule, now time.Time) Schedule {
 	s.NextStart = ""
 	s.NextEnd = ""
+	s.NextCaptureStart, s.NextCaptureEnd = "", ""
 	if !s.Enabled {
 		return s
 	}
@@ -214,9 +237,11 @@ func preview(s Schedule, now time.Time) Schedule {
 		day, err := time.Parse("2006-01-02", s.Date)
 		if err == nil {
 			o := occurrenceOn(s, day)
-			if o.Reason == "" && o.End.After(now) {
+			if o.Reason == "" && o.captureEnd().After(now) {
 				s.NextStart = o.Start.In(loc).Format(time.RFC3339)
 				s.NextEnd = o.End.In(loc).Format(time.RFC3339)
+				s.NextCaptureStart = o.captureStart().In(loc).Format(time.RFC3339)
+				s.NextCaptureEnd = o.captureEnd().In(loc).Format(time.RFC3339)
 			}
 		}
 		return s
@@ -228,9 +253,11 @@ func preview(s Schedule, now time.Time) Schedule {
 			continue
 		}
 		o := occurrenceOn(s, day)
-		if o.Reason == "" && o.End.After(now) {
+		if o.Reason == "" && o.captureEnd().After(now) {
 			s.NextStart = o.Start.In(loc).Format(time.RFC3339)
 			s.NextEnd = o.End.In(loc).Format(time.RFC3339)
+			s.NextCaptureStart = o.captureStart().In(loc).Format(time.RFC3339)
+			s.NextCaptureEnd = o.captureEnd().In(loc).Format(time.RFC3339)
 			break
 		}
 	}

@@ -279,6 +279,7 @@ func (m *Manager) UpsertSchedule(revision int64, schedule Schedule) error {
 	sort.Ints(schedule.Weekdays)
 	schedule.NextStart = ""
 	schedule.NextEnd = ""
+	schedule.NextCaptureStart, schedule.NextCaptureEnd = "", ""
 	s := m.state.clone()
 	found := false
 	for i, r := range s.Schedules {
@@ -592,7 +593,7 @@ func (m *Manager) tickLocked() {
 			if r.ID != id {
 				continue
 			}
-			if !now.Before(parseTime(r.PlannedEnd)) {
+			if !now.Before(r.captureEnd()) {
 				m.requestStop(j, "", false)
 			}
 			if _, _, err := managedInfo(r); err != nil {
@@ -614,17 +615,17 @@ func (m *Manager) tickLocked() {
 		if _, ok := m.jobs[r.ID]; ok {
 			continue
 		}
-		if r.ResumeAfter != "" && now.Before(parseTime(r.ResumeAfter)) && now.Before(parseTime(r.PlannedEnd)) {
+		if r.ResumeAfter != "" && now.Before(parseTime(r.ResumeAfter)) && now.Before(r.captureEnd()) {
 			continue
 		}
-		if now.Before(parseTime(r.PlannedEnd)) && !now.Before(parseTime(r.PlannedStart)) {
+		if now.Before(r.captureEnd()) && !now.Before(r.captureStart()) {
 			rule := Schedule{ID: r.ScheduleID, Label: r.Label, StationID: r.StationID, StationName: r.StationName, StreamURL: r.StreamURL}
-			o := occurrence{Key: r.Occurrence, Start: parseTime(r.PlannedStart), End: parseTime(r.PlannedEnd)}
+			o := occurrence{Key: r.Occurrence, Start: parseTime(r.PlannedStart), End: parseTime(r.PlannedEnd), CaptureStart: r.captureStart(), CaptureEnd: r.captureEnd()}
 			if err := m.startLocked(rule, o, now, r.ID); err != nil {
 				m.fail(err)
 				return
 			}
-		} else if !now.Before(parseTime(r.PlannedEnd)) {
+		} else if !now.Before(r.captureEnd()) {
 			s := m.state.clone()
 			for i := range s.Recordings {
 				if s.Recordings[i].ID == r.ID {
@@ -686,14 +687,14 @@ func (m *Manager) scheduleLocked(now time.Time) error {
 		}
 		localFrom, localNow := from.In(loc), now.In(loc)
 		day := time.Date(localFrom.Year(), localFrom.Month(), localFrom.Day(), 12, 0, 0, 0, loc).AddDate(0, 0, -1)
-		last := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 12, 0, 0, 0, loc)
+		last := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 12, 0, 0, 0, loc).AddDate(0, 0, 1)
 		for scanned := 0; !day.After(last); scanned++ {
 			if scanned > maxOccurrences {
 				return boundsError("scheduler catch-up days", maxOccurrences)
 			}
 			if chosenDay(rule, day) {
 				o := occurrenceOn(rule, day)
-				if !o.Start.After(now) && !o.End.Before(created) && (!o.End.Before(from) || o.Start.After(from)) && !m.state.Seen[o.Key] {
+				if !o.captureStart().After(now) && !o.captureEnd().Before(created) && (!o.captureEnd().Before(from) || o.captureStart().After(from)) && !m.state.Seen[o.Key] {
 					if err := m.startLocked(rule, o, now, ""); err != nil {
 						return err
 					}
@@ -712,12 +713,12 @@ func (m *Manager) startLocked(rule Schedule, o occurrence, now time.Time, parent
 	if !m.state.Seen[o.Key] && len(m.state.Seen) >= maxOccurrences {
 		return boundsError("occurrence ledger", maxOccurrences)
 	}
-	r := entry{Recording: Recording{ID: newID(), ScheduleID: rule.ID, Label: rule.Label, StationID: rule.StationID, StationName: rule.StationName, PlannedStart: timestamp(o.Start), PlannedEnd: timestamp(o.End), Status: "recording", Folder: m.state.Settings.Folder, ParentID: parent}, StreamURL: rule.StreamURL, Occurrence: o.Key}
+	r := entry{Recording: Recording{ID: newID(), ScheduleID: rule.ID, Label: rule.Label, StationID: rule.StationID, StationName: rule.StationName, PlannedStart: timestamp(o.Start), PlannedEnd: timestamp(o.End), CaptureStart: timestamp(o.captureStart()), CaptureEnd: timestamp(o.captureEnd()), Status: "recording", Folder: m.state.Settings.Folder, ParentID: parent}, StreamURL: rule.StreamURL, Occurrence: o.Key}
 	reason := o.Reason
 	if reason == "" && m.dependencyError != "" {
 		reason = m.dependencyError
 	}
-	if reason == "" && !now.Before(o.End) {
+	if reason == "" && !now.Before(o.captureEnd()) {
 		reason = "scheduled interval elapsed while plugin was unavailable"
 	}
 	if reason == "" && len(m.jobs) >= m.state.Settings.Concurrency {
@@ -742,7 +743,7 @@ func (m *Manager) startLocked(rule Schedule, o occurrence, now time.Time, parent
 	} else {
 		r.Filename = r.ID + ".partial"
 		r.StartedAt = timestamp(now)
-		if now.Sub(o.Start) > 2*time.Second {
+		if now.Sub(o.captureStart()) > 2*time.Second {
 			r.Reason = "started after scheduled beginning"
 		}
 	}
@@ -765,7 +766,7 @@ func (m *Manager) startLocked(rule Schedule, o occurrence, now time.Time, parent
 		return nil
 	}
 	// Persist the identity before creating media or launching any process.
-	job, err := m.startCapture(context.Background(), CaptureOptions{FFmpeg: m.config.FFmpeg, FFprobe: m.config.FFprobe, URL: r.StreamURL, Path: filepath.Join(r.Folder, r.Filename), End: o.End, StopGrace: m.config.StopGrace})
+	job, err := m.startCapture(context.Background(), CaptureOptions{FFmpeg: m.config.FFmpeg, FFprobe: m.config.FFprobe, URL: r.StreamURL, Path: filepath.Join(r.Folder, r.Filename), End: o.captureEnd(), StopGrace: m.config.StopGrace})
 	if err != nil {
 		s = m.state.clone()
 		i := len(s.Recordings) - 1
@@ -804,11 +805,11 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	r.EndedAt = timestamp(endedAt)
 	if !result.StartedAt.IsZero() {
 		r.StartedAt = timestamp(result.StartedAt)
-		if result.StartedAt.Sub(parseTime(r.PlannedStart)) > 2*time.Second && r.Reason == "" {
+		if result.StartedAt.Sub(r.captureStart()) > 2*time.Second && r.Reason == "" {
 			r.Reason = "started after scheduled beginning"
 		}
 	}
-	early := endedAt.Before(parseTime(r.PlannedEnd).Add(-2 * time.Second))
+	early := endedAt.Before(r.captureEnd().Add(-2 * time.Second))
 	r.Bytes = result.Bytes
 	r.DurationSeconds = result.DurationSeconds
 	r.Resume = job.resume
@@ -825,7 +826,7 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	} else if result.Err != nil && r.Reason == "" {
 		r.Reason = "stream or encoder interrupted"
 	}
-	if job.reason == "" && early && now.Before(parseTime(r.PlannedEnd)) {
+	if job.reason == "" && early && now.Before(r.captureEnd()) {
 		// Unexpected EOF and stream/encoder failures retry at most twice, while
 		// explicit user/storage/lifecycle stops keep their own resume policy.
 		r.Failures++

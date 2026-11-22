@@ -60,6 +60,85 @@ func saveRule(t *testing.T, m *Manager, s Schedule) {
 	}
 }
 func tick(m *Manager) { m.mu.Lock(); defer m.mu.Unlock(); m.tickLocked() }
+
+func TestPaddedCaptureKeepsProgramWindowAndResumesThroughPostRoll(t *testing.T) {
+	m, now, count := engineFixture(t)
+	s := rule("padded")
+	s.PreRollSeconds, s.PostRollSeconds = 30, 60
+	saveRule(t, m, s)
+	var deadline time.Time
+	original := m.startCapture
+	m.startCapture = func(ctx context.Context, o CaptureOptions) (captureJob, error) {
+		deadline = o.End
+		return original(ctx, o)
+	}
+	*now = now.Add(time.Hour - 31*time.Second)
+	tick(m)
+	if *count != 0 {
+		t.Fatal("started before pre-roll")
+	}
+	*now = now.Add(time.Second)
+	tick(m)
+	row := m.Snapshot().Recordings[0]
+	if *count != 1 || parseTime(row.PlannedStart).Format("15:04:05") != "10:00:00" || row.captureStart().Format("15:04:05") != "09:59:30" || deadline.Format("15:04:05") != "11:01:00" {
+		t.Fatalf("wrong padded window: %+v end=%s", row, deadline)
+	}
+	// Editing the source rule cannot change an active capture or its remainder.
+	s.PreRollSeconds, s.PostRollSeconds = 0, 0
+	s.EndTime = "12:00"
+	saveRule(t, m, s)
+	*now = time.Date(2026, 1, 5, 11, 0, 15, 0, time.UTC)
+	m.lastNow = *now
+	m.mu.Lock()
+	m.requestStop(m.jobs[row.ID], "test interruption", true)
+	m.mu.Unlock()
+	until := time.Now().Add(time.Second)
+	for *count < 2 && time.Now().Before(until) {
+		tick(m)
+		time.Sleep(time.Millisecond)
+	}
+	if *count != 2 || deadline.Format("15:04:05") != "11:01:00" {
+		t.Fatalf("post-roll resume lost frozen timing: count=%d end=%s", *count, deadline)
+	}
+	for _, r := range m.Snapshot().Recordings {
+		if r.ParentID == row.ID && (r.PlannedEnd != row.PlannedEnd || r.CaptureEnd != row.CaptureEnd) {
+			t.Fatalf("remainder timing changed: %+v", r)
+		}
+	}
+	*now = deadline
+	m.lastNow = *now
+	tick(m)
+	waitFinished(t, m)
+}
+
+func TestPreRollStartsOnDayBeforeProgramAndRespectsConcurrency(t *testing.T) {
+	m, now, count := engineFixture(t)
+	s := rule("midnight")
+	s.Kind, s.Date, s.StartTime, s.EndTime = "once", "2026-01-06", "00:00", "00:01"
+	s.PreRollSeconds = 60
+	saveRule(t, m, s)
+	*now = time.Date(2026, 1, 5, 23, 59, 0, 0, time.UTC)
+	tick(m)
+	if *count != 1 {
+		t.Fatal("tomorrow's pre-roll did not start")
+	}
+	settings := m.Snapshot().Settings
+	settings.Concurrency = 1
+	if err := m.SetSettings(m.Snapshot().Revision, settings); err != nil {
+		t.Fatal(err)
+	}
+	s.ID = "overlap"
+	saveRule(t, m, s)
+	tick(m)
+	if *count != 1 || len(m.Snapshot().Recordings) != 2 {
+		t.Fatal("padding bypassed concurrency")
+	}
+	for _, r := range m.Snapshot().Recordings {
+		if r.ScheduleID == "overlap" && (r.Status != "missed" || !strings.Contains(r.Reason, "limit")) {
+			t.Fatalf("overlap not explained: %+v", r)
+		}
+	}
+}
 func waitFinished(t *testing.T, m *Manager) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)

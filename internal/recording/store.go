@@ -113,6 +113,13 @@ func validateState(s diskState) error {
 		if parseTime(r.PlannedStart).IsZero() || parseTime(r.PlannedEnd).IsZero() || len(r.Occurrence) > 200 || !textOK(r.StreamURL, 4096) {
 			return errors.New("invalid recording interval")
 		}
+		if (r.CaptureStart == "") != (r.CaptureEnd == "") || (r.CaptureStart != "" &&
+			(parseTime(r.CaptureStart).IsZero() || parseTime(r.CaptureEnd).IsZero() ||
+				r.captureStart().After(parseTime(r.PlannedStart)) || r.captureEnd().Before(parseTime(r.PlannedEnd)) ||
+				parseTime(r.PlannedStart).Sub(r.captureStart()) > maxPaddingSeconds*time.Second ||
+				r.captureEnd().Sub(parseTime(r.PlannedEnd)) > maxPaddingSeconds*time.Second)) {
+			return errors.New("invalid recording capture window")
+		}
 	}
 	for k, v := range s.Seen {
 		id, date, ok := strings.Cut(k, ":")

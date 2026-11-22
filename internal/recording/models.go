@@ -10,20 +10,24 @@ type Settings struct {
 }
 
 type Schedule struct {
-	ID          string `json:"id"`
-	Kind        string `json:"kind,omitempty"`
-	Date        string `json:"date,omitempty"`
-	Label       string `json:"label"`
-	StationID   string `json:"stationId"`
-	StationName string `json:"stationName"`
-	StreamURL   string `json:"streamUrl"`
-	Weekdays    []int  `json:"weekdays"`
-	StartTime   string `json:"startTime"`
-	EndTime     string `json:"endTime"`
-	Timezone    string `json:"timezone"`
-	Enabled     bool   `json:"enabled"`
-	NextStart   string `json:"nextStart"`
-	NextEnd     string `json:"nextEnd"`
+	ID               string `json:"id"`
+	Kind             string `json:"kind,omitempty"`
+	Date             string `json:"date,omitempty"`
+	Label            string `json:"label"`
+	StationID        string `json:"stationId"`
+	StationName      string `json:"stationName"`
+	StreamURL        string `json:"streamUrl"`
+	Weekdays         []int  `json:"weekdays"`
+	StartTime        string `json:"startTime"`
+	EndTime          string `json:"endTime"`
+	Timezone         string `json:"timezone"`
+	Enabled          bool   `json:"enabled"`
+	NextStart        string `json:"nextStart"`
+	NextEnd          string `json:"nextEnd"`
+	PreRollSeconds   int    `json:"preRollSeconds,omitempty"`
+	PostRollSeconds  int    `json:"postRollSeconds,omitempty"`
+	NextCaptureStart string `json:"nextCaptureStart,omitempty"`
+	NextCaptureEnd   string `json:"nextCaptureEnd,omitempty"`
 }
 
 type Recording struct {
@@ -34,6 +38,8 @@ type Recording struct {
 	StationName     string  `json:"stationName"`
 	PlannedStart    string  `json:"plannedStart"`
 	PlannedEnd      string  `json:"plannedEnd"`
+	CaptureStart    string  `json:"captureStart,omitempty"`
+	CaptureEnd      string  `json:"captureEnd,omitempty"`
 	StartedAt       string  `json:"startedAt"`
 	EndedAt         string  `json:"endedAt"`
 	Status          string  `json:"status"`
@@ -45,6 +51,20 @@ type Recording struct {
 	Filename        string  `json:"filename"`
 	ParentID        string  `json:"parentId,omitempty"`
 	Playable        bool    `json:"playable"`
+}
+
+// Older indexes have only the program interval. Keep their timing unchanged.
+func (r Recording) captureStart() time.Time {
+	if r.CaptureStart != "" {
+		return parseTime(r.CaptureStart)
+	}
+	return parseTime(r.PlannedStart)
+}
+func (r Recording) captureEnd() time.Time {
+	if r.CaptureEnd != "" {
+		return parseTime(r.CaptureEnd)
+	}
+	return parseTime(r.PlannedEnd)
 }
 
 type Snapshot struct {

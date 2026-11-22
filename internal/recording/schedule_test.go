@@ -1,9 +1,48 @@
 package recording
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+func TestPaddingPreviewAcrossMidnightAndDST(t *testing.T) {
+	s := rule("padding")
+	s.Kind, s.Date, s.Timezone = "once", "2026-11-01", "America/New_York"
+	s.StartTime, s.EndTime = "01:30", "02:30"
+	s.PreRollSeconds, s.PostRollSeconds = 30, 60
+	p, err := PreviewSchedule(s, time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC))
+	if err != nil || p.NextStart != "2026-11-01T01:30:00-04:00" || p.NextCaptureStart != "2026-11-01T01:29:30-04:00" || p.NextCaptureEnd != "2026-11-01T02:31:00-05:00" {
+		t.Fatalf("padded DST preview: %+v %v", p, err)
+	}
+	s.Date, s.StartTime, s.EndTime = "2026-11-02", "00:00", "00:01"
+	p, err = PreviewSchedule(s, time.Date(2026, 11, 2, 4, 59, 0, 0, time.UTC))
+	if err != nil || p.NextCaptureStart != "2026-11-01T23:59:30-05:00" {
+		t.Fatalf("padding across midnight: %+v %v", p, err)
+	}
+	// The capture remains upcoming during its post-roll even after the show ends.
+	p, err = PreviewSchedule(s, time.Date(2026, 11, 2, 5, 1, 30, 0, time.UTC))
+	if err != nil || p.NextCaptureEnd != "2026-11-02T00:02:00-05:00" {
+		t.Fatalf("post-roll preview: %+v %v", p, err)
+	}
+	for _, padding := range []int{-1, 601} {
+		s.PreRollSeconds = padding
+		if _, err := PreviewSchedule(s, time.Now()); err == nil {
+			t.Fatal("invalid padding accepted")
+		}
+	}
+}
+
+func TestOldSchedulesKeepUnpaddedTiming(t *testing.T) {
+	var s Schedule
+	if err := json.Unmarshal([]byte(`{"id":"old","stationId":"station","stationName":"Station","streamUrl":"https://example.test/live","weekdays":[1],"startTime":"10:00","endTime":"11:00","timezone":"UTC","enabled":true}`), &s); err != nil {
+		t.Fatal(err)
+	}
+	p, err := PreviewSchedule(s, time.Date(2026, 1, 5, 9, 0, 0, 0, time.UTC))
+	if err != nil || p.NextStart != p.NextCaptureStart || p.NextEnd != p.NextCaptureEnd || s.PreRollSeconds != 0 || s.PostRollSeconds != 0 {
+		t.Fatalf("old timing changed: %+v %v", p, err)
+	}
+}
 
 func TestWeeklyDSTAndOvernight(t *testing.T) {
 	s := rule("dst")
