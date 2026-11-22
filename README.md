@@ -400,8 +400,16 @@ at most every 10 seconds and when pausing, stopping, switching, or shutting down
 finishing or reaching the end resets it. Saved recordings support 0.75×, 1×,
 1.25×, 1.5×, and 2× playback with pitch correction; live listening returns to
 1×. Missing files become available again when their retained folder returns.
-Audio quality and exact broadcast boundaries depend on the source; connection
-startup, broadcaster buffering and network interruptions can affect the segment.
+Schedules follow the computer clock. The scheduler checks once per second;
+connection setup adds further delay before audio arrives. Exact broadcast
+boundaries depend on the source: buffered feeds and HLS segments can contain
+audio from before the connection, so a file's audio duration can exceed the
+scheduled interval. **Duration** measures retained audio; the **Recorded** range
+tracks the encoder process, excluding later file inspection and finalization.
+Neither guarantees the broadcaster's program-clock boundaries. Early cutoffs
+are retained as partial recordings. A forced encoder stop also warns that ending
+audio may be missing, even when the remaining file is playable. Audio quality
+depends on the source and the recording codec.
 
 Dates use a consistent format such as **Fri Nov 20 2026 02:30PM**. Library dates
 use local time; upcoming schedule times and previews use the schedule's timezone.
@@ -688,6 +696,10 @@ revision fencing and child cleanup. The optional mpv checks use local HTTP
 fixtures and null audio; they do not contact
 broadcasters or change the installed widget. GitHub Actions runs these checks
 and builds Linux amd64 and arm64 archives.
+
+For an isolated investigation of audio duration and scheduled boundaries, see
+the [recording timing audit](tools/recording-audit/README.md). It compares decoded
+audio with time-coded local fixtures and can optionally sample selected stations.
 
 Optional native UI checks (installed Omarchy controls required):
 

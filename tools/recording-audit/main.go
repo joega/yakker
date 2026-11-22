@@ -23,22 +23,25 @@ import (
 const sampleRate = 16000
 
 type measurement struct {
-	Source          string  `json:"source"`
-	WindowSeconds   float64 `json:"windowSeconds"`
-	FinishedSeconds float64 `json:"finishedSeconds"`
-	ReportedSeconds float64 `json:"reportedSeconds"`
-	DecodedSeconds  float64 `json:"decodedSeconds"`
-	RequestSeconds  float64 `json:"requestSeconds,omitempty"`
-	FirstWrite      float64 `json:"firstWriteSeconds,omitempty"`
-	FirstSource     float64 `json:"firstSourceSecond,omitempty"`
-	LastSource      float64 `json:"lastSourceSecond,omitempty"`
-	SourceSamples   int     `json:"sourceSamplesDelivered,omitempty"`
-	RMSDB           float64 `json:"rmsDB"`
-	PeakDB          float64 `json:"peakDB"`
-	ClippedSamples  int     `json:"clippedSamples"`
-	Bytes           int64   `json:"bytes"`
-	Error           string  `json:"error,omitempty"`
-	DecodeError     string  `json:"decodeError,omitempty"`
+	EncoderStartedAt string  `json:"encoderStartedAt,omitempty"`
+	EncoderEndedAt   string  `json:"encoderEndedAt,omitempty"`
+	Status           string  `json:"status,omitempty"`
+	Source           string  `json:"source"`
+	WindowSeconds    float64 `json:"windowSeconds"`
+	FinishedSeconds  float64 `json:"finishedSeconds"`
+	ReportedSeconds  float64 `json:"reportedSeconds"`
+	DecodedSeconds   float64 `json:"decodedSeconds"`
+	RequestSeconds   float64 `json:"requestSeconds,omitempty"`
+	FirstWrite       float64 `json:"firstWriteSeconds,omitempty"`
+	FirstSource      float64 `json:"firstSourceSecond,omitempty"`
+	LastSource       float64 `json:"lastSourceSecond,omitempty"`
+	SourceSamples    int     `json:"sourceSamplesDelivered,omitempty"`
+	RMSDB            float64 `json:"rmsDB"`
+	PeakDB           float64 `json:"peakDB"`
+	ClippedSamples   int     `json:"clippedSamples"`
+	Bytes            int64   `json:"bytes"`
+	Error            string  `json:"error,omitempty"`
+	DecodeError      string  `json:"decodeError,omitempty"`
 }
 
 type fixture struct {
@@ -49,7 +52,7 @@ type fixture struct {
 
 // An 8-second burst models the initial buffered audio sent by some live feeds.
 // The chirp's frequency identifies its original position after lossy encoding.
-func source(burst int, delay time.Duration) (*httptest.Server, *fixture) {
+func source(burst int, delay time.Duration, origin ...time.Time) (*httptest.Server, *fixture) {
 	f := &fixture{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
@@ -78,6 +81,10 @@ func source(burst int, delay time.Duration) (*httptest.Server, *fixture) {
 		flush := w.(http.Flusher)
 		flush.Flush()
 		sample := 0
+		if len(origin) > 0 {
+			sample = int(time.Since(origin[0]).Seconds() * sampleRate)
+		}
+		firstSample := sample
 		write := func(count int) bool {
 			data := make([]byte, count*2)
 			for i := 0; i < count; i++ {
@@ -91,7 +98,7 @@ func source(burst int, delay time.Duration) (*httptest.Server, *fixture) {
 			flush.Flush()
 			sample += count
 			f.mu.Lock()
-			f.samples = sample
+			f.samples = sample - firstSample
 			f.mu.Unlock()
 			return true
 		}
@@ -168,9 +175,17 @@ wait:
 		}
 	}
 	r.FinishedSeconds, r.ReportedSeconds, r.Bytes = time.Since(start).Seconds(), captured.DurationSeconds, captured.Bytes
+	if !captured.StartedAt.IsZero() {
+		r.EncoderStartedAt = captured.StartedAt.Format(time.RFC3339Nano)
+		r.EncoderEndedAt = captured.EndedAt.Format(time.RFC3339Nano)
+	}
 	if captured.Err != nil {
 		r.Error = captured.Err.Error()
 	}
+	return analyzeAudio(r, path, f, start)
+}
+
+func analyzeAudio(r measurement, path string, f *fixture, start time.Time) measurement {
 	if f != nil {
 		f.mu.Lock()
 		r.RequestSeconds, r.SourceSamples = f.request.Sub(start).Seconds(), f.samples
@@ -203,14 +218,69 @@ wait:
 	return r
 }
 
+// scheduledAudit exercises the actual one-minute rule and default scheduler
+// poll, with a source whose chirp position is tied to the planned wall clock.
+func scheduledAudit(output string) measurement {
+	start := time.Now().UTC().Truncate(time.Minute).Add(time.Minute)
+	end := start.Add(time.Minute)
+	fmt.Printf("Scheduled boundary audit: %s to %s\n", start.Format(time.RFC3339), end.Format(time.RFC3339))
+	server, fixture := source(0, 0, start)
+	defer server.Close()
+	root, err := filepath.Abs(output)
+	if err != nil {
+		panic(err)
+	}
+	manager, err := recording.Open(recording.Config{DataDir: filepath.Join(root, "schedule-data"), DefaultFolder: filepath.Join(root, "schedule-media")})
+	if err != nil {
+		panic(err)
+	}
+	defer manager.Close()
+	rule := recording.Schedule{ID: "boundary-audit", Kind: "once", Date: start.Format("2006-01-02"), StationID: "fixture", StationName: "Time-coded local audio", StreamURL: server.URL, StartTime: start.Format("15:04"), EndTime: end.Format("15:04"), Timezone: "UTC", Enabled: true}
+	if err := manager.UpsertSchedule(manager.Snapshot().Revision, rule); err != nil {
+		panic(err)
+	}
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(time.Until(end.Add(15 * time.Second)))
+	defer deadline.Stop()
+	for {
+		select {
+		case <-deadline.C:
+			panic("scheduled capture did not finish")
+		case <-ticker.C:
+			snapshot := manager.Snapshot()
+			if snapshot.Error != "" {
+				panic(snapshot.Error)
+			}
+			if len(snapshot.Recordings) == 0 || snapshot.ActiveCount > 0 {
+				continue
+			}
+			row := snapshot.Recordings[0]
+			r := measurement{Source: "scheduled", WindowSeconds: 60, FinishedSeconds: time.Since(start).Seconds(), ReportedSeconds: row.DurationSeconds, Bytes: row.Bytes, Status: row.Status, EncoderStartedAt: row.StartedAt, EncoderEndedAt: row.EndedAt, Error: row.Reason}
+			if !row.Playable {
+				return r
+			}
+			_, path, err := manager.RecordingPath(row.ID)
+			if err != nil {
+				panic(err)
+			}
+			return analyzeAudio(r, path, fixture, start)
+		}
+	}
+}
+
 func main() {
 	duration := flag.Duration("duration", 12*time.Second, "capture window (2s to 2m)")
 	output := flag.String("output", "build/planning/recording-audit", "new output directory")
+	scheduled := flag.Bool("scheduled", false, "exercise a real one-minute schedule at the next UTC minute boundary")
 	fixtures := flag.Bool("fixtures", true, "include local paced, burst and delayed fixtures")
 	stationIDs := flag.String("stations", "", "optional comma-separated bundled stations; connects to those broadcasters")
 	flag.Parse()
 	if *duration < 2*time.Second || *duration > 2*time.Minute {
 		panic("duration must be between 2s and 2m")
+	}
+	if err := os.MkdirAll(filepath.Dir(*output), 0700); err != nil {
+		panic(err)
 	}
 	if err := os.Mkdir(*output, 0700); err != nil {
 		panic(err)
@@ -255,6 +325,12 @@ func main() {
 				panic("unknown station identifier")
 			}
 		}
+	}
+	if *scheduled {
+		r := scheduledAudit(*output)
+		reports = append(reports, r)
+		data, _ := json.Marshal(r)
+		fmt.Println(string(data))
 	}
 	data, _ := json.MarshalIndent(reports, "", "  ")
 	if err := os.WriteFile(filepath.Join(*output, "report.json"), append(data, '\n'), 0600); err != nil {
