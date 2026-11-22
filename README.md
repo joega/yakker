@@ -1,36 +1,16 @@
 # Yakker
 
-A native player for curated sports, news and talk radio, with **pause, rewind, padded recording schedules, and a polished Focus interface**.
+A native player for curated sports, news, and talk radio on the Omarchy / Quattro
+bar. Listen live, pause and rewind, or save a show for later—without a browser.
 
-Native Qt/QML internet radio for the Quattro bar, with a compiled Go controller.
-Thirty-seven stations across the US, Canada, UK and Ireland—24 sports stations
-and 13 news/public-radio additions—streamed through headless mpv.
-Choose a station on first launch; Yakker remembers your last choice. A fresh
-install has no preselected station. If a saved station disappears, choose another.
-No browser required. The widget starts playback only when you press Play.
+- **37 stations** across the US, Canada, UK, and Ireland, with Sports, News,
+  search, and Favorites filters. Add your own stations when needed.
+- **Pause and rewind** with an in-memory replay buffer and one-click Go live.
+- **Record now or schedule shows**, with padding, recovery, and saved-position resume.
+- **Keep listening while browsing** Library, Schedules, or Settings; playback
+  controls remain available and the bar shows playback and recording status.
 
-**Pause live radio, rewind a segment, and jump back to live.** Take a call, then
-resume where you left off while audio keeps arriving. Choose **5, 15, or 30
-minutes of history** in Settings; use the timeline, skip back or forward
-30 seconds, or select **Go live** to catch up. **Live only** remains the default,
-and buffered audio stays in RAM without creating recording files.
-
-**Keep listening while you browse.** Favorite station presets, clear Pause and
-Stop controls, and a persistent playback dock connect Listen, Library, Schedules,
-and Settings. The compact bar shows playback state and any active recordings;
-its tooltip gives the full status.
-
-**Save a show for later.** Record now or schedule a show once or weekly, keep
-compact Opus files in `~/Music/Yakker`, and resume them inside Yakker. Choose your recording folder
-and storage cap. Start early and end late to protect a show's boundaries;
-interrupted captures retain playable partials and linked remainders.
-Favorite stations stay at the top of search,
-and you can add your own stream URLs.
-
-Plugin ID: `io.github.joega.yakker`. Code is MIT licensed. Unaffiliated with the broadcaster.
-The bundled station logos belong to their respective owners; see [artwork attribution](assets/README.md).
-
-[What’s new in 1.8](#whats-new-in-18) · [Install](#install-locally) · [DVR controls](#pause-and-rewind) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Settings](#settings-and-stations)
+[Install](#install-locally) · [Listen](#listen) · [Recordings](#scheduled-recordings) · [Stations](#stations) · [Terminal player](#terminal-player) · [Troubleshooting](#troubleshooting)
 
 <table>
   <thead>
@@ -66,112 +46,43 @@ The bundled station logos belong to their respective owners; see [artwork attrib
   </tbody>
 </table>
 
-Yakker follows your active Omarchy colors, with Adwaita Sans for player text and local vector controls. Screenshots use Catppuccin Latte and varied stations; recording artwork follows the saved show’s source.
-
-_Select any screenshot to enlarge it. Screens show the current native UI with
-illustrative playback and recording data; see [how to refresh them](docs/screenshots.md)._
+_Select an image to enlarge it. Screenshots use illustrative data and a mix of
+Sports and News stations; Yakker follows your active Omarchy theme._
 
 ## What’s new in 1.8
 
-**Grouped recordings and curated news radio** build on the Focus player.
-
-- **One show, expandable parts.** Recovered segments share a library row, with
-  total saved audio, clear interruption markers and individual part controls.
-  Resume opens the last unfinished part, or selects the next part after completion.
-  Parts still play separately; progress and seeking describe the selected part.
-- **Sports and News in one picker.** All / Sports / News works together with
-  Favorites and search. Thirteen news/public-radio additions bring the curated
-  catalogue to 37 stations, with official artwork bundled locally.
-- **A focused main player.** Favorites stay inside Change station, without a
-  permanent preset row or a separate Favorites dropdown. The idle bar icon is
-  sized to sit more comfortably alongside other shell widgets.
-- **Cleaner HLS shutdown and stronger checks.** A second cooperative reader
-  interrupt helps finalize stalled sources within the existing stop budget.
-  Recording audits verify decoder progress and fail inconclusive boundaries.
-
-Schedule padding and recovery from [1.7](docs/releases/1.7.0.md), and the Focus
-interface from [1.6](docs/releases/1.6.0.md), carry forward. See the
-[1.8.0 release notes](docs/releases/1.8.0.md) for details, validation and the
-**recording-index backup required for rollback to v1.7.0**.
-
-## Stations
-
-Use **Change station → All / Sports / News** to browse the curated catalogue.
-**Favorites** narrows the current category; search works alongside both filters.
-Custom stations remain available under All and Favorites. Browsing and filtering
-never changes playback until you select a station. Public-radio news feeds also
-carry interviews, culture and other scheduled programs.
-
-**Sports**
-
-| Country | City | Station | CLI station ID |
-| --- | --- | --- | --- |
-| US | Atlanta | 92.9 The Game | `wzgc-fm` |
-| US | Boston | 98.5 The Sports Hub | `wbz-fm` |
-| US | Boston | WEEI 93.7 | `weei-fm` |
-| US | Chicago | 104.3 The Score | `wscr` |
-| US | Cleveland | 92.3 The Fan | `wkrk-fm` |
-| US | Columbus | 97.1 The Fan | `wbns-fm` |
-| US | Dallas–Fort Worth | 105.3 The Fan | `krld-fm` |
-| US | Denver | 104.3 The Fan | `kkfn-fm` |
-| US | Detroit | 97.1 The Ticket | `wxyt-fm` |
-| US | Los Angeles | AM 570 LA Sports | `klac` |
-| US | Minneapolis | KFAN 100.3 | `kfan` |
-| US | New York | ESPN New York 880 | `espn-new-york` |
-| US | New York | WFAN 101.9 / 660 | `wfan` |
-| US | Philadelphia | SportsRadio 94WIP | `wip-fm` |
-| US | Pittsburgh | 93.7 The Fan | `kdka-fm` |
-| US | San Diego | 97.3 The Fan | `kwfn-fm` |
-| US | Seattle | Seattle Sports 710 | `kiro-am` |
-| Canada | Montreal | TSN 690 | `tsn-690` |
-| Canada | Toronto | Sportsnet 590 The FAN | `sportsnet-590` |
-| Canada | Toronto | TSN 1050 | `tsn-1050` |
-| UK | London | BBC Radio 5 Live | `bbc-radio-5-live` |
-| UK | London | talkSPORT | `talksport` |
-| UK | London | talkSPORT 2 | `talksport-2` |
-| Ireland | Dublin | Off The Ball | `off-the-ball` |
-
-**News and public radio**
-
-| Country | City | Station | CLI station ID |
-| --- | --- | --- | --- |
-| US | Boston | WBUR 90.9 | `wbur` |
-| US | Boston | WBZ NewsRadio 1030 | `wbz-am` |
-| US | Chicago | WBBM Newsradio | `wbbm-am` |
-| US | Denver | CPR News | `kcfr` |
-| US | Detroit | WWJ Newsradio 950 | `wwj-am` |
-| US | Los Angeles | KNX News 1070 | `knx-am` |
-| US | Los Angeles | LAist 89.3 | `kpcc` |
-| US | Minneapolis | MPR News | `know` |
-| US | New York | 1010 WINS / 92.3 FM | `wins` |
-| US | New York | WNYC 93.9 | `wnyc-fm` |
-| US | Philadelphia | KYW Newsradio | `kyw-am` |
-| US | San Diego | KPBS 89.5 | `kpbs` |
-| US | Seattle | KUOW 94.9 | `kuow` |
-
-## Requirements
-
-- Omarchy / Quattro with `qs.Ui` controls and the documented bar-widget API (tested on Omarchy 4.5.0).
-- Quickshell 0.3.2, Qt 6.12, and mpv 0.41 (tested versions).
-- Go 1.26+ and Make to build from source. Go is only needed at build time.
-- Linux with working audio. The bar widget also needs a desktop session with a private `XDG_RUNTIME_DIR`.
-- Optional: the distribution's `mpv-mpris` package for media keys.
-- Recordings need `ffmpeg` with the `libopus` encoder and `ffprobe`.
-  Listening and playing retained recordings use mpv.
-
-These are tested versions; older shells must provide the same native UI components.
-The controller uses only Go’s standard library and builds without cgo. The
-terminal tool includes Bubble Tea and Lip Gloss, with versions and checksums
-pinned in `go.mod` and `go.sum`; the first build downloads those Go modules.
-Both executables are standalone Linux binaries. The terminal modes need mpv and
-audio; they can run without Omarchy or Qt.
+Recovered recording parts now share one expandable library entry, with Resume
+opening the right part. The station picker adds **All / Sports / News** and
+13 curated news/public-radio stations; Favorites stays inside the picker.
+See the [v1.8.0 release notes](docs/releases/1.8.0.md) for the full changes and
+upgrade details.
 
 ## Install locally
 
-For a compiled archive, extract it and run `./yakker tui` or
-`./yakker install` from its `yakker/` directory; no build is needed.
+### Requirements
 
-For a source checkout:
+- **Desktop widget:** Omarchy / Quattro with its native `qs.Ui` controls, plus mpv.
+  Tested with Omarchy 4.5.0, Quickshell 0.3.2, Qt 6.12, and mpv 0.41.
+- **Recording:** FFmpeg with `libopus`, and ffprobe.
+- **Source builds:** Go 1.26+ and Make. Compiled downloads need neither.
+- **Terminal playback:** Linux, mpv, and working audio; Omarchy and Qt are optional.
+
+### Compiled download
+
+Get the matching Linux amd64 or arm64 archive and its checksum from
+[Releases](https://github.com/joega/yakker/releases/latest). For example:
+
+```sh
+sha256sum -c yakker-1.8.0-linux-amd64.tar.gz.sha256
+tar -xzf yakker-1.8.0-linux-amd64.tar.gz
+cd yakker
+./yakker install
+```
+
+Keep the extracted folder together: the executables use its catalogue and assets.
+ARM64 is cross-built; playback on physical ARM64 hardware remains unverified.
+
+### From source
 
 ```sh
 git clone https://github.com/joega/yakker.git
@@ -180,673 +91,244 @@ make build
 ./yakker install
 ```
 
-The build produces `yakker-controller` (the runtime controller) and `yakker`
-(standalone playback and local installation). Run the installer from this checkout. It validates and copies the compiled controller, QML, and assets to
-`~/.config/omarchy/plugins/io.github.joega.yakker`, rescans the existing shell,
-and enables a new widget in `centerEnd`, beside the center island. Existing
-widgets keep their saved section, order, and preferences. The manifest's
-`barWidget.defaultSection` sets the default for new widgets; dragging a widget saves its section and order in
-`~/.config/omarchy/shell.json`. It uses Omarchy's documented drop-in workflow; `omarchy dev link` is
-for developing the shell itself. No second Quickshell instance is launched.
-Run the installer again after editing this checkout. For helper/controller code
-updates, stop playback and run `omarchy restart shell` after reinstalling so the
-shared singleton and helper process load the new code. It refuses to overwrite
-unmanaged installations or edits made directly in the installed files. Replaced
-managed installations are retained under `~/.config/omarchy/plugin-backups/`.
+The installer validates and copies the widget to
+`~/.config/omarchy/plugins/io.github.joega.yakker`, then enables it beside the
+center island. Existing widgets keep their position and preferences. Keep your
+checkout or extracted folder at a stable path and reinstall from that same path;
+the installer refuses a different source or directly edited installed files.
+Previous plugin files are retained in `~/.config/omarchy/plugin-backups/`.
 
-Before upgrading, back up `~/.local/share/yakker/recordings.json` (or
-`$XDG_DATA_HOME/yakker/recordings.json` when configured) while recordings are
-idle. This build reads older indexes and preserves existing schedule timing.
-Once padded schedules or new recordings are saved, the index contains fields
-that v1.6.0 cannot read. Keep the index backup with the previous plugin for a
-rollback; plugin backups contain code, not recording metadata. Recordings added
-after that backup will not appear in a restored older index.
+### Upgrading
 
-Version 1.8 also saves last-played and completion bookmarks for recording parts.
-Once playback saves these fields, v1.7.0 cannot read that index; retain a
-pre-upgrade index backup if you need to roll back.
-
-The source checkout must be built before installation; `omarchy plugin add`
-clones source without compiling the controller. Update a local installation by
-rebuilding and rerunning the installer from the same checkout path. The installer
-keeps an ownership marker and refuses to overwrite files edited in the installed
-copy. Existing bar entries and their saved preferences are retained.
-
-`make build` produces stripped binaries. To create compiled Linux archives with
-checksums and dependency license notices:
+Finish active recordings, stop listening, and **back up the recording index**
+while idle: `~/.local/share/yakker/recordings.json`, or
+`$XDG_DATA_HOME/yakker/recordings.json` when configured. Rebuild source checkouts
+with `make build`, rerun `./yakker install`, then run:
 
 ```sh
-make release TARGET_ARCH=amd64
-make release TARGET_ARCH=arm64
+omarchy restart shell
 ```
 
-Archives are written to `dist/`. Each contains a `yakker/` directory with both
-executables, the station catalogue, QML, local artwork, and this guide. Keep these
-files together; the executables locate the catalogue beside themselves. Release
-packaging builds locally and does not publish or install anything.
+Schedules, recordings, custom stations, and preferences survive upgrades. Once
+v1.8 saves new playback bookmarks, **v1.7.0 cannot read that index**; padding fields
+are also incompatible with v1.6.0. Keep the index backup with the previous plugin
+for rollback. Plugin backups contain code, not recording metadata.
+Restoring an older index hides recordings added since that backup.
 
 ## Listen
 
-Click the radio icon in the bar, select a station, then press **Play**. Your last
-chosen station is restored on later launches. If it is no longer in the
-catalogue, choose another station; Yakker never substitutes a broadcaster.
-
-The **Listen**, **Library**, and **Schedules** tabs form the first row, with
-Settings at the right edge. Playback controls stay available while you browse
-Library, Schedules, or Settings. Closing the popup leaves audio playing.
-
-### Playback controls
+Click the bar icon, choose a station, and press **Play**. Your last station and
+volume are remembered, but playback does not start automatically at login.
+Closing the popup leaves audio playing.
 
 | Control | Action |
 | --- | --- |
-| **Play / Pause** | Start listening, or pause and resume the current player. |
-| **Rewind / Forward** | Skip 30 seconds when replay is available; dim when unavailable. |
-| **Record** | Open Record now to capture a station. |
-| **Stop** | Disconnect listening and clear replay history. Playing again starts a fresh live stream. |
-| **Sleep** | Set a timer to stop listening; background recordings continue. |
+| **Play / Pause** | Start, pause, or resume listening. Paused live radio keeps buffering your place. |
+| **Stop** | Disconnect the stream and clear replay history. Playing again starts live. |
+| **Rewind / Forward** | Skip 30 seconds when replay is available. |
+| **Record** | Open Record now. Background captures continue when listening stops. |
+| **Sleep** | Stop listening after a preset or custom timer of 1–240 minutes. |
 
-**Rewind · Play/Pause · Forward** form the main transport row, with a larger
-Play/Pause control. **Record · Stop · Sleep** sit below, with Stop centered
-beneath Play/Pause. Volume, mute, connection status, and Retry after errors are
-also available in the player.
+**Paused · buffering** means the stream remains connected; **Listening stopped**
+means it is disconnected. The bar uses compact state icons, with full status and
+active recording details in its tooltip. A separate **REC** count marks captures.
 
-Playback status distinguishes keeping your place from disconnecting:
+![Bar states: live, paused buffering, stopped with a recording, offline, and saved recording paused](docs/yakker-bar-states.png?v=1.8.0)
 
-- **Paused · buffering** means the live stream stays connected and audio keeps
-  arriving for you to resume.
-- **Listening stopped** appears with **Stream disconnected · Replay cleared**.
-  The replay track stays hidden until listening starts again.
-- **Recording paused** and **Recording stopped** describe saved-show playback.
-  Stopped recordings can be resumed from Library.
+### Choose a station
 
-These states also appear in the persistent controls on Library, Schedules, and
-Settings. See [Pause and rewind](#pause-and-rewind) for replay buffer options.
+Open **Change station**, or right-click the bar icon. Search by station, city,
+or country; use **All / Sports / News** with the independent **Favorites** filter.
+Save favorites with a heart in the player or picker. Custom stations appear in
+All and Favorites.
 
-### Stations and favorites
+Choosing a station while playing reconnects to it. While stopped, it only changes
+the selection. Long titles scroll without wrapping; reduced-motion mode uses an
+ellipsis and a tooltip.
 
-Choose **Change station**, or right-click the bar icon to open the station picker
-directly. Search by station, city, or country—for example, `WBUR`, `Seattle`,
-`UK`, or `Ireland`. Multiple words narrow the results together. Results show
-station artwork, name, category, location, and the selected station.
+### Keyboard controls
 
-Use **All / Sports / News** to choose a category. **Favorites** is an independent
-filter that works alongside the category and search. Favorites stay inside the
-picker, so saving stations does not add a row to the main player.
+Tab / Shift+Tab moves between controls, Space / Enter activates, and Escape
+closes. In the picker, Up / Down browses, Enter selects, and F toggles a favorite.
 
-Use each row's heart to save or remove a favorite without tuning in or closing
-the picker. Rows stay in place while you change hearts; favorites sort first on
-the next opening. Down/Up browses, Enter selects, F toggles the highlighted
-favorite, and Escape closes.
-
-Changing stations while playing makes a fresh live connection. While stopped,
-it selects the next station without starting playback. The last station, volume,
-mute setting, and listening buffer length are remembered across shell restarts.
-
-The station title stays on one line above **Change station**. Long titles scroll
-slowly to the end and back, pausing at both ends; short titles stay still.
-Reduced-motion mode uses an ellipsis and a full-title tooltip instead. Station
-and playback dock titles stay on one line without independent animations;
-playback status can wrap to keep paused/stopped states readable.
-
-### Bar status and tooltips
-
-Station artwork remains visible while playing or paused. Compact state icons
-indicate playing, paused, stopped, behind-live, connecting/reconnecting, and
-offline states. Stop restores the neutral radio icon. A separate **REC** count
-shows background recordings even when listening is stopped. Vertical bars use
-a compact state marker over the artwork and a separate recording dot.
-
-The tooltip groups the source name and location, playback state, replay
-availability and delay, and active recording names. Saved-show playback
-identifies its original station and elapsed time. Long metadata is bounded and
-displayed as plain text.
-
-![Bar tooltip examples for live, paused buffering, stopped listening with captures, and saved-show playback](docs/yakker-bar-tooltips.png?v=1.8.0)
-
-![Native bar widget states: live, paused buffering, stopped with background recordings, offline, and paused saved recording](docs/yakker-bar-states.png?v=1.8.0)
-
-_Captions explain these examples; the bar itself uses state icons and a separate REC count._
-
-### Keyboard navigation
-
-| Key or gesture | Action inside the popup |
+| Key | Player action |
 | --- | --- |
-| Tab / Shift+Tab or Up / Down | Move between controls, including Settings and available replay controls. |
-| Space / Enter | Activate the selected control. |
-| Left / Right on a navigation tab | Switch sections while keeping focus on the tab strip. |
-| Left / Right or mouse wheel on a slider | Adjust volume by 5% or playback position by 30 seconds. |
-| Page Up / Down on a slider | Adjust volume by 10% or playback position by one minute. |
-| Home / End on a slider | Jump to its limits. |
-| M or right-click on the volume slider | Toggle mute. |
-| R | Retry a stopped stream. |
-| Escape | Dismiss the popup, or cancel an open station selector. |
+| P | Pause / resume |
+| [ / ] | Rewind / forward 30 seconds |
+| G | Go live |
+| Left / Right | Adjust volume; on tabs, switch sections; on timelines, seek |
+| M | Toggle mute |
+| R | Retry a stopped stream |
 
-Inside the station selector, type to search, use Down to browse matches, Enter to
-select, and Escape to cancel and clear the search. Left/Right on a category
-button changes categories. Fields keep their normal text-editing keys.
-
-Keyboard focus scrolls fields and actions into view and stays visible until you
-move it. Tab follows the visual control order and can leave an editor for the
-persistent playback controls. Closing Settings restores the previous view and
-scroll position, with focus on its gear button. Manual scrolling takes over
-until the next focus move.
-
-Controls keep consistent spacing and hover/focus feedback at smaller sizes.
-Library search and status filters stack on narrow panels, replay presets use two
-rows, and saved-playback options stack when needed. Short popups keep transport
-and volume visible while omitting the secondary playback hint from the dock.
-Recording elapsed and total times sit at opposite ends of the track; elapsed
-time previews a drag before seeking.
-
-### Sleep timer
-
-The Sleep menu shows the active countdown, quick duration choices, and a custom
-minute field with a clear **Set timer** action. **Cancel timer** removes an active
-timer without stopping listening. Recording captures continue when the timer ends.
-
-[<img src="docs/yakker-sleep-timer.png?v=1.8.0" alt="Sleep timer with a clear active countdown, duration presets, custom minutes, and a quiet cancel action" width="300">](docs/yakker-sleep-timer.png?v=1.8.0)
-
-### Scripted controls
-
-For diagnostics or scripted controls:
-
-```sh
-omarchy-shell shell summon io.github.joega.yakker '{}'
-omarchy-shell io.github.joega.yakker play
-omarchy-shell io.github.joega.yakker stop
-omarchy-shell io.github.joega.yakker setVolume 65
-omarchy-shell io.github.joega.yakker toggleMute
-omarchy-shell io.github.joega.yakker setStation wfan
-omarchy-shell io.github.joega.yakker chooseStation
-omarchy-shell io.github.joega.yakker status
-omarchy-shell shell hide io.github.joega.yakker
-```
+Focused sliders also support Home / End and Page Up / Down. Settings → Listening
+includes the shortcut reference.
 
 ## Pause and rewind
 
-The **Sleep** button below Play/Pause opens the session-only **Sleep timer**: choose 15, 30, or 60
-minutes, or set a custom duration from 1 to 240 minutes. It stops foreground
-listening when it expires; captures continue. Changing stations keeps the
-deadline, and pressing **Stop** cancels the timer.
-
-The optional DVR-style buffer lets you pause a live station and listen from that
-point later. Open **Settings → Listening** and choose a **Replay buffer** preset:
+Choose **Settings → Listening → Replay buffer**:
 
 - **Live only** (default): no replay history is exposed until you pause.
-- **5 minutes**, **15 minutes**, or **30 minutes**: enable pause and rewind for the selected station.
+- **5, 15, or 30 minutes:** keep a rolling window for pause and rewind.
 
-Press **Pause** or **P** during Live only playback to start a temporary **15-minute**
-RAM buffer without reconnecting the stream. **Resume** continues from the paused
-position, and the timeline, **Rewind / Forward**, and **Go live** become available.
-The saved Live only setting stays unchanged. This temporary buffer ends when you
-Stop, change stations, explicitly change the buffer setting, or close the player.
-A stream reconnection retains temporary mode but clears the old connection's
-audio, so the original paused position is lost.
+Pausing in Live only starts a temporary **15-minute** RAM buffer without
+reconnecting. Resume keeps your place; **Go live** returns to the latest audio.
+Audio continues arriving while paused, without creating recording files.
 
-With a configured buffer, use the same **Pause / Resume**, timeline,
-**Rewind / Forward**, and **Go live** controls. Audio continues arriving while paused. History begins when buffering
-is enabled; programmes from before that connection are unavailable. Changing
-stations or buffer length, pressing Stop, or closing the player clears history.
-The widget remembers the selected buffer length without starting playback at login.
-
-Buffered audio stays in RAM; no audio files are recorded. The forward and backward
-packet caches together are capped at 32 MiB for 5 minutes, 64 MiB for 15 minutes,
-and 128 MiB for 30 minutes, in addition to normal player/decoder memory.
-Temporary pause buffering uses the 15-minute / 64 MiB cap. To make immediate
-pause possible without reconnecting, Live only also prepares this bounded
-packet cache at startup. RAM use can therefore grow before you pause; earlier
-audio is not exposed as replay history. This is a cap, not a fixed allocation. Actual use
-grows with received audio. The byte cap can shorten the available window on
-high-bitrate streams. When a paused position expires, playback moves to the oldest
-available audio and remains paused. Reconnecting after a stream failure also clears
-that connection's buffer. “Live” is relative to the newest audio received from the
-station, which may already have a broadcaster delay.
-
-Popup shortcuts: **P** pauses/resumes, **[ / ]** skip 30 seconds, and **G** goes live.
-The plain CLI accepts `pause`, `play` (resume), `back 30`, `forward 30`, `live`, and
-`buffer 0`, `buffer 5`, `buffer 15`, or `buffer 30`. Terminal modes use `--buffer`:
-
-```sh
-./yakker tui --buffer 30
-./yakker listen --buffer 15
-```
-
-In the terminal UI, **P** pauses/resumes, **[ / ]** skip 30 seconds, **G** goes live,
-and Space retains Play / Stop. Buffer preferences in terminal sessions are
-independent of the desktop widget.
-
-If a station cannot connect, a recovery card offers **Retry** and **Choose
-station**, with technical information under **Show details**. Automatic retries
-show the countdown; a compact Retry action also stays available in the playback
-dock while browsing other sections.
-
-[<img src="docs/yakker-connection-error.png?v=1.8.0" alt="Connection failure with clear retry and choose-station recovery actions" width="300">](docs/yakker-connection-error.png?v=1.8.0)
+Stop, station changes, buffer changes, or a player shutdown clear history.
+Reconnecting after a network failure also clears the previous connection's audio.
+The selected preset stays saved; temporary pause buffering does not change it.
+Live only prepares a bounded packet cache even before you pause. Cache limits
+are 32 / 64 / 128 MiB for 5 / 15 / 30 minutes; high-bitrate streams may retain
+less time. If your paused position expires, it moves to the oldest available
+audio and stays paused.
 
 ## Scheduled recordings
 
-Open **Library** or **Schedules** from the tabs at the top. Library also contains
-**Record now** and **Storage**; **Record** on the player opens Record now directly.
-In Schedules, choose **New schedule**, select a bundled or
-custom station, then choose weekly weekdays or a one-time date. Enter start and
-end times in 24-hour format. **Next recording** checks the resolved occurrence
-automatically as you edit. The timezone defaults to your local zone; choose
-**Change zone** when needed. For example, WEEI can record Fridays from `14:00`
-to `14:20` in `America/New_York`. An end time before the
-start ends the next day; recordings can last up to 12 hours. Daylight saving
-follows the saved timezone. Schedules start empty; create and enable the ones
-you want.
+Choose **Record** for an immediate capture, or **Schedules → New schedule** for
+a one-time or weekly show. Select the station, times, and timezone, then review
+the next capture window. An end time before the start means the following day.
 
-Use **Start early** and **End late** to add up to 10 minutes on either side of a
-show. New schedules suggest 30 seconds early and 1 minute late; existing
-schedules keep their saved timing with padding off until you edit it. The review
-and upcoming list show the resulting **Captures** window, including seconds.
-Padding follows the resolved timezone/DST occurrence and can cross midnight.
-It counts toward the same storage and simultaneous-recording limits, so allow
-for overlaps between adjacent shows. Changes apply to future captures; an active
-recording and any linked remainder keep their original capture window.
+**Start early** and **End late** add up to 10 minutes on either side. New schedules
+suggest 30 seconds early and one minute late. Edits affect future captures;
+an active capture keeps its original settings and has its own **Stop capture**.
 
-Schedules appear in upcoming order, with **Next up** highlighted and paused
-schedules grouped at the bottom. **Edit schedule** opens the saved values;
-use the enabled switch to pause a schedule or the confirmed delete action to
-remove it. Existing recordings stay in Library.
+### Library and recovered shows
 
-<table>
-  <thead>
-    <tr>
-      <th>Schedule editor</th>
-      <th>Record now</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td valign="top" align="center"><a href="docs/yakker-schedule.png?v=1.8.0"><img src="docs/yakker-schedule.png?v=1.8.0" alt="Schedule editor with Start early and End late padding, timezone, and precise capture-window preview" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-record-now.png?v=1.8.0"><img src="docs/yakker-record-now.png?v=1.8.0" alt="Record now with a station picker, duration presets, and a clear Start recording action" width="300"></a></td>
-    </tr>
-  </tbody>
-</table>
+Open **Library** to search, play, resume, or delete recordings. **Listen** provides
+the full seek bar, playback speed controls (0.75×–2×), and **Return to live**.
+Playback position is saved between sessions; deletion requires confirmation.
 
-For an immediate capture, choose **Record now**, a station, and a duration. It
-defaults to 30 minutes, with 15, 30, and 60 minute presets and a custom range of
-1 to 720 minutes. It uses the same storage and concurrency limits as scheduled
-captures and does not create a repeating schedule.
-
-<table>
-  <thead>
-    <tr>
-      <th>Saved-show playback</th>
-      <th>Recording storage</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td valign="top" align="center"><a href="docs/yakker-recording-player.png?v=1.8.0"><img src="docs/yakker-recording-player.png?v=1.8.0" alt="Saved recording with resume position, playback speed, sleep timer, seek timeline, and Return to live" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-storage.png?v=1.8.0"><img src="docs/yakker-storage.png?v=1.8.0" alt="Storage settings tab with folder picker, library cap, and dedicated save controls" width="300"></a></td>
-    </tr>
-  </tbody>
-</table>
-
-Up to **three recordings** can run at once, including while you listen to another
-station. Closing the popup, stopping foreground audio, changing stations, or
-playing a saved recording leaves those captures running. The bar’s separate **REC** count marks active captures; a recording dot on the **Library** tab marks active captures.
-The Library tooltip shows the count, and the persistent player in Settings
-keeps a **REC** count that opens the library. The machine must be awake
-with the plugin loaded in the bar. Disabling/removing the last widget, restarting
-the shell, or shutting down the helper interrupts captures. Recoverable output is
-retained as partial; when the plugin returns during the scheduled interval it can
-capture a linked remainder. Unexpected stream failures can retry twice within
-the remaining interval, retaining separate segments. There is no wake timer or separate recording service.
-After a forced controller exit, the previous segment's exact end time may be
-unavailable; recovery keeps a saved end time when present and does not substitute
-the restart time. Retained audio and the original padded capture window remain
-available for recovery.
-
-Recordings use **mono Opus at 24 kbit/s VBR** in `.opus` files: roughly **3.6 MB
-per 20 minutes** or **10.8 MB per hour**, plus container overhead, with sizes
-varying by content. The bitrate is an internal encoder parameter; raising it later
-affects future captures. The Library shows station artwork, show titles and
-compact dates in each row. Partly listened-to saved shows display a progress bar, elapsed
-and remaining audio time, and a **Resume** action labeled with the saved position.
-The current show updates live and its row can pause/resume the same player.
-Unknown durations never show an invented percentage. **Details**, restart,
-deletion and storage controls use quieter secondary actions. Search
-by title or station and filter by status across the full library before moving between pages. Open
-**Details** for a compact status, duration, and size summary, separate scheduled
-and recorded time ranges in local time, and any recording note. **Play from start**
-and **Delete** are quiet secondary actions. Delete shows what will be removed and
-requires confirmation; Cancel or Hide details clears that confirmation.
-
-Recovered segments from the same scheduled occurrence appear as **one show**,
-with an **Interrupted** indicator, part count, and total available saved audio.
-Open **Parts** to see each capture's time range, status and recovery note, with
-individual playback, restart and confirmed deletion actions. Interruptions are
-marked explicitly; their missing-audio duration is unknown. Different episodes
-of a recurring schedule remain separate shows.
-
-The show's **Resume** action selects the last-played unfinished part. After a
-part finishes, it selects the next part when you press Resume; playback does
-not advance automatically. Older indexes use their saved per-file positions
-until new playback bookmarks are available. Progress and seeking apply to the
-selected part. If that part is unavailable or still recording, the row explains
-why; open Parts to choose other available audio. Deleting one part keeps the
-other parts and their files.
+Recovered parts from one scheduled occurrence share a show row. Expand **Parts**
+for individual captures, recovery notes, and interruption markers. **Resume**
+opens the last-played unfinished part, or selects the next part after completion.
+Parts play separately: there is no automatic advance or seamless joining.
+Gaps remain explicit, and missing audio cannot be reconstructed.
 
 <table>
   <thead>
     <tr>
       <th>Recovered show parts</th>
-      <th>Individual recording details</th>
+      <th>Saved-show playback</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <td valign="top" align="center"><a href="docs/yakker-recording-parts.png?v=1.8.0"><img src="docs/yakker-recording-parts.png?v=1.8.0" alt="One recovered show with chronological parts, interruption markers, and Resume for part two" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-recording-details.png?v=1.8.0"><img src="docs/yakker-recording-details.png?v=1.8.0" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300"></a></td>
+      <td valign="top" align="center"><a href="docs/yakker-recording-player.png?v=1.8.0"><img src="docs/yakker-recording-player.png?v=1.8.0" alt="Saved recording with resume, playback speed, sleep timer, and seek controls" width="300"></a></td>
     </tr>
   </tbody>
 </table>
 
-**Play** or **Resume** starts a retained file while keeping the library open.
-An empty library explains how to **Record now** or create a **New schedule**.
-When a search or status filter matches nothing, **Clear filters** resets both
-without changing saved audio. Library loading failures are shown separately from
-an empty library. Station search offers a clear-search or Show all stations action
-when no results or favorites are available.
+### Recording limits and storage
 
-<table>
-  <thead>
-    <tr>
-      <th>Empty library</th>
-      <th>No matching recordings</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td valign="top" align="center"><a href="docs/yakker-empty-library.png?v=1.8.0"><img src="docs/yakker-empty-library.png?v=1.8.0" alt="Empty recording library with record-now and schedule guidance" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-empty-search.png?v=1.8.0"><img src="docs/yakker-empty-search.png?v=1.8.0" alt="No matching recordings with a clear-filters action" width="300"></a></td>
-    </tr>
-  </tbody>
-</table>
+- **Up to three captures at once**, including while listening to another station.
+- **Up to 12 hours per show**, saved as mono Opus at 24 kbit/s VBR—about 11 MB/hour.
+- **The computer must be awake with the widget enabled.** There is no wake timer
+  or separate background recording service. Shell restarts and disabling the last
+  widget interrupt captures; retained audio may be partial, with a linked
+  remainder if the original capture window is still open when Yakker returns.
+- **Stream failures can retry twice** within the remaining capture window.
+  Broadcaster buffering affects duration and timing; exact program boundaries
+  are not guaranteed, even with padding.
+- **Storage defaults:** `~/Music/Yakker`, a 5 GiB library cap, and a 1 GiB free-space
+  reserve. Existing recordings are preserved when full; delete files to make room.
 
-A fixed playback dock remains available while you scroll recordings, schedules,
-editors, or settings. It uses the same round Pause/Resume control as Listen, with
-a smaller labeled Stop directly beneath it, quieter 30-second skips, and volume.
-The playing row also offers Pause/Resume. Choose **Listen** for the full player, duration-based
-seek bar, speed controls, and **Return to live**. Artwork follows the source of
-the saved show, independently of the selected live station. Position is saved
-at most every 10 seconds and when pausing, stopping, switching, or shutting down;
-finishing or reaching the end resets it. Saved recordings support 0.75×, 1×,
-1.25×, 1.5×, and 2× playback with pitch correction; live listening returns to
-1×. Missing files become available again when their retained folder returns.
-Schedules follow the computer clock. The scheduler checks once per second;
-connection setup adds further delay before audio arrives. Exact broadcast
-boundaries depend on the source: buffered feeds and HLS segments can contain
-audio from before the connection, so a file's audio duration can exceed the
-scheduled interval. **Duration** measures retained audio; the **Recorded** range
-tracks the stream-reader process, excluding the writer's drain and later file inspection.
-Details also show the intended **Capture window** when padding is enabled,
-separately from the show's scheduled interval and the recorded process times.
-Neither guarantees the broadcaster's program-clock boundaries. Early cutoffs
-are retained as partial recordings. The stream reader and Opus writer use a
-bounded in-memory pipe, so the writer can finish received audio even if an HLS
-reader stalls. HLS reads get a second cooperative interrupt within the existing
-shutdown budget before a hard kill. A hard reader stop still leaves a partial-recording note;
-a writer failure warns that ending audio may be missing. Audio quality
-depends on the source and the recording codec.
+Change the folder or cap under **Settings → Storage** and choose **Save storage**.
+Folder changes apply to future recordings; existing files stay at their saved
+locations. Schedules, recording settings, and the index live separately at
+`~/.local/share/yakker/recordings.json` (under `$XDG_DATA_HOME` when set).
+Deleting a schedule does not delete saved recordings.
 
-Dates use a consistent format such as **Fri Nov 20 2026 02:30PM**. Library dates
-use local time; upcoming schedule times and previews use the schedule's timezone.
+## Stations
 
-Open **Settings → Storage**, or the storage controls in Library, to
-choose a folder and total library cap. Enter a path or use **Choose folder**;
-**Open folder** opens it in your file manager. A usage bar shows the saved library
-limit; **Save storage** applies folder and limit edits and confirms the save
-on the same tab. **Reset** discards unsaved storage edits. Folder actions remain quiet secondary controls. Defaults:
+The bundled catalogue has **24 sports stations and 13 news/public-radio stations**.
+Public radio also carries interviews, culture, and other scheduled programming.
+Availability and regional restrictions depend on the broadcaster.
 
-- **Folder:** `~/Music/Yakker`, created when the first capture needs it.
-- **Library cap:** 5 GiB, editable in Settings.
-- **Free-space reserve:** 1 GiB on the destination disk.
-- **Cleanup:** manual deletion; existing recordings are preserved when full.
+| Market | Sports | News and public radio |
+| --- | --- | --- |
+| Atlanta, US | 92.9 The Game | — |
+| Boston, US | 98.5 The Sports Hub; WEEI 93.7 | WBZ NewsRadio 1030; WBUR 90.9 |
+| Chicago, US | 104.3 The Score | WBBM Newsradio |
+| Cleveland, US | 92.3 The Fan | — |
+| Columbus, US | 97.1 The Fan | — |
+| Dallas–Fort Worth, US | 105.3 The Fan | — |
+| Denver, US | 104.3 The Fan | CPR News |
+| Detroit, US | 97.1 The Ticket | WWJ Newsradio 950 |
+| Los Angeles, US | AM 570 LA Sports | KNX News 1070; LAist 89.3 |
+| Minneapolis, US | KFAN 100.3 | MPR News |
+| New York, US | ESPN New York 880; WFAN 101.9 / 660 | 1010 WINS / 92.3 FM; WNYC 93.9 |
+| Philadelphia, US | SportsRadio 94WIP | KYW Newsradio |
+| Pittsburgh, US | 93.7 The Fan | — |
+| San Diego, US | 97.3 The Fan | KPBS 89.5 |
+| Seattle, US | Seattle Sports 710 | KUOW 94.9 |
+| Montreal, Canada | TSN 690 | — |
+| Toronto, Canada | Sportsnet 590 The FAN; TSN 1050 | — |
+| London, UK | BBC Radio 5 Live; talkSPORT; talkSPORT 2 | — |
+| Dublin, Ireland | Off The Ball | — |
 
-Recording notifications are on by default for completed, partial, failed, and
-missed captures and storage or manager failures. The **Alerts** tab
-uses switches for **Recording alerts** and **When recording starts**, which is
-off by default. Notification changes apply immediately. Turning alerts off
-disables the start switch without erasing its saved preference. Yakker suppresses
-duplicate notices and does not announce old recordings again at startup.
-
-A folder change applies to future recordings. Older files remain listed at their
-saved locations and count toward the cap. An unavailable/unwritable destination
-produces an explicit failure instead of switching folders. Lowering the cap below
-current usage preserves files and blocks new captures until space is available.
-Metadata, schedules and recording settings live separately in
-`$XDG_DATA_HOME/yakker/recordings.json` (normally
-`~/.local/share/yakker/recordings.json`), outside the replaceable plugin files.
-Uninstalling the plugin preserves this data and the audio files.
-
-Schedule edits and enable/disable/delete actions affect future occurrences; an
-already running capture retains its original settings and has a separate **Stop
-capture** action. Editing a station does not silently change a saved schedule's
-source. Saving that schedule in the editor refreshes its source from the latest
-available catalogue entry; a removed station's saved source is retained. Saved
-recordings survive schedule deletion. Delete requires confirmation, and a capture
-or file that is currently playing must be stopped before deletion.
-
-Changes from another monitor or a background job can make an editor stale. Your
-draft stays visible; **Refresh and keep this draft** lets you review and resubmit
-it. The helper can restart with bounded retries after an interruption, restoring
-schedules without automatically starting foreground listening. Terminal sessions
-remain independent and do not start the desktop scheduler.
-
-## Terminal player
-
-Open the Bubble Tea player without changing the installed widget:
-
-```sh
-./yakker tui
-```
-
-Run `./yakker tui` to choose a station on first launch, then press Enter to play.
-Later terminal sessions restore your last chosen station.
-An explicit `--station` overrides that choice. Terminal selection is saved
-separately from the desktop widget in `$XDG_CONFIG_HOME/yakker/terminal.json`
-(normally `~/.config/yakker/terminal.json`). Sessions using `--stations` or `--url`
-keep their selections separate and do not change that saved choice.
-
-The player shows the current station, actual playback/connection status, volume,
-mute, and stream metadata when available. It uses a compact layout in smaller
-terminals and adapts its colors to the terminal background and color support.
-
-| Key | Action |
-| --- | --- |
-| Space | Play / Stop |
-| `p` | Pause / Resume; starts a temporary buffer in Live only |
-| `[` / `]` | Rewind / forward 30 seconds |
-| `g` | Go live |
-| Left / Right or `-` / `+` | Change volume by 5% |
-| `m` | Toggle mute |
-| Up / Down or `k` / `j` | Browse configured stations |
-| Enter | Tune the highlighted station |
-| `r` | Make a fresh connection |
-| `?` | Show / hide help |
-| `q`, Escape, or Ctrl+C | Quit and clean up playback |
-
-Browsing leaves playback on the current station until Enter. The active station
-is marked with a dot; the highlighted row is the station selected for tuning.
-Play after Stop reconnects to the live stream. The interface returns the terminal
-to its normal screen and waits for player cleanup when you quit.
-
-The same `--url`, `--stations`, `--volume`, `--muted`, and `--list-stations`
-arguments work with `tui`; use `./yakker tui --help` for details. It needs an
-interactive terminal. The plain `listen` command below remains available for
-line-oriented or piped input. Both modes keep the desktop audio environment and
-widget settings intact and use their own temporary lock/socket directory.
-
-## Standalone CLI
-
-The built CLI runs independently of the installed Omarchy widget:
-
-```sh
-./yakker listen --station wbz-fm --volume 60
-```
-
-It starts the selected station and prints readable connection/playback status.
-Without `--station`, `listen` uses your last terminal station. If none has been
-chosen, or it was removed, use `--list-stations` and supply a station ID.
-Volume defaults to 60%; `--muted` starts muted. Its private lock/socket directory
-is created and removed automatically. Desktop audio environment variables,
-widget settings, and the installed plugin are not changed.
-
-Type a command and press Enter:
-
-```text
-volume 40
-mute
-unmute
-stop
-play
-status
-help
-quit
-```
-
-`mute` toggles mute; `unmute` always unmutes. `play` after `stop` connects to a
-fresh live stream. Ctrl+C or input EOF also exits and cleans up the player.
-Invalid commands show a readable message without interrupting playback.
-
-To discover station IDs, test an arbitrary stream, or use another station file:
-
-```sh
-./yakker listen --list-stations
-./yakker listen --url 'https://example.com/live.aac' --volume 60
-./yakker listen --stations /path/to/stations.json --station my-station
-./yakker listen --help
-```
-
-The example URL is a placeholder; supply an actual HTTP(S) audio stream. A custom
-URL uses a temporary station record and does not modify `stations.json`.
-Arguments are parsed locally; the widget's JSON protocol stays internal.
-This is a plain line-oriented CLI; each command requires Enter.
+For station IDs, use `./yakker listen --list-stations` or see
+[stations.json](stations.json).
 
 ## Settings and stations
 
-The gear opens **Settings**, starting with four tabs: **Listening**, **Storage**,
-**Alerts**, and **Stations**. Listening shows the Live only / 5 / 15 / 30 minute
-buffer choices directly, with an explanation of the selected mode and a compact
-two-column keyboard shortcut reference. Each tab replaces the content below it;
-the playback dock stays available, with the X at the right end of the tab row.
-X returns to your previous player section.
-Storage has its own Save and Reset controls. Alerts apply immediately and have
-no save buttons. Switching tabs preserves unfinished storage and station drafts;
-closing settings discards unsaved drafts.
+| Tab | Settings |
+| --- | --- |
+| **Listening** | Replay buffer and keyboard shortcuts. |
+| **Storage** | Recording folder and library cap; Save / Reset applies to this tab. |
+| **Alerts** | Recording alerts, enabled by default; start notifications are off by default. Changes apply immediately. |
+| **Stations** | Add, edit, or delete custom stations using a direct HTTP(S) audio URL. |
 
-In **Stations**, choose **Add station** and enter a name and direct HTTP(S) audio
-stream URL. City, country, and website are optional, with persistent labels above
-each field. Saved custom stations appear here with a quiet **Edit station**
-action, so you can edit any custom station without changing your listening
-selection. Delete lives in the editor and requires confirmation. Escape or Cancel
-returns from the editor to the station list; Escape from a settings tab closes
-settings. Deleting the selected station stops playback and clears its selection.
-Editing its stream URL reconnects if it was playing. Yakker does not fetch or
-test a URL until you play it.
+City, country, and website are optional for custom stations. They are saved in
+`~/.config/yakker/stations.json` (under `$XDG_CONFIG_HOME` when set), outside the
+plugin. Widget preferences and position live in `~/.config/omarchy/shell.json`.
+Custom stations are also available in the default terminal catalogue.
 
-<table>
-  <thead>
-    <tr>
-      <th>Notification settings</th>
-      <th>Custom station editor</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td valign="top" align="center"><a href="docs/yakker-notifications.png?v=1.8.0"><img src="docs/yakker-notifications.png?v=1.8.0" alt="Separate Alerts settings tab with immediate notification switches and no storage save actions" width="300"></a></td>
-      <td valign="top" align="center"><a href="docs/yakker-custom-station.png?v=1.8.0"><img src="docs/yakker-custom-station.png?v=1.8.0" alt="Custom station editor with permanent labels, required stream fields, and a quieter Cancel action" width="300"></a></td>
-    </tr>
-  </tbody>
-</table>
+### Media keys and metadata
 
-Custom stations are saved separately from the installed plugin in `$XDG_CONFIG_HOME/yakker/stations.json` (normally `~/.config/yakker/stations.json`). They persist through plugin upgrades and removal. The default terminal player and `--list-stations` include them; explicit `--stations` and `--url` sessions remain isolated. If the custom file cannot be read or is malformed, the widget keeps bundled stations available and shows an error; repair the file and restart Yakker before editing. The terminal player reports the error.
+Media keys are optional: install a trusted [mpv-mpris](https://github.com/hoyon/mpv-mpris)
+plugin and set the widget entry's `mprisPlugin` in `shell.json` to its absolute
+path, such as `/etc/mpv/scripts/mpris.so`. Nothing is installed automatically.
+MPRIS is available while the player runs; after Stop, restart listening in Yakker.
+Program titles appear only when supplied by the stream.
 
-Use the heart beside the station title to add or remove the selected station from favorites. Open **Change station → Favorites** to browse saved stations, including custom stations, with search and scrolling for longer lists. **All / Sports / News** selects the category; Favorites can be toggled on or off within that category. All includes custom stations without a category. Favorites appear first, and the picker opens with All and Favorites off. Left/Right on a category button switches categories; Up/Down browses results, Enter selects, F toggles the highlighted favorite, and Escape closes. Selecting a favorite changes the stream while listening and selects without starting playback while stopped. Saving favorites never adds a row beneath the player.
+## Terminal player
 
-The selected station, favorites, volume, mute and listening buffer length are saved through Quattro's inline entry persistence in
-`~/.config/omarchy/shell.json`. The widget entry also accepts:
+Both terminal modes run independently of the widget and do not run its scheduler:
 
-```json
-{
-  "id": "io.github.joega.yakker",
-  "volume": 65,
-  "muted": false,
-  "stationId": "",
-  "favorites": [],
-  "bufferMinutes": 0,
-  "recordingNotifications": true,
-  "recordingStartNotifications": false,
-  "showName": false,
-  "recordingNotifications": true,
-  "recordingStartNotifications": false,
-  "mprisPlugin": ""
-}
+```sh
+./yakker tui                              # Choose a station interactively
+./yakker tui --station wbur --buffer 15
+./yakker listen --station weei-fm --volume 60
+./yakker listen --list-stations
 ```
 
-Choose a station by ID from the [catalogue above](#stations).
+The terminal player remembers its own last station, separately from the widget.
+Use Up / Down to browse, Enter to tune, Space to play/stop, P to pause/resume,
+[ / ] to skip, G for live, and Q to quit. Press **?** for the complete key list.
 
-For example: `./yakker tui --station tsn-690 --volume 60` or
-`./yakker tui --station talksport --volume 60`.
-The UK selection includes football talk on talkSPORT, broader live sport on
-talkSPORT 2, and news/football/sport on BBC Radio 5 Live. Off The Ball adds Irish
-football and sports discussion. The BBC entry uses its worldwide feed.
-The standalone terminal modes keep their session independent of saved widget settings.
+### Standalone CLI
 
-`showName` adds a compact “Radio” label on horizontal bars. `stations.json`
-contains station ID, name, subtitle, HTTP(S) stream URL, optional city/country/website,
-optional `category` (`sports` or `news`),
-optional local `artwork` path, optional `artworkBackground` color for logo contrast,
-and an optional fallback Nerd Font `icon`. Both the bar and terminal player read
-this catalogue. After editing station data, rebuild/reinstall and restart the shell.
-New artwork must also be included in the installer and release file lists; tests
-check the bundled catalogue's coverage. No network configuration fetch is needed.
+With `listen`, type commands such as `pause`, `play`, `back 30`, `live`,
+`volume 40`, `status`, or `quit`, then press Enter. Ctrl+C or EOF also exits.
+Both modes accept `--url` for a direct stream and `--stations` for an alternate
+catalogue. See `./yakker tui --help` or `./yakker listen --help` for all options.
 
-## Media keys and metadata
+## Troubleshooting
 
-Stock mpv does not provide MPRIS. To opt in with an existing, trusted
-[mpv-mpris](https://github.com/hoyon/mpv-mpris) installation, set `mprisPlugin`
-to its absolute file path (a common Arch path is `/etc/mpv/scripts/mpris.so`).
-No plugin or global keybinding is installed automatically. All other mpv user
-configuration and scripts are disabled for predictable playback.
-
-MPRIS exists while the player is running and exposes the station title, state,
-volume, and media controls. Pause retains buffered audio; in Live only mode it starts the same temporary
-15-minute buffer as the widget and terminal controls. After Stop, use the radio widget to start again: no idle MPRIS player is
-kept alive. Your desktop chooses which application's MPRIS session media keys
-control. Native widget controls work with MPRIS disabled.
-
-The helper observes stream metadata and shows an actual `icy-title` or `title`
-when supplied. The verified WBZ response identifies the station and AAC stream;
-a changing current-program title is not guaranteed. There is no scraped program
-schedule, fabricated show name, remote artwork fetch, or periodic website request. The official station logo is bundled locally.
-
-## Lifecycle and reliability
-
-A shared QML singleton owns one compiled Go helper. The helper owns one foreground
-mpv process and a JSON IPC socket under `$XDG_RUNTIME_DIR/io.github.joega.yakker/`.
-A private runtime directory and exclusive lock prevent duplicate players, including
-across monitors or overlapping shell reloads. Stop cancels retry work, terminates
-mpv, waits for it, and removes the socket before another player can start.
-
-Popup closing and bar visibility do not own playback. Recreating widgets has a
-one-second grace period. With no widgets left (disable/remove), the helper shuts
-down. EOF, SIGTERM, and Linux parent-death protection clean up the player if the
-shell or helper exits. Recording workers have independent foreground controls
-and are finalized/reaped on helper shutdown. Full shell restarts may stop
-listening; press Play to reconnect.
-Playback intent is never saved or automatically restored after login.
-
-Failed connections and stalled streams time out and retry at 1, 2, 4, 8, and 16
-seconds, then stop with Retry available. A minute of successful playback resets
-the failure budget. Network buffering is reported as Connecting. State comes
-from mpv events rather than an optimistic Play button. Live only starts playback as audio arrives and prepares a bounded in-memory
-packet cache for immediate pause; end-to-end delay also depends on the
-broadcaster, output device, and network.
+- **No sound:** check Yakker's volume/mute and your system output. Playback status
+  does not guarantee sound is reaching the speakers.
+- **Cannot connect:** check network access or try another station. Automatic
+  retries are bounded; use **Retry** afterward. Broadcaster outages and regional
+  restrictions can apply.
+- **Missing widget:** run `omarchy plugin list --json`, then
+  `omarchy plugin enable io.github.joega.yakker`. After a controller upgrade,
+  stop listening and run `omarchy restart shell`.
+- **Recordings unavailable:** check FFmpeg/libopus, ffprobe, and the destination's
+  free space. If the index is malformed, preserve it before repairing it; ordinary
+  listening remains available.
+- **Need status or logs:** run `omarchy-shell io.github.joega.yakker status` or
+  `qs log -n -p "$OMARCHY_PATH/shell" --tail 100`.
 
 ## Disable and remove
 
@@ -855,94 +337,39 @@ omarchy plugin disable io.github.joega.yakker
 omarchy plugin remove io.github.joega.yakker --yes
 ```
 
-Disable removes the bar entry and shuts down radio within a few seconds. Remove
-also deletes the installed copy. Capture finalization may take a few more seconds.
-Recording files, schedules and this source checkout remain available.
-
-## Troubleshooting
-
-- Missing mpv: install your distribution's `mpv` package, then Retry.
-- Unable to connect: check network access and the station stream; Retry after the
-  bounded attempts finish. Regional restrictions or broadcaster outages can apply.
-- Helper already owned: allow the old shell a moment to exit, then Retry. Do not
-  delete the live owner's lock file; the lock is released by process exit.
-- No sound with “Live”: check radio volume/mute, the system output and mixer.
-  “Live” confirms player activity, not acoustic output from your speakers.
-- Missing widget: run `omarchy plugin list --json`, then `omarchy plugin enable
-  io.github.joega.yakker`. Inspect logs with `qs log -n -p "$OMARCHY_PATH/shell"
-  --tail 100`.
-- Recording encoder unavailable: install your distribution's FFmpeg package with
-  libopus and ffprobe, then disable/re-enable the widget or restart the shell.
-- Recording index unavailable: preserve and repair the reported metadata file;
-  Yakker refuses to overwrite malformed data. Ordinary listening remains available.
-- Source edits: rerun the local installer. Do not modify packaged Omarchy files.
+Disabling the last widget stops listening and interrupts captures. Removal also
+deletes the installed plugin; audio files, schedules, custom stations, and the
+source checkout remain.
 
 ## Build checks
 
+From a source checkout:
+
 ```sh
 make check
-YAKKER_TEST_REAL_MPV=1 make check  # Also decode local test audio with mpv
+YAKKER_TEST_REAL_MPV=1 make check
+make release TARGET_ARCH=amd64     # Or arm64; archives and checksums go to dist/
 ```
 
-Checks cover formatting, vet, module checksums, and race-enabled tests. The
-recording checks include atomic storage/recovery, timezone/DST rules, cap limits,
-revision fencing and child cleanup. The optional mpv checks use local HTTP
-fixtures and null audio; they do not contact
-broadcasters or change the installed widget. GitHub Actions runs these checks
-and builds Linux amd64 and arm64 archives.
-
-The developer audits below run from a source checkout; their guides link to the
-source repository so they are also accessible from compiled-archive documentation.
-
-For an isolated investigation of audio duration and scheduled boundaries, see
-the [recording timing audit](https://github.com/joega/yakker/blob/main/tools/recording-audit/README.md). It compares decoded
-audio with time-coded local fixtures and can optionally sample selected stations.
-The [matched-source quality comparison](https://github.com/joega/yakker/blob/main/tools/recording-quality/README.md)
-prepares randomized 24/48 kbit/s samples from local reference audio for listening
-checks, with full-rate decode measurements. It does not change the recording bitrate.
-For a live acceptance run across several stations, the
-[scheduled recording audit](https://github.com/joega/yakker/blob/main/tools/scheduled-recordings-audit.md) checks real padded
-schedules, decoded head/tail audio, silent playback and persisted resume using
-isolated data. It requires explicit station selection and contacts those broadcasters.
-The [recovery audit](https://github.com/joega/yakker/blob/main/tools/recording-recovery-audit.md) uses a controlled loopback
-source to test disconnects, stalls, controller loss, bounded retries and linked
-remainders without changing the installed library or connecting to broadcasters.
-
-Optional native UI checks (installed Omarchy controls required):
-
-```sh
-python3 tools/test-recordings-ui.py
-python3 tools/test-recordings-ui.py --compact --output /tmp/yakker-compact-ui-qa
-```
-
-This uses isolated temporary settings/data and silent local audio. It verifies
-keyboard navigation, scheduling, preview, stale drafts, file playback/seek and
-helper recovery, and writes screenshots under `/tmp/yakker-recordings-ui-qa`.
-The compact audit includes native card padding, 68 view/size/font combinations,
-Tab traversal and focus visibility, manual scrolling and Settings return, and
-station, filter and timer popover bounds and cancellation.
-Its test container substitutes for the actual layer-shell popup. Audible quality,
-physical sleep/resume, and installed-shell focus/lifecycle behavior also need
-manual checks on the target desktop.
+Checks cover formatting, vet, module verification, race tests, and optional local
+mpv integration. For deeper work, see the
+[timing audit](https://github.com/joega/yakker/blob/main/tools/recording-audit/README.md),
+[quality comparison](https://github.com/joega/yakker/blob/main/tools/recording-quality/README.md),
+[scheduled capture audit](https://github.com/joega/yakker/blob/main/tools/scheduled-recordings-audit.md),
+[recovery audit](https://github.com/joega/yakker/blob/main/tools/recording-recovery-audit.md),
+and [native UI / screenshot guide](docs/screenshots.md).
 
 ## Privacy and licensing
 
-Yakker has no analytics, account system, or background station discovery.
-Playback connects to the selected broadcaster and its stream providers, which
-receive the network request. Enabled recording schedules also connect to their
-saved station sources while due and the plugin is running. Artwork and station configuration are bundled
-locally. The widget saves station, volume, and mute preferences on your device;
-standalone terminal sessions use temporary local state.
+No analytics or accounts. Playback and due recording schedules connect to the
+chosen broadcaster and its stream providers. Artwork and station configuration
+are bundled locally; preferences, custom stations, and recordings stay on your
+machine.
 
-The code is MIT licensed; see [LICENSE](LICENSE). Station artwork and broadcaster
-marks are owned by their respective owners and are excluded from the code
-license; see [artwork attribution](assets/README.md). Compiled archives include
-`THIRD_PARTY_NOTICES.txt` for their Go dependencies.
+Code is [MIT licensed](LICENSE). Broadcaster artwork and marks belong to their
+owners and are excluded from the code license; see [attribution](assets/README.md).
+Compiled archives include dependency notices. Yakker is unaffiliated with the
+broadcasters.
 
-## Made something with Yakker?
-
-If you build something with Yakker, please consider crediting
-[Yakker](https://github.com/joega/yakker) by [@joega](https://github.com/joega)
-in your README or credits. I'd love to see what you make—share a link in an issue!
-
-This is an optional request; use of Yakker is governed by the MIT license above.
+Built something with Yakker? Credit is appreciated, and we'd love a link in an
+issue; attribution is optional under the MIT license.
