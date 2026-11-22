@@ -435,6 +435,89 @@ ShellRoot {
           panel.showPlayer()
         }
       }
+      function checkRecordingGroups() {
+        const view = panel.testView, radio = panel.radio
+        const saved = radio.recordings
+        const width = window.width, height = window.height
+        const first = {id:"group-first",showId:"episode",label:"Morning drive",stationId:"weei-fm",stationName:"WEEI 93.7",status:"partial",playable:true,durationSeconds:730,resumePosition:0,plannedStart:"2030-01-02T08:00:00Z",plannedEnd:"2030-01-02T08:30:00Z",startedAt:"2030-01-02T08:00:02Z",endedAt:"2030-01-02T08:12:12Z",reason:"Connection lost"}
+        const second = Object.assign({},first,{id:"group-second",parentId:first.id,status:"complete",durationSeconds:1068,resumePosition:120,startedAt:"2030-01-02T08:12:32Z",endedAt:"2030-01-02T08:30:00Z",reason:"",lastPlayedAt:"2030-01-03T08:00:00Z"})
+        const setParts = function(a,b) { radio.recordings = Object.assign({},saved,{recordings:[b,a]}); wait(30) }
+        try {
+          view.testInterceptPlayback = true
+          setParts(first,second)
+          tryCompare(view.testLibrary,"count",1)
+          let row = view.testLibrary.itemAt(0)
+          verify(row.grouped); compare(row.parts.length,2)
+          compare(row.parts[0].id,first.id); compare(row.partNumber,2)
+          compare(row.rowData.durationSeconds,1798)
+          compare(row.primaryLabel,"Resume · Part 2")
+          row.testPrimary.clicked(); compare(view.testPlayedId,second.id); compare(view.testFromStart,false)
+          row.testDetails.clicked(); verify(row.expanded)
+          compare(row.testParts.count,2)
+          row.testParts.itemAt(0).testPlay.clicked(); compare(view.testPlayedId,first.id)
+          row.testParts.itemAt(1).testDelete.clicked()
+          compare(view.confirmation,"deleteRecording:"+second.id)
+          row.testDetails.clicked(); compare(view.confirmation,"")
+          row.testDetails.clicked()
+          const partControl = row.testParts.itemAt(1).testPlay
+          partControl.forceActiveFocus(); wait(30)
+          setParts(first,Object.assign({},second,{resumePosition:123}))
+          compare(row.testParts.itemAt(1).testPlay,partControl,"Progress update rebuilt the part control")
+          verify(partControl.activeFocus,"Progress update discarded part focus")
+          window.height = 1000; wait(40)
+          view.testSearch.forceActiveFocus(); wait(40)
+          capture("recording-group-parts")
+          window.height = height
+          setParts(Object.assign({},first,{stationId:"talksport",stationName:"talkSPORT"}),Object.assign({},second,{stationId:"talksport",stationName:"talkSPORT"}))
+          window.width = 320; window.height = 300; wait(60)
+          row.testParts.itemAt(1).testPlay.forceActiveFocus()
+          tryVerify(function() { const item = row.testParts.itemAt(1).testPlay; const y = item.mapToItem(panel,0,0).y; return y >= 0 && y + item.height <= panel.testDock.mapToItem(panel,0,0).y },2000,"Part playback stayed behind the dock")
+          keyClick(Qt.Key_Tab)
+          verify(window.activeFocusItem && window.activeFocusItem.visible,"Tab lost focus inside parts")
+          capture("recording-group-small")
+          window.width = width; window.height = height
+          setParts(Object.assign({},first,{lastPlayedAt:"2030-01-04T08:00:00Z",playbackCompleted:true}),Object.assign({},second,{resumePosition:0,lastPlayedAt:""}))
+          row = view.testLibrary.itemAt(0)
+          compare(row.partNumber,2); compare(row.primaryLabel,"Resume · Part 2")
+          row.testPrimary.clicked(); compare(view.testPlayedId,second.id)
+          // A missing resume target remains explicit; it never silently opens part 1.
+          setParts(first,Object.assign({},second,{status:"missing",playable:false}))
+          row = view.testLibrary.itemAt(0)
+          verify(!row.testPrimary.visible)
+          verify(row.progressLabel.indexOf("unavailable") >= 0)
+          // A finished part can point to an unfinished capture without offering playback.
+          setParts(Object.assign({},first,{lastPlayedAt:"2030-01-04T08:00:00Z",playbackCompleted:true}),Object.assign({},second,{status:"recording",playable:false,lastPlayedAt:""}))
+          row = view.testLibrary.itemAt(0)
+          verify(!row.testPrimary.visible); compare(row.progressLabel,"Next part is still recording")
+          if (!row.expanded) row.testDetails.clicked()
+          compare(row.testParts.itemAt(1).testPlay.text,"Stop capture")
+          verify(!row.testParts.itemAt(1).testDelete.enabled)
+          view.statusFilter = "partial"; tryCompare(view.testLibrary,"count",1)
+          view.searchText = "no match"; tryCompare(view.testLibrary,"count",0)
+          view.searchText = ""; view.statusFilter = "all"
+          // Filtering/pagination sees shows rather than scattering their parts.
+          const many = []
+          for (let i=0;i<21;i++) {
+            many.push(Object.assign({},first,{id:"first-"+i,showId:"show-"+i}))
+            many.push(Object.assign({},second,{id:"second-"+i,showId:"show-"+i}))
+          }
+          radio.recordings = Object.assign({},saved,{recordings:many}); wait(40)
+          compare(view.filteredRecordings.length,21); compare(view.libraryPages,2)
+          compare(view.testLibrary.count,20)
+          view.libraryPage=1; wait(30); compare(view.testLibrary.count,1)
+          compare(view.testLibrary.itemAt(0).parts.length,2)
+          view.libraryPage=0
+          const old = view.groupRecordings([Object.assign({},second,{lastPlayedAt:""}),first])
+          compare(old[0].resumeId,second.id,"Legacy part bookmark was ignored")
+          const differentEpisodes = view.groupRecordings([first,second,Object.assign({},first,{id:"next-week",showId:"episode-next-week"})])
+          compare(differentEpisodes.length,2,"Same-title weekly episodes merged")
+          console.log("QA: grouped recording parts and resume")
+        } finally {
+          view.testInterceptPlayback = false; view.confirmation = ""; view.searchText = ""; view.statusFilter = "all"
+          window.width = width; window.height = height; radio.recordings = saved
+          wait(30)
+        }
+      }
       function runChecks() {
         try {
           const reducedMotion = Commons.Style.reduceMotion
@@ -705,6 +788,7 @@ ShellRoot {
           compare(libraryRow.primaryLabel, "Play")
           verify(!libraryRow.testProgress.visible, "Unstarted audio shows invented listening progress")
           const librarySnapshot = panel.radio.recordings
+          checkRecordingGroups()
           panel.radio.recordings = Object.assign({}, librarySnapshot, {recordings:[
             {id:"bounds",label:"<b>Literal title</b>",stationName:"Station",status:"complete",playable:true,durationSeconds:60,resumePosition:90},
             {id:"unknown",label:"Unknown duration",stationName:"Station",status:"complete",playable:true,durationSeconds:0,resumePosition:12},

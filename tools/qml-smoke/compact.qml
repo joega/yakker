@@ -88,6 +88,13 @@ ShellRoot {
             ["saved-player",function() { radio.playbackKind="recording";radio.recordingId="saved";radio.recordingTitle=savedShow.label;radio.duration=7200;radio.position=3661;radio.station=radio.noStation;radio.stationId="" }],
             ["library",function() { panel.openRecordings(false) }],
             ["details",function() { panel.openRecordings(false);view.toggleDetails("saved") }],
+            ["grouped-library",function() {
+              radio.recordings=Object.assign({},radio.recordings,{recordings:[
+                Object.assign({},savedShow,{id:"part-two",showId:"recovered-show",parentId:"saved",startedAt:"2026-11-19T15:00:00-05:00",resumePosition:61,lastPlayedAt:"2026-11-20T10:00:00Z"}),
+                Object.assign({},savedShow,{showId:"recovered-show",status:"partial",durationSeconds:3500,resumePosition:0,endedAt:"2026-11-19T14:58:00-05:00",reason:"Network interrupted; retained audio is available"})
+              ]})
+              panel.openRecordings(false);view.toggleDetails("recovered-show")
+            }],
             ["schedules",function() { panel.openSchedules() }],
             ["weekly-editor",function() { panel.openSchedules();view.beginEdit(schedule) }],
             ["once-editor",function() { panel.openSchedules();view.beginEdit(null);view.scheduleKind="once" }],
@@ -109,7 +116,7 @@ ShellRoot {
               reset(index++); entry[1](); wait(45)
               const name = entry[0] + "-" + size.join("x")
               checkLayout(name)
-              if (entry[0].indexOf("editor") >= 0 || ["library","storage","alerts","record-now","schedules","custom-stations"].indexOf(entry[0]) >= 0) checkFocus(name,16)
+              if (entry[0].indexOf("editor") >= 0 || ["library","grouped-library","storage","alerts","record-now","schedules","custom-stations"].indexOf(entry[0]) >= 0) checkFocus(name,16)
               if (size[0]===320 && size[2]===base) capture(name)
             }
           }

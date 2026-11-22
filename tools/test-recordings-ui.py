@@ -159,7 +159,11 @@ def main():
   property alias testOpenFolder: openFolderButton
   property alias testFolder: folderField
   property alias testRefreshDraft: refreshDraftButton
+  property bool testInterceptPlayback: false
+  property string testPlayedId: ""
+  property bool testFromStart: false
   required property var radio''', 1))
+        view.write_text(view.read_text().replace('  function playItem(id, fromStart) {', '  function playItem(id, fromStart) {\n    if (testInterceptPlayback) { testPlayedId = id; testFromStart = fromStart; return }', 1))
         view.write_text(view.read_text().replace('        id: recordRow', """        id: recordRow
         property alias testPrimary: rowPrimary
         property alias testDetails: rowDetails
@@ -173,6 +177,8 @@ def main():
         property alias testReason: detailsReason
         property alias testProgress: listeningProgress
         property alias testTitle: recordTitle""", 1))
+        view.write_text(view.read_text().replace('        property alias testTitle: recordTitle', '        property alias testTitle: recordTitle\n        property alias testParts: partsRepeater', 1))
+        view.write_text(view.read_text().replace('                id: partRow', '                id: partRow\n                property alias testPlay: partPlay\n                property alias testDelete: partDelete', 1))
         view.write_text(view.read_text().replace('        id: scheduleRow', '        id: scheduleRow\n        property alias testEdit: scheduleEditButton\n        property alias testTitle: scheduleTitle', 1))
         picker = plugin / "StationPicker.qml"
         picker.write_text(picker.read_text().replace('  property string value: ""', '  property alias testSearch: search\n  property alias testList: list\n  property alias testPopup: popup\n  property alias testEmpty: pickerEmpty\n  property alias testEmptyViewport: emptyViewport\n  property alias testAll: allFilter\n  property alias testFavorites: favoritesFilter\n  property alias testClear: clearSearch\n  property string value: ""', 1).replace('          id: stationRow', '          id: stationRow\n          property alias testTitle: stationTitle\n          property alias testFavorite: favoriteButton\n          property alias testResult: stationResult', 1))

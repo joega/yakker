@@ -151,6 +151,10 @@ that v1.6.0 cannot read. Keep the index backup with the previous plugin for a
 rollback; plugin backups contain code, not recording metadata. Recordings added
 after that backup will not appear in a restored older index.
 
+Development builds with grouped recording parts also save last-played and
+completion bookmarks. Once playback saves these fields, v1.7.0 cannot read that
+index; retain a pre-upgrade index backup if you need to roll back.
+
 The source checkout must be built before installation; `omarchy plugin add`
 clones source without compiling the controller. Update a local installation by
 rebuilding and rerunning the installer from the same checkout path. The installer
@@ -402,6 +406,21 @@ by title or station and filter by status across the full library before moving b
 and recorded time ranges in local time, and any recording note. **Play from start**
 and **Delete** are quiet secondary actions. Delete shows what will be removed and
 requires confirmation; Cancel or Hide details clears that confirmation.
+
+Recovered segments from the same scheduled occurrence appear as **one show**,
+with an **Interrupted** indicator, part count, and total available saved audio.
+Open **Parts** to see each capture's time range, status and recovery note, with
+individual playback, restart and confirmed deletion actions. Interruptions are
+marked explicitly; their missing-audio duration is unknown. Different episodes
+of a recurring schedule remain separate shows.
+
+The show's **Resume** action selects the last-played unfinished part. After a
+part finishes, it selects the next part when you press Resume; playback does
+not advance automatically. Older indexes use their saved per-file positions
+until new playback bookmarks are available. Progress and seeking apply to the
+selected part. If that part is unavailable or still recording, the row explains
+why; open Parts to choose other available audio. Deleting one part keeps the
+other parts and their files.
 
 [<img src="docs/yakker-recording-details.png" alt="Recovered partial recording with scheduled and padded capture windows, unavailable end time, and a recovery note" width="300">](docs/yakker-recording-details.png)
 

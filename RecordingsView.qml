@@ -62,10 +62,12 @@ Column {
   property string searchText: ""
   property string statusFilter: "all"
   readonly property bool hasLibraryFilters: !!searchText.trim() || statusFilter !== "all"
-  readonly property var filteredRecordings: (snapshot.recordings || []).filter(function(r) {
+  readonly property var libraryShows: groupRecordings(snapshot.recordings || [])
+  readonly property var filteredRecordings: libraryShows.filter(function(r) {
     const q = root.searchText.trim().toLowerCase()
     return (!q || ((r.label || "") + " " + (r.stationName || "")).toLowerCase().indexOf(q) >= 0)
-      && (root.statusFilter === "all" || r.status === root.statusFilter)
+      && (root.statusFilter === "all" || r.status === root.statusFilter
+        || (r.parts || []).some(function(p) { return p.status === root.statusFilter }))
   })
   property int libraryPage: 0
   readonly property int pageSize: 20
@@ -103,7 +105,7 @@ Column {
   }
   onSnapshotChanged: {
     if (confirmation && confirmRevision !== Number(snapshot.revision)) confirmation = ""
-    const retained = {}, records = snapshot.recordings || []
+    const retained = {}, records = libraryShows
     for (let i = 0; i < records.length; i++) if (expandedRecordings[records[i].id]) retained[records[i].id] = true
     expandedRecordings = retained
     if (libraryPage >= Math.max(1, Math.ceil(filteredRecordings.length / pageSize))) libraryPage = Math.max(0, Math.ceil(filteredRecordings.length / pageSize) - 1)
@@ -305,7 +307,7 @@ Column {
   }
   function toggleDetails(id) {
     const next = Object.assign({}, expandedRecordings)
-    if (next[id]) { delete next[id]; if (confirmation === "deleteRecording:" + id) confirmation = "" }
+    if (next[id]) { delete next[id]; confirmation = "" }
     else next[id] = true
     expandedRecordings = next
   }
@@ -373,6 +375,48 @@ Column {
   function seconds(value) {
     const number = Number(value)
     return isFinite(number) && number > 0 ? number : 0
+  }
+  function groupRecordings(records) {
+    const groups = {}, order = []
+    records.forEach(function(r) {
+      const key = r.showId || r.id
+      if (!groups[key]) { groups[key] = []; order.push(key) }
+      groups[key].push(r)
+    })
+    return order.map(function(key) {
+      const parts = groups[key].slice().sort(function(a, b) {
+        const time = function(p) { return Date.parse(p.startedAt || p.plannedStart) || 0 }
+        return time(a) - time(b) || String(a.id).localeCompare(String(b.id))
+      })
+      if (parts.length === 1) return parts[0]
+      const playable = parts.filter(function(p) { return p.playable === true })
+      let latest = null
+      parts.forEach(function(p) {
+        if (p.lastPlayedAt && (!latest || Date.parse(p.lastPlayedAt) > Date.parse(latest.lastPlayedAt))) latest = p
+      })
+      // Older indexes have positions but no last-played/completion metadata.
+      if (!latest) playable.forEach(function(p) { if (root.seconds(p.resumePosition) > 0) latest = p })
+      let target = latest && !latest.playbackCompleted ? latest : null
+      const next = latest && latest.playbackCompleted ? parts[parts.indexOf(latest) + 1] : null
+      if (!target) target = next || playable[0] || parts[0]
+      return Object.assign({}, parts[0], {
+        id: key, parts: parts, resumeId: target.id, resumeNext: !!next,
+        playable: playable.length > 0,
+        status: parts.some(function(p) { return p.status === "recording" }) ? "recording" : playable.length ? "partial" : parts.some(function(p) { return p.status === "missing" }) ? "missing" : "error",
+        durationSeconds: playable.reduce(function(sum, p) { return sum + root.seconds(p.durationSeconds) }, 0),
+        bytes: parts.reduce(function(sum, p) { return sum + root.seconds(p.bytes) }, 0)
+      })
+    })
+  }
+  function recordingPart(id) {
+    return (snapshot.recordings || []).find(function(p) { return p.id === id }) || ({})
+  }
+  function partProgress(part) {
+    const playing = radio.playbackKind === "recording" && radio.recordingId === part.id && radio.wanted
+    const position = playing ? seconds(radio.position) : seconds(part.resumePosition)
+    return (playing ? (radio.paused ? "Paused · " : "Playing · ") : part.playbackCompleted ? "Finished · " : "")
+      + (position > 0 ? radio.clock(position) + " / " : "")
+      + (seconds(part.durationSeconds) > 0 ? radio.clock(part.durationSeconds) : "Duration unavailable")
   }
   function recordingStation(recording) {
     return radio.stations.find(function(station) { return station.id === recording.stationId })
@@ -779,17 +823,31 @@ Column {
         id: recordRow
         required property var rowData
         readonly property var modelData: rowData
+        readonly property bool grouped: !!rowData.parts && rowData.parts.length > 1
+        readonly property var parts: grouped ? rowData.parts : [rowData]
+        // Keep nested controls alive across progress checkpoints, just like the
+        // top-level rows, so an incoming snapshot does not discard Tab focus.
+        ListModel { id: partRows; dynamicRoles: true }
+        onPartsChanged: if (partRows) root.syncRows(partRows, grouped ? parts : [])
+        Component.onCompleted: root.syncRows(partRows, grouped ? parts : [])
         readonly property bool expanded: !!root.expandedRecordings[rowData.id]
-        readonly property bool capturing: rowData.status === "recording"
-        readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.recordingId === rowData.id && root.radio.wanted
+        readonly property bool capturing: !grouped && rowData.status === "recording"
+        readonly property bool playingHere: root.radio.playbackKind === "recording" && root.radio.wanted && parts.some(function(p) { return p.id === root.radio.recordingId })
+        readonly property var selectedPart: grouped ? root.recordingPart(playingHere ? root.radio.recordingId : rowData.resumeId) : rowData
+        readonly property int partNumber: grouped ? parts.findIndex(function(p) { return p.id === recordRow.selectedPart.id }) + 1 : 1
         readonly property bool opening: playingHere && !root.radio.paused && root.radio.playbackState !== "playing"
-        readonly property real durationSeconds: playingHere && root.seconds(root.radio.duration) > 0 ? root.seconds(root.radio.duration) : root.seconds(rowData.durationSeconds)
-        readonly property real rawPosition: playingHere ? root.seconds(root.radio.position) : Math.floor(root.seconds(rowData.resumePosition))
+        readonly property real durationSeconds: playingHere && root.seconds(root.radio.duration) > 0 ? root.seconds(root.radio.duration) : root.seconds(selectedPart.durationSeconds)
+        readonly property real rawPosition: playingHere ? root.seconds(root.radio.position) : Math.floor(root.seconds(selectedPart.resumePosition))
         readonly property real listeningPosition: durationSeconds > 0 ? Math.min(rawPosition, durationSeconds) : rawPosition
         readonly property bool hasResume: listeningPosition > 0.5 && (durationSeconds === 0 || listeningPosition < durationSeconds - 0.5)
         readonly property string primaryLabel: capturing ? "Stop capture" : opening ? "Opening…" : playingHere && !root.radio.paused ? "Pause"
+          : grouped ? (hasResume || rowData.resumeNext || (playingHere && root.radio.paused) ? "Resume" : "Play") + " · Part " + partNumber
           : hasResume ? "Resume · " + root.radio.clock(listeningPosition) : "Play"
-        readonly property string progressLabel: (rowData.status !== "complete" && !capturing ? root.statusText(rowData.status) + " · " : "") + (capturing ? "Recording live audio"
+        readonly property string progressLabel: grouped ? (playingHere ? "Part " + partNumber + " · " + root.partProgress(selectedPart)
+          : selectedPart.status === "recording" ? "Next part is still recording"
+          : selectedPart.playable !== true ? "Part " + partNumber + " unavailable · choose another part"
+          : "Part " + partNumber + " · " + root.partProgress(selectedPart))
+          : (rowData.status !== "complete" && !capturing ? root.statusText(rowData.status) + " · " : "") + (capturing ? "Recording live audio"
           : rowData.playable !== true ? (rowData.status === "missing" ? "File unavailable" : "No playable audio")
           : opening ? "Opening recording…"
           : durationSeconds > 0 ? ((playingHere ? (root.radio.paused ? "Paused · " : "Playing · ") : "")
@@ -827,27 +885,32 @@ Column {
         Column {
           width: parent.width
           spacing: Style.space(6)
+          Hint {
+            visible: recordRow.grouped
+            text: (recordRow.rowData.status === "recording" ? "Recording · " : "Interrupted · ") + recordRow.parts.length + " parts · "
+              + (recordRow.rowData.playable ? root.radio.clock(root.seconds(recordRow.rowData.durationSeconds)) + " saved audio" : "Audio unavailable")
+          }
           QQC.ProgressBar {
             id: listeningProgress
             width: parent.width
             height: Style.space(3)
-            visible: recordRow.rowData.playable === true && !recordRow.capturing && recordRow.durationSeconds > 0 && (recordRow.listeningPosition > 0 || recordRow.playingHere)
+            visible: recordRow.selectedPart.playable === true && !recordRow.capturing && recordRow.durationSeconds > 0 && (recordRow.listeningPosition > 0 || recordRow.playingHere)
             from: 0
             to: recordRow.durationSeconds > 0 ? recordRow.durationSeconds : 1
             value: recordRow.listeningPosition
             Accessible.name: "Listening progress for " + (recordRow.rowData.label || recordRow.rowData.stationName)
-            Accessible.description: root.radio.clock(recordRow.listeningPosition) + " of " + root.radio.clock(recordRow.durationSeconds)
+            Accessible.description: (recordRow.grouped ? "Part " + recordRow.partNumber + " of " + recordRow.parts.length + ": " : "") + root.radio.clock(recordRow.listeningPosition) + " of " + root.radio.clock(recordRow.durationSeconds)
             background: Rectangle { radius: height / 2; color: Qt.alpha(root.foreground, 0.14) }
             contentItem: Item { Rectangle { width: parent.width * listeningProgress.visualPosition; height: parent.height; radius: height / 2; color: Commons.Color.accent } }
           }
           Text { width: parent.width; text: recordRow.progressLabel; textFormat: Text.PlainText; color: recordRow.capturing ? Commons.Color.urgent : recordRow.playingHere ? Commons.Color.accent : root.foreground; opacity: recordRow.playingHere || recordRow.capturing ? 1 : 0.8; font.family: root.uiFontFamily; font.pixelSize: Style.fontPx(1); wrapMode: Text.Wrap }
         }
-        Row {
+        Flow {
           width: parent.width
           spacing: Style.space(8)
           Radio.FocusButton {
             id: rowPrimary
-            visible: recordRow.capturing || recordRow.rowData.playable === true
+            visible: recordRow.capturing || recordRow.selectedPart.playable === true
             text: recordRow.primaryLabel
             iconName: recordRow.capturing ? "stop" : recordRow.playingHere && !root.radio.paused ? "pause" : "play"
             iconSize: Style.space(16)
@@ -862,13 +925,13 @@ Column {
             onClicked: {
               if (recordRow.capturing) root.action("stopRecording", recordRow.rowData.id, root.snapshot.revision)
               else if (recordRow.playingHere) root.radio.togglePause()
-              else root.playItem(recordRow.rowData.id, recordRow.durationSeconds > 0 && recordRow.listeningPosition >= recordRow.durationSeconds - 0.5)
+              else root.playItem(recordRow.selectedPart.id, recordRow.durationSeconds > 0 && recordRow.listeningPosition >= recordRow.durationSeconds - 0.5)
             }
           }
-          Item { width: Math.max(0, parent.width - (rowPrimary.visible ? rowPrimary.width + parent.spacing : 0) - rowDetails.width - parent.spacing); height: 1 }
+          Item { width: Math.max(0, parent.width - (rowPrimary.visible ? rowPrimary.width + parent.spacing : 0) - rowDetails.width - parent.spacing); height: 1; visible: width > 0 }
           Radio.FocusButton {
             id: rowDetails
-            text: recordRow.expanded ? "Hide details" : "Details"
+            text: recordRow.grouped ? (recordRow.expanded ? "Hide parts" : "Parts") : recordRow.expanded ? "Hide details" : "Details"
             fontSize: Style.fontPx(1)
             foreground: Qt.alpha(root.foreground, 0.8)
             focusable: true
@@ -881,12 +944,94 @@ Column {
         Rectangle {
           id: recordingMetadata
           width: parent.width
-          implicitHeight: detailsBody.implicitHeight + Style.space(24)
+          implicitHeight: (recordRow.grouped ? partsBody.implicitHeight : detailsBody.implicitHeight) + Style.space(24)
           visible: recordRow.expanded
           radius: Style.space(8)
           color: Qt.alpha(root.foreground, 0.035)
           Column {
+            id: partsBody
+            visible: recordRow.grouped
+            x: Style.space(12); y: Style.space(12)
+            width: parent.width - Style.space(24)
+            spacing: Style.space(12)
+            DetailLine { label: "Scheduled"; value: root.recordingRangeText(recordRow.rowData.plannedStart, recordRow.rowData.plannedEnd, false) }
+            Hint { text: "Choose a part to play. Playback stops at the end of each part." }
+            Repeater {
+              id: partsRepeater
+              model: partRows
+              Column {
+                id: partRow
+                required property var rowData
+                readonly property var modelData: rowData
+                required property int index
+                readonly property bool playing: root.radio.playbackKind === "recording" && root.radio.recordingId === modelData.id && root.radio.wanted
+                readonly property bool active: modelData.status === "recording"
+                readonly property string deleteKey: "deleteRecording:" + modelData.id
+                width: partsBody.width
+                spacing: Style.space(6)
+                Ui.PanelSeparator { width: parent.width }
+                Hint { visible: partRow.index > 0; text: "Capture interrupted · gap length unknown"; font.pixelSize: Style.fontPx(0.917) }
+                FieldLabel { text: "Part " + (partRow.index + 1) + " · " + root.statusText(partRow.modelData.status) }
+                Hint { text: root.recordingRangeText(partRow.modelData.startedAt, partRow.modelData.endedAt, partRow.active); font.pixelSize: Style.fontPx(0.917) }
+                Hint { text: partRow.active ? "Recording live audio" : !partRow.modelData.playable ? "Audio unavailable" : root.partProgress(partRow.modelData) }
+                Hint { visible: !!partRow.modelData.reason; text: partRow.modelData.reason || ""; font.pixelSize: Style.fontPx(0.917) }
+                Hint { visible: root.confirmation === partRow.deleteKey; text: "Delete part " + (partRow.index + 1) + " and its audio file? Other parts are kept."; color: Commons.Color.urgent }
+                Flow {
+                  width: parent.width
+                  spacing: Style.space(8)
+                  Radio.FocusButton {
+                    id: partPlay
+                    visible: partRow.active || partRow.modelData.playable === true
+                    text: partRow.active ? "Stop capture" : partRow.playing ? (root.radio.paused ? "Resume" : "Pause") : root.seconds(partRow.modelData.resumePosition) > 0 ? "Resume" : "Play"
+                    iconName: partRow.active ? "stop" : partRow.playing && !root.radio.paused ? "pause" : "play"
+                    fontSize: Style.fontPx(1); horizontalPadding: Style.space(6)
+                    foreground: partRow.active ? Commons.Color.urgent : Commons.Color.accent
+                    Accessible.name: text + " part " + (partRow.index + 1)
+                    focusable: true
+                    enabled: root.radio.ready && !root.pending && (!partRow.active || root.available)
+                    onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                    onClicked: {
+                      if (partRow.active) root.action("stopRecording", partRow.modelData.id, root.snapshot.revision)
+                      else if (partRow.playing) root.radio.togglePause()
+                      else root.playItem(partRow.modelData.id, false)
+                    }
+                  }
+                  Radio.FocusButton {
+                    text: "Restart"
+                    visible: partRow.modelData.playable === true
+                    fontSize: Style.fontPx(1); horizontalPadding: Style.space(6)
+                    foreground: Qt.alpha(root.foreground, 0.75)
+                    Accessible.name: "Play part " + (partRow.index + 1) + " from start"
+                    focusable: true; enabled: root.radio.ready && !root.pending
+                    onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                    onClicked: { root.confirmation = ""; root.playItem(partRow.modelData.id, true) }
+                  }
+                  Radio.FocusButton {
+                    id: partDelete
+                    text: root.confirmation === partRow.deleteKey ? "Confirm delete" : "Delete"
+                    fontSize: Style.fontPx(1); horizontalPadding: Style.space(6)
+                    foreground: root.confirmation === partRow.deleteKey ? Commons.Color.urgent : Qt.alpha(root.foreground, 0.65)
+                    Accessible.name: text + " part " + (partRow.index + 1)
+                    focusable: true; enabled: root.available && !root.pending && !partRow.active
+                    onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                    onClicked: root.action("deleteRecording", partRow.modelData.id, root.snapshot.revision)
+                  }
+                  Radio.FocusButton {
+                    visible: root.confirmation === partRow.deleteKey
+                    text: "Cancel"
+                    fontSize: Style.fontPx(1); horizontalPadding: Style.space(6)
+                    foreground: Qt.alpha(root.foreground, 0.75)
+                    focusable: true; enabled: !root.pending
+                    onActiveFocusChanged: if (activeFocus) root.ensureVisible(this)
+                    onClicked: { root.confirmation = ""; root.focusItem(partDelete) }
+                  }
+                }
+              }
+            }
+          }
+          Column {
             id: detailsBody
+            visible: !recordRow.grouped
             x: Style.space(12); y: Style.space(12)
             width: parent.width - Style.space(24)
             spacing: Style.space(12)
