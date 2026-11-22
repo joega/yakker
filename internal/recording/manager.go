@@ -796,7 +796,19 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 		return errors.New("active recording missing from index")
 	}
 	r := &s.Recordings[found]
-	r.EndedAt = timestamp(m.config.Now())
+	now := m.config.Now()
+	endedAt := result.EndedAt
+	if endedAt.IsZero() {
+		endedAt = now
+	}
+	r.EndedAt = timestamp(endedAt)
+	if !result.StartedAt.IsZero() {
+		r.StartedAt = timestamp(result.StartedAt)
+		if result.StartedAt.Sub(parseTime(r.PlannedStart)) > 2*time.Second && r.Reason == "" {
+			r.Reason = "started after scheduled beginning"
+		}
+	}
+	early := endedAt.Before(parseTime(r.PlannedEnd).Add(-2 * time.Second))
 	r.Bytes = result.Bytes
 	r.DurationSeconds = result.DurationSeconds
 	r.Resume = job.resume
@@ -806,13 +818,13 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	if result.Err != nil && r.Reason == "" {
 		r.Reason = "stream or encoder interrupted"
 	}
-	if job.reason == "" && m.config.Now().Before(parseTime(r.PlannedEnd).Add(-2*time.Second)) {
+	if job.reason == "" && early && now.Before(parseTime(r.PlannedEnd)) {
 		// Unexpected EOF and stream/encoder failures retry at most twice, while
 		// explicit user/storage/lifecycle stops keep their own resume policy.
 		r.Failures++
 		if r.Failures < 3 {
 			r.Resume = true
-			r.ResumeAfter = timestamp(m.config.Now().Add(time.Duration(r.Failures) * time.Second))
+			r.ResumeAfter = timestamp(now.Add(time.Duration(r.Failures) * time.Second))
 		} else {
 			r.Resume = false
 			r.Reason = "stream interrupted; recording retry limit reached"
@@ -820,7 +832,7 @@ func (m *Manager) finishLocked(id string, job *activeJob, result CaptureResult) 
 	}
 	if result.Bytes > 0 && result.DurationSeconds > 0 {
 		r.Status = "complete"
-		if r.Reason != "" || m.config.Now().Before(parseTime(r.PlannedEnd).Add(-2*time.Second)) {
+		if r.Reason != "" || early {
 			r.Status = "partial"
 			if r.Reason == "" {
 				r.Reason = "recording ended before scheduled end"

@@ -204,6 +204,57 @@ func TestCaptureCancellationAndFailures(t *testing.T) {
 	})
 }
 
+func TestCaptureRejectsExpiredWindowWithoutCreatingOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "expired.partial")
+	_, err := StartCapture(context.Background(), CaptureOptions{URL: "http://127.0.0.1:1", Path: path, End: time.Now().Add(-time.Second)})
+	if err == nil {
+		t.Fatal("expired capture window launched an encoder")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expired capture created an artifact: %v", err)
+	}
+}
+
+func TestCaptureTimestampsExcludeProbeDelay(t *testing.T) {
+	mediaTools(t)
+	dir := t.TempDir()
+	clip := filepath.Join(dir, "source.opus")
+	if out, err := exec.Command("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=0.25", "-ac", "1", "-c:a", "libopus", clip).CombinedOutput(); err != nil {
+		t.Fatalf("fixture audio: %v: %s", err, out)
+	}
+	probe, err := exec.LookPath("ffprobe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("YAKKER_CAPTURE_TEST_CLIP", clip)
+	t.Setenv("YAKKER_CAPTURE_TEST_PROBE", probe)
+	encoder := filepath.Join(dir, "encoder")
+	probeWrapper := filepath.Join(dir, "probe")
+	for path, script := range map[string]string{
+		encoder:      "#!/bin/sh\ncat \"$YAKKER_CAPTURE_TEST_CLIP\" >&3\n",
+		probeWrapper: "#!/bin/sh\nsleep 0.5\nexec \"$YAKKER_CAPTURE_TEST_PROBE\" \"$@\"\n",
+	} {
+		if err := os.WriteFile(path, []byte(script), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := time.Now()
+	capture, err := StartCapture(context.Background(), CaptureOptions{FFmpeg: encoder, FFprobe: probeWrapper, URL: "fixture", Path: filepath.Join(dir, "capture.partial")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := receive(t, capture)
+	if result.Err != nil {
+		t.Fatal(result.Err)
+	}
+	if result.StartedAt.Before(before) || result.EndedAt.Before(result.StartedAt) {
+		t.Fatalf("invalid encoder timestamps: %+v", result)
+	}
+	if time.Since(result.EndedAt) < 450*time.Millisecond {
+		t.Fatalf("probe delay changed capture end: %+v", result)
+	}
+}
+
 func TestCaptureEscalatesAndReaps(t *testing.T) {
 	dir := t.TempDir()
 	encoder := filepath.Join(dir, "stubborn")

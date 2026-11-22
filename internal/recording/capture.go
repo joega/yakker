@@ -29,14 +29,18 @@ type CaptureOptions struct {
 type CaptureResult struct {
 	Bytes           int64
 	DurationSeconds float64
-	Err             error
+	// Encoder lifetime, separate from the later probe/finalization work. These
+	// are local process times, not timestamps of the broadcaster's programme.
+	StartedAt, EndedAt time.Time
+	Err                error
 }
 type Capture struct {
-	stop     chan struct{}
-	finished chan struct{}
-	done     chan CaptureResult
-	once     sync.Once
-	pid      int
+	stop      chan struct{}
+	finished  chan struct{}
+	done      chan CaptureResult
+	once      sync.Once
+	pid       int
+	startedAt time.Time
 }
 
 // StartCapture starts a single encoder writing an exclusively created Ogg file.
@@ -49,6 +53,9 @@ func StartCapture(ctx context.Context, options CaptureOptions) (*Capture, error)
 	}
 	if options.URL == "" || options.Path == "" {
 		return nil, errors.New("capture: URL and output path are required")
+	}
+	if !options.End.IsZero() && !time.Now().Before(options.End) {
+		return nil, errors.New("capture: scheduled end has already passed")
 	}
 	if options.FFmpeg == "" {
 		options.FFmpeg = "ffmpeg"
@@ -83,6 +90,7 @@ func StartCapture(ctx context.Context, options CaptureOptions) (*Capture, error)
 		}
 		_ = f.Close()
 		c.pid = cmd.Process.Pid
+		c.startedAt = time.Now()
 		started <- nil
 		c.run(ctx, cmd, options)
 	}()
@@ -98,8 +106,15 @@ func (c *Capture) Stop()                      { c.once.Do(func() { close(c.stop)
 func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions) {
 	defer close(c.finished)
 	defer close(c.done)
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
+	type exitResult struct {
+		err error
+		at  time.Time
+	}
+	exited := make(chan exitResult, 1)
+	go func() {
+		err := cmd.Wait()
+		exited <- exitResult{err: err, at: time.Now()}
+	}()
 	var timer *time.Timer
 	var end <-chan time.Time
 	if !options.End.IsZero() {
@@ -111,10 +126,11 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 		end = timer.C
 		defer timer.Stop()
 	}
-	var processErr, reason error
+	var exit exitResult
+	var reason error
 	stopped := false
 	select {
-	case processErr = <-exited:
+	case exit = <-exited:
 	case <-c.stop:
 		stopped = true
 	case <-end:
@@ -127,13 +143,13 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 		_ = cmd.Process.Signal(os.Interrupt)
 		grace := time.NewTimer(options.StopGrace)
 		select {
-		case processErr = <-exited:
+		case exit = <-exited:
 			if !grace.Stop() {
 				<-grace.C
 			}
 		case <-grace.C:
 			_ = cmd.Process.Kill()
-			processErr = <-exited
+			exit = <-exited
 			if reason == nil {
 				reason = errors.New("capture: encoder did not stop gracefully")
 			}
@@ -142,6 +158,7 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 	probeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	result, probeErr := ProbeRecording(probeCtx, options.FFprobe, options.Path)
 	cancel()
+	result.StartedAt, result.EndedAt = c.startedAt, exit.at
 	if info, err := os.Stat(options.Path); err == nil {
 		result.Bytes = info.Size()
 	}
@@ -149,7 +166,7 @@ func (c *Capture) run(ctx context.Context, cmd *exec.Cmd, options CaptureOptions
 		result.Err = reason
 	} else if probeErr != nil {
 		result.Err = probeErr
-	} else if processErr != nil && !stopped {
+	} else if exit.err != nil && !stopped {
 		result.Err = errors.New("capture: encoder exited unsuccessfully")
 	}
 	c.done <- result

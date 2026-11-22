@@ -852,6 +852,48 @@ func TestUnexpectedStreamEndRetriesWithBoundedBackoff(t *testing.T) {
 	}
 }
 
+func TestCaptureEndTimeSurvivesDelayedFinalization(t *testing.T) {
+	for _, early := range []bool{true, false} {
+		t.Run(fmt.Sprint(early), func(t *testing.T) {
+			m, now, _ := engineFixture(t)
+			saveRule(t, m, rule("timing"))
+			*now = now.Add(time.Hour)
+			start, end := *now, now.Add(time.Hour)
+			capturedEnd := end
+			if early {
+				capturedEnd = end.Add(-10 * time.Second)
+			}
+			m.startCapture = func(_ context.Context, o CaptureOptions) (captureJob, error) {
+				if err := os.WriteFile(o.Path, make([]byte, 40), 0600); err != nil {
+					return nil, err
+				}
+				result := CaptureResult{Bytes: 40, DurationSeconds: 5, StartedAt: start, EndedAt: capturedEnd}
+				return &finishedCapture{result: result, done: resultChannel(result)}, nil
+			}
+			tick(m)
+			// The probe/poll finishes after the deadline, even though the stream
+			// may have ended ten seconds early. No actual suspend occurred.
+			*now = end.Add(3 * time.Second)
+			m.lastNow = *now
+			tick(m)
+			row := m.Snapshot().Recordings[0]
+			if parseTime(row.EndedAt) != capturedEnd {
+				t.Fatalf("probe time replaced encoder end: got %s, want %s", row.EndedAt, capturedEnd)
+			}
+			want := "complete"
+			if early {
+				want = "partial"
+			}
+			if row.Status != want {
+				t.Fatalf("ended early=%v: got %s, want %s (%s)", early, row.Status, want, row.Reason)
+			}
+			if m.state.Recordings[0].Resume {
+				t.Fatal("expired interval retained retry intent")
+			}
+		})
+	}
+}
+
 func TestPersistenceFailureReapsActiveCapturesWithoutWaitingForShutdown(t *testing.T) {
 	for _, afterRename := range []bool{false, true} {
 		t.Run(fmt.Sprint(afterRename), func(t *testing.T) {
