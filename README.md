@@ -227,59 +227,79 @@ packaging builds locally and does not publish or install anything.
 
 ## Listen
 
-Click the radio icon in the bar, select a station, then press the **Play** icon.
-Your last chosen station is restored on later launches. If it is no longer in
-the catalogue, choose another station; Yakker never substitutes a broadcaster.
-The Focus player keeps the station title on one line above **Change station**.
-Titles that overflow scroll slowly to the end and back, pausing at both ends.
-Short titles stay still; reduced-motion mode uses an ellipsis and a full-title
-tooltip instead. Preset and playback dock titles also stay on one line, without
-independent animations; playback status can wrap to keep paused/stopped states
-readable. Favorites live in the station picker's **Favorites** filter, keeping
-the player in place when stations are saved. The **Listen**, **Library**,
-and **Schedules** tabs form the first row, with Settings at the right edge. Both
-navigation rows use the same label alignment, hover/focus treatment, and compact
-spacing on narrow panels. Smaller artwork leaves room for station labels; replay
-presets use two rows and saved-playback options stack when space is tight. Short
-popups keep transport and volume visible while omitting the secondary playback
-hint from the dock. Keyboard focus scrolls fields and actions into view.
-Search fields, editors, and dropdowns share proportional
-text, stable focus/hover insets, and a common minimum height. Library search and
-status filters stack vertically on narrow panels; station dropdowns keep keyboard
-search, selection, cancellation, and focus return. **Rewind · Play/Pause · Forward** form the
-main transport row, with a larger Play/Pause control; **Record**, **Stop**, and
-**Sleep** sit below it, with Stop centered beneath Play/Pause. Rewind and forward
-skip 30 seconds and dim when unavailable. **Play/Pause** pauses or resumes
-an active player; **Stop** releases it. Playing a stopped radio starts a fresh
-live stream. Paused live radio is labeled **Paused · buffering**, with a pause
-indicator and a reminder that the stream stays connected. Fully stopped radio
-is labeled **Listening stopped**, with **Stream disconnected · Replay cleared**;
-its replay track is hidden until listening starts again. These states also appear
-in the persistent controls on Library, Schedules, and Settings. Saved recordings
-use **Recording paused** or **Recording stopped**, and stopped recordings can be
-resumed from Library. Closing the popup leaves audio playing.
-Right-click the bar icon to open the station list directly.
-The popup includes a text-style searchable station selector, volume, mute, connection status, and Retry after errors. Compact underline tabs and proportional typography keep the station name and transport controls prominent.
-Search by station, city or country—for example, `690`, `Seattle`, `UK` or
-`Ireland`; multiple words narrow the results together. Results show station
-artwork, name, location and the selected station. **All / Favorites** filters
-make saved stations easy to find. Use each row's heart to save or remove a
-favorite without tuning in or closing the picker. Rows stay in place while you
-change hearts, and favorites sort first on the next opening. Down/Up browses,
-Enter selects, F toggles the highlighted favorite, and Escape closes.
-Changing stations while playing makes a fresh live connection; while stopped it
-selects the next station without starting playback. The last station, volume,
-mute setting and listening buffer length are remembered across shell restarts.
-The bar uses the standard icon canvas for smaller station artwork, retained
-while playing or paused. Compact state icons indicate playing, paused, stopped,
-behind-live, connecting/reconnecting, and offline states. Full status text and
-connection/replay details stay in the tooltip. Stop restores the neutral radio
-icon. A separate **REC** count shows background recordings even when listening
-is stopped. Vertical bars use a compact state marker over the artwork and a
-separate recording dot. The tooltip groups the source name and location, playback
-state, replay availability and delay, and active recording names. Saved-show
-playback identifies its original station and elapsed time. Long metadata is
-bounded and displayed as plain text.
+Click the radio icon in the bar, select a station, then press **Play**. Your last
+chosen station is restored on later launches. If it is no longer in the
+catalogue, choose another station; Yakker never substitutes a broadcaster.
+
+The **Listen**, **Library**, and **Schedules** tabs form the first row, with
+Settings at the right edge. Playback controls stay available while you browse
+Library, Schedules, or Settings. Closing the popup leaves audio playing.
+
+### Playback controls
+
+| Control | Action |
+| --- | --- |
+| **Play / Pause** | Start listening, or pause and resume the current player. |
+| **Rewind / Forward** | Skip 30 seconds when replay is available; dim when unavailable. |
+| **Record** | Open Record now to capture a station. |
+| **Stop** | Disconnect listening and clear replay history. Playing again starts a fresh live stream. |
+| **Sleep** | Set a timer to stop listening; background recordings continue. |
+
+**Rewind · Play/Pause · Forward** form the main transport row, with a larger
+Play/Pause control. **Record · Stop · Sleep** sit below, with Stop centered
+beneath Play/Pause. Volume, mute, connection status, and Retry after errors are
+also available in the player.
+
+Playback status distinguishes keeping your place from disconnecting:
+
+- **Paused · buffering** means the live stream stays connected and audio keeps
+  arriving for you to resume.
+- **Listening stopped** appears with **Stream disconnected · Replay cleared**.
+  The replay track stays hidden until listening starts again.
+- **Recording paused** and **Recording stopped** describe saved-show playback.
+  Stopped recordings can be resumed from Library.
+
+These states also appear in the persistent controls on Library, Schedules, and
+Settings. See [Pause and rewind](#pause-and-rewind) for replay buffer options.
+
+### Stations and favorites
+
+Choose **Change station**, or right-click the bar icon to open the station picker
+directly. Search by station, city, or country—for example, `WBUR`, `Seattle`,
+`UK`, or `Ireland`. Multiple words narrow the results together. Results show
+station artwork, name, category, location, and the selected station.
+
+Use **All / Sports / News** to choose a category. **Favorites** is an independent
+filter that works alongside the category and search. Favorites stay inside the
+picker, so saving stations does not add a row to the main player.
+
+Use each row's heart to save or remove a favorite without tuning in or closing
+the picker. Rows stay in place while you change hearts; favorites sort first on
+the next opening. Down/Up browses, Enter selects, F toggles the highlighted
+favorite, and Escape closes.
+
+Changing stations while playing makes a fresh live connection. While stopped,
+it selects the next station without starting playback. The last station, volume,
+mute setting, and listening buffer length are remembered across shell restarts.
+
+The station title stays on one line above **Change station**. Long titles scroll
+slowly to the end and back, pausing at both ends; short titles stay still.
+Reduced-motion mode uses an ellipsis and a full-title tooltip instead. Station
+and playback dock titles stay on one line without independent animations;
+playback status can wrap to keep paused/stopped states readable.
+
+### Bar status and tooltips
+
+Station artwork remains visible while playing or paused. Compact state icons
+indicate playing, paused, stopped, behind-live, connecting/reconnecting, and
+offline states. Stop restores the neutral radio icon. A separate **REC** count
+shows background recordings even when listening is stopped. Vertical bars use
+a compact state marker over the artwork and a separate recording dot.
+
+The tooltip groups the source name and location, playback state, replay
+availability and delay, and active recording names. Saved-show playback
+identifies its original station and elapsed time. Long metadata is bounded and
+displayed as plain text.
 
 ![Bar tooltip examples for live, paused buffering, stopped listening with captures, and saved-show playback](docs/yakker-bar-tooltips.png?v=1.8.0)
 
@@ -287,25 +307,46 @@ bounded and displayed as plain text.
 
 _Captions explain these examples; the bar itself uses state icons and a separate REC count._
 
-Keyboard inside the popup: Tab/Shift+Tab or Up/Down moves between controls, including
-Settings and the DVR controls when available;
-Space/Enter activates the selection. Inside the station selector, type to search,
-Down browses the matches, Enter selects, and Escape cancels and clears the search. Left/Right adjusts volume by 5%; M toggles
-mute; R retries a stopped stream; Escape dismisses the popup. Right-clicking the
-volume slider also toggles mute. Wheel over a slider uses the same steps as
-Left/Right: 5% for volume or 30 seconds for playback position. When a slider is
-focused, Page Up/Down adjusts volume by 10% or playback by one minute; Home/End
-jumps to its limits. Sliders share a 36 px interaction height, inset tracks, and
-hover/focus feedback without changing size. Recording elapsed and total times
-sit at opposite ends of the track; the elapsed time previews a drag before seeking.
+### Keyboard navigation
 
-Left/Right on a navigation tab switches sections and keeps focus on the tab strip.
-Closing Settings restores the previous view and scroll position, with focus on
-its gear button. Manual scrolling takes over until the next focus move.
-Tab continues through the controls in visual order. Fields use normal text-editing
-keys, and Tab can leave the custom station editor for the persistent playback
-controls. Mouse hover clears when the pointer leaves; keyboard focus remains
-visible until you move it.
+| Key or gesture | Action inside the popup |
+| --- | --- |
+| Tab / Shift+Tab or Up / Down | Move between controls, including Settings and available replay controls. |
+| Space / Enter | Activate the selected control. |
+| Left / Right on a navigation tab | Switch sections while keeping focus on the tab strip. |
+| Left / Right or mouse wheel on a slider | Adjust volume by 5% or playback position by 30 seconds. |
+| Page Up / Down on a slider | Adjust volume by 10% or playback position by one minute. |
+| Home / End on a slider | Jump to its limits. |
+| M or right-click on the volume slider | Toggle mute. |
+| R | Retry a stopped stream. |
+| Escape | Dismiss the popup, or cancel an open station selector. |
+
+Inside the station selector, type to search, use Down to browse matches, Enter to
+select, and Escape to cancel and clear the search. Left/Right on a category
+button changes categories. Fields keep their normal text-editing keys.
+
+Keyboard focus scrolls fields and actions into view and stays visible until you
+move it. Tab follows the visual control order and can leave an editor for the
+persistent playback controls. Closing Settings restores the previous view and
+scroll position, with focus on its gear button. Manual scrolling takes over
+until the next focus move.
+
+Controls keep consistent spacing and hover/focus feedback at smaller sizes.
+Library search and status filters stack on narrow panels, replay presets use two
+rows, and saved-playback options stack when needed. Short popups keep transport
+and volume visible while omitting the secondary playback hint from the dock.
+Recording elapsed and total times sit at opposite ends of the track; elapsed
+time previews a drag before seeking.
+
+### Sleep timer
+
+The Sleep menu shows the active countdown, quick duration choices, and a custom
+minute field with a clear **Set timer** action. **Cancel timer** removes an active
+timer without stopping listening. Recording captures continue when the timer ends.
+
+[<img src="docs/yakker-sleep-timer.png?v=1.8.0" alt="Sleep timer with a clear active countdown, duration presets, custom minutes, and a quiet cancel action" width="300">](docs/yakker-sleep-timer.png?v=1.8.0)
+
+### Scripted controls
 
 For diagnostics or scripted controls:
 
@@ -320,12 +361,6 @@ omarchy-shell io.github.joega.yakker chooseStation
 omarchy-shell io.github.joega.yakker status
 omarchy-shell shell hide io.github.joega.yakker
 ```
-
-The Sleep menu shows the active countdown, quick duration choices, and a custom
-minute field with a clear **Set timer** action. **Cancel timer** removes an active
-timer without stopping listening. Recording captures continue when the timer ends.
-
-[<img src="docs/yakker-sleep-timer.png?v=1.8.0" alt="Sleep timer with a clear active countdown, duration presets, custom minutes, and a quiet cancel action" width="300">](docs/yakker-sleep-timer.png?v=1.8.0)
 
 ## Pause and rewind
 
