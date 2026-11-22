@@ -164,6 +164,15 @@ def confident(match):
     return bool(match and match["correlation"] >= .85 and match["ambiguityMargin"] >= .05)
 
 
+def boundary_failure(boundaries):
+    coverage = boundaries.get("coversReferenceDeliveryBoundaries")
+    if coverage is True:
+        return ""
+    if coverage is False:
+        return "saved audio did not cover independent reference delivery boundaries"
+    return "reference delivery boundary coverage could not be confirmed; review the retained audio"
+
+
 def match_delivery_boundary(saved, reference, bounds):
     if not bounds:
         return {"confirmed": False, "reason": "reference progress does not bracket this boundary"}
@@ -343,9 +352,34 @@ class Reference:
         self.reader.join(timeout=2)
         self.log.close()
         original = self.path
-        if self.killed:
-            self.path, self.recovery = recover_reference_wav(original)
-        write_json(original.with_suffix(".progress.json"), {"forcedStop":self.killed,"points":self.progress,"wavRecovery":self.recovery})
+        progress = {"forcedStop":self.killed,"points":self.progress,"wavRecovery":None}
+        try:
+            if self.killed:
+                self.path, self.recovery = recover_reference_wav(original)
+            progress["wavRecovery"] = self.recovery
+        except Exception as exc:
+            progress["recoveryError"] = str(exc) or type(exc).__name__
+            raise
+        finally:
+            write_json(original.with_suffix(".progress.json"), progress)
+
+
+def cleanup_audit(controller, references):
+    """Attempt every cleanup, even when a reference cannot be finalized."""
+    failures = []
+    if controller:
+        try:
+            controller.close()
+        except Exception as exc:
+            failures.append("controller cleanup failed: "+(str(exc) or type(exc).__name__))
+    for reference in references:
+        if reference.log.closed:
+            continue
+        try:
+            reference.close()
+        except Exception as exc:
+            failures.append(reference.path.name+": reference cleanup failed: "+(str(exc) or type(exc).__name__))
+    return failures
 
 
 def row(state, recording_id):
@@ -527,8 +561,9 @@ def main():
                 print(result["id"]+": decode, head/tail extraction, pause, seek and saved position passed", flush=True)
             while time.time() < last_capture_end+8:
                 time.sleep(.2)
-            for reference in references:
-                reference.close()
+            reference_failures = cleanup_audit(None, references)
+            if reference_failures:
+                raise RuntimeError("; ".join(reference_failures))
             controller.close()
             controller = Controller(executable, env, output, 2)
             for result, reference in zip(report["stations"], references):
@@ -539,18 +574,15 @@ def main():
                 result["boundaries"] = compare_boundaries(Path(item["folder"])/item["filename"], reference.path, reference.progress,
                                                           timestamp(result["programStart"]), timestamp(result["programEnd"]))
                 result["referenceWavRecovery"] = reference.recovery
-                if result["boundaries"].get("coversReferenceDeliveryBoundaries") is False:
-                    report["failures"].append(result["id"]+": saved audio did not cover independent reference delivery boundaries")
+                issue = boundary_failure(result["boundaries"])
+                if issue:
+                    report["failures"].append(result["id"]+": "+issue)
                 print(result["id"]+": persisted resume, pause/resume and ending playback passed; reference match "+str(result["boundaries"]["available"]), flush=True)
             report["completed"] = True
         except Exception as exc:
             report["failures"].append(str(exc))
         finally:
-            if controller:
-                controller.close()
-            for reference in references:
-                if not reference.log.closed:
-                    reference.close()
+            report["failures"].extend(cleanup_audit(controller, references))
             if not report["completed"] and not report["failures"]:
                 report["failures"].append("audit interrupted before completion")
             write_json(output/"report.json", report)

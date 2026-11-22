@@ -2,11 +2,13 @@
 """Local checks for the live audit's content-matching confidence logic."""
 import importlib.util
 import datetime as dt
+import io
 from pathlib import Path
 import random
 import struct
 import tempfile
 import unittest
+from unittest.mock import Mock
 import wave
 
 spec = importlib.util.spec_from_file_location("scheduled_audit", Path(__file__).with_name("test-scheduled-recordings.py"))
@@ -15,6 +17,43 @@ spec.loader.exec_module(audit)
 
 
 class MatchingTests(unittest.TestCase):
+    def test_inconclusive_boundary_coverage_cannot_pass_the_audit(self):
+        self.assertEqual(audit.boundary_failure({"coversReferenceDeliveryBoundaries":True}), "")
+        for result in ({"available":False}, {"coversReferenceDeliveryBoundaries":None},
+                       {"coversReferenceDeliveryBoundaries":False}):
+            with self.subTest(result=result):
+                self.assertTrue(audit.boundary_failure(result))
+
+    def test_failed_reference_recovery_retains_progress_and_cleans_other_processes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            broken = audit.Reference.__new__(audit.Reference)
+            broken.path = Path(folder)/"broken-reference.wav"
+            broken.path.write_bytes(b"not a WAV")
+            broken.process = Mock()
+            broken.process.poll.return_value = 0
+            broken.reader = Mock()
+            broken.log = io.StringIO()
+            broken.progress = [{"wallTime":1,"mediaSecond":2}]
+            broken.killed = True
+            broken.recovery = None
+            later = Mock()
+            later.log = io.StringIO()
+            later.path = Path(folder)/"later-reference.wav"
+            later.close.side_effect = later.log.close
+            controller = Mock()
+            controller.close.side_effect = RuntimeError("controlled controller cleanup failure")
+            failures = audit.cleanup_audit(controller, [broken,later])
+            self.assertEqual(len(failures), 2)
+            later.close.assert_called_once()
+            self.assertTrue(later.log.closed)
+            progress = audit.json.loads(broken.path.with_suffix(".progress.json").read_text())
+            self.assertTrue(progress["forcedStop"])
+            self.assertEqual(progress["points"], broken.progress)
+            self.assertTrue(progress["recoveryError"])
+            self.assertEqual(broken.path.read_bytes(), b"not a WAV")
+            self.assertEqual(audit.cleanup_audit(None, [broken,later]), [])
+            later.close.assert_called_once()
+
     def test_forced_stop_reference_preserves_pcm_and_finalizes_its_header(self):
         for trailing in (b"", b"x"):
             with self.subTest(trailing=trailing), tempfile.TemporaryDirectory() as folder:

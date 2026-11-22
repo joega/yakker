@@ -96,7 +96,10 @@ clock mapping. Matching uses 20 ms features and requires strong correlation and
 separation from competing matches. Physical head/tail alignment additionally
 requires agreement within 200 ms; scheduled boundary clips are matched independently.
 Unavailable matching requires manual/reference review. Strongly matched but
-uncovered delivery boundaries fail the audit. A finalized file with partial
+uncovered delivery boundaries fail the audit. Inconclusive coverage also returns
+a nonzero result; it cannot print a passing audit summary. A reference-finalization
+failure preserves its progress evidence and cleanup still attempts every remaining
+reference and controller. A finalized file with partial
 status still needs its recording note reviewed.
 
 Silent mpv playback validates decoding, seeking and state persistence, not
