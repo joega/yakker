@@ -59,7 +59,7 @@ awk '
   }
   { print }
 ' "$project_dir/Panel.qml" > "$capture_dir/plugin/Panel.qml"
-awk '/required property var radio/ { print "  property alias screenshotSearch: searchField" } { print }' "$project_dir/RecordingsView.qml" > "$capture_dir/plugin/RecordingsView.qml"
+awk '/required property var radio/ { print "  property alias screenshotSearch: searchField"; print "  property alias screenshotPreviewDelay: previewDelay" } { print }' "$project_dir/RecordingsView.qml" > "$capture_dir/plugin/RecordingsView.qml"
 awk '/property string value:/ { print "  property alias screenshotSearch: search" } { print }' "$project_dir/StationPicker.qml" > "$capture_dir/plugin/StationPicker.qml"
 cp "$project_dir/tools/readme/gallery.qml" "$capture_dir/shell.qml"
 if ! timeout 60s env -u QT_QPA_PLATFORMTHEME \

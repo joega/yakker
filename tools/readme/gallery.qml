@@ -19,7 +19,7 @@ ShellRoot {
       when: false
       property var themes: ({})
       readonly property var radio: panel.radio
-      readonly property var schedule: ({id: "football", label: "Football review", stationId: "talksport", stationName: "talkSPORT", weekdays: [1,2,3,4,5], startTime: "14:00", endTime: "14:20", timezone: "America/New_York", enabled: true, nextStart: "2026-11-23T14:00:00-05:00", nextEnd: "2026-11-23T14:20:00-05:00"})
+      readonly property var schedule: ({id: "football", label: "Football review", stationId: "talksport", stationName: "talkSPORT", weekdays: [1,2,3,4,5], startTime: "14:00", endTime: "14:20", timezone: "America/New_York", enabled: true, preRollSeconds:30, postRollSeconds:60, nextStart: "2026-11-23T14:00:00-05:00", nextEnd: "2026-11-23T14:20:00-05:00", nextCaptureStart:"2026-11-23T13:59:30-05:00", nextCaptureEnd:"2026-11-23T14:21:00-05:00"})
       function snapshot(schedules, recordings, active) {
         return {available: true, revision: 1, error: "", localTimezone: "America/New_York",
           settings: {folder: "/home/demo/Music/Yakker", storageCapBytes: 5368709120, freeSpaceReserveBytes: 1073741824, concurrency: 3},
@@ -95,24 +95,26 @@ ShellRoot {
           capture("stations")
           panel.screenshotPicker.close()
 
-          const complete = {id: "saved", stationId: "weei-fm", label: "Morning drive", stationName: "WEEI 93.7", status: "complete", bytes: 3600000, durationSeconds: 1200,
-            plannedStart: "2026-11-19T14:00:00-05:00", plannedEnd: "2026-11-19T14:20:00-05:00", startedAt: "2026-11-19T14:00:01-05:00", endedAt: "2026-11-19T14:20:00-05:00", playable: true, resumePosition: 486}
+          const complete = {id: "saved", stationId: "weei-fm", label: "Morning drive", stationName: "WEEI 93.7", status: "complete", bytes: 3870000, durationSeconds: 1290,
+            plannedStart: "2026-11-19T09:00:00-05:00", plannedEnd: "2026-11-19T09:20:00-05:00", captureStart:"2026-11-19T08:59:30-05:00", captureEnd:"2026-11-19T09:21:00-05:00", startedAt: "2026-11-19T08:59:31-05:00", endedAt: "2026-11-19T09:21:00-05:00", playable: true, resumePosition: 486}
+          const recovered = {id:"recovered",stationId:"kdka-fm",label:"Afternoon sports",stationName:"93.7 The Fan",status:"partial",bytes:1080000,durationSeconds:360,
+            plannedStart:"2026-11-19T14:00:00-05:00",plannedEnd:"2026-11-19T14:20:00-05:00",captureStart:"2026-11-19T13:59:30-05:00",captureEnd:"2026-11-19T14:21:00-05:00",startedAt:"2026-11-19T13:59:31-05:00",endedAt:"",reason:"plugin interrupted; recovered retained audio",playable:true,resumePosition:96}
           const active = {id: "capturing", stationId: "kiro-am", label: "Seattle sports", stationName: "Seattle Sports 710", status: "recording", bytes: 1800000,
             plannedStart: "2026-11-20T14:00:00-05:00", plannedEnd: "2026-11-20T14:20:00-05:00", startedAt: "2026-11-20T14:00:01-05:00", playable: false}
-          radio.recordings = snapshot([schedule], [active, complete], 1)
+          radio.recordings = snapshot([schedule], [active, recovered, complete], 1)
           selectExample("kiro-am")
           panel.openRecordings(false)
           capture("recordings")
           selectExample("kdka-fm")
-          const detailed = Object.assign({}, complete, {id:"detailed",label:"Afternoon sports",stationId:"kdka-fm",stationName:"93.7 The Fan"})
+          const detailed = Object.assign({}, recovered, {id:"detailed"})
           radio.recordings = snapshot([], [detailed], 0)
           panel.screenshotView.toggleDetails("detailed")
           capture("recording-details")
           panel.screenshotView.toggleDetails("detailed")
 
           selectExample("talksport")
-          const later = Object.assign({}, schedule, {id: "later", label: "Afternoon drive", stationId: "wscr", stationName: "104.3 The Score", startTime: "16:00", endTime: "17:00", nextStart: "2026-11-23T16:00:00-05:00", nextEnd: "2026-11-23T17:00:00-05:00"})
-          const paused = Object.assign({}, schedule, {id: "paused", label: "Weekend catch-up", stationId: "bbc-radio-5-live", stationName: "BBC Radio 5 Live", weekdays: [0,6], enabled: false, nextStart: "", nextEnd: ""})
+          const later = Object.assign({}, schedule, {id: "later", label: "Afternoon drive", stationId: "wscr", stationName: "104.3 The Score", startTime: "16:00", endTime: "17:00", preRollSeconds:60,postRollSeconds:120, nextStart: "2026-11-23T16:00:00-05:00", nextEnd: "2026-11-23T17:00:00-05:00",nextCaptureStart:"2026-11-23T15:59:00-05:00",nextCaptureEnd:"2026-11-23T17:02:00-05:00"})
+          const paused = Object.assign({}, schedule, {id: "paused", label: "Weekend catch-up", stationId: "bbc-radio-5-live", stationName: "BBC Radio 5 Live", weekdays: [0,6], enabled: false, nextStart: "", nextEnd: "",nextCaptureStart:"",nextCaptureEnd:""})
           radio.recordings = snapshot([paused, later, schedule], [], 0)
           panel.openSchedules()
           capture("schedules")
@@ -120,7 +122,9 @@ ShellRoot {
           selectExample("wzgc-fm")
           radio.recordings = snapshot([], [], 0)
           panel.screenshotView.beginEdit(Object.assign({}, schedule, {id: "", kind: "once", date: "2026-11-23"}))
+          panel.screenshotView.screenshotPreviewDelay.stop()
           panel.screenshotView.previewText = "Mon Nov 23 · 02:00PM–02:20PM · America/New_York"
+          panel.screenshotView.previewCaptureText = "Captures Mon Nov 23 · 01:59:30PM–02:21:00PM"
           capture("schedule")
           panel.screenshotView.editing = false
 
@@ -133,7 +137,7 @@ ShellRoot {
           radio.recordings = snapshot([], [complete], 0)
           radio.recordingId = "saved"
           radio.playbackKind = "recording"; radio.recordingTitle = "Morning drive"
-          radio.duration = 1200; radio.position = 486
+          radio.duration = complete.durationSeconds; radio.position = 486
           radio.playbackSpeed = 1.25; radio.sleepRemaining = 900
           capture("recording-player")
           panel.showPlayer()
