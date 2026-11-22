@@ -343,7 +343,6 @@ Ui.Panel {
       if (dockRetry.visible) order.push(53)
     } else {
       order.push(0)
-      if (stationPicker.favoritesControl.visible) order.push(25)
       if (favoriteButton.visible && favoriteButton.enabled) order.push(13)
       if (connectionState.visible) {
         order.push(50)
@@ -371,7 +370,7 @@ Ui.Panel {
   function ensureCursorVisible() {
     const targets = [stationPicker, playButton, volumeSlider, muteButton, root.settingsOpen ? settingsCloseButton : settingsButton,
                      bufferPicker, stopButton, backButton, forwardButton, liveButton,
-                     addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton, stationPicker.favoritesControl]
+                     addStationButton, addStationButton, deleteStationButton, favoriteButton, recordingsButton, fileTimeline, returnLiveButton, addStationButton, speedPicker, sleepButton, listenButton, schedulesButton, timelineSlider, recordNowButton, addStationButton]
     ensureItemVisible(cursor === 58 ? captureIndicator : cursor >= 54 && cursor <= 57 ? [dockBack, dockPlay, dockForward, dockStop][cursor - 54] : cursor === 53 ? dockRetry : cursor >= 50 && cursor <= 52 ? [connectionState.primaryControl, connectionState.secondaryControl, connectionState.detailsControl][cursor - 50] : cursor >= 40 && cursor <= 43 ? bufferPresets.itemAt(cursor - 40) : cursor >= 30 && cursor <= 33 ? settingsTabs.itemAt(cursor - 30) : targets[cursor])
   }
   Connections {
@@ -424,7 +423,6 @@ Ui.Panel {
     else if (cursor === 21) openSchedules()
     else if (cursor === 23) recordNow()
     else if (cursor === 24) backFromSettings()
-    else if (cursor === 25 && stationPicker.favoritesControl.visible) stationPicker.toggleFavorites()
     else if (cursor === 58 && settingsOpen && captureIndicator.visible) captureIndicator.clicked()
     else if (cursor >= 54 && cursor <= 57 && auxiliaryView) {
       const target = [dockBack, dockPlay, dockForward, dockStop][cursor - 54]
@@ -1026,16 +1024,11 @@ Ui.Panel {
                     emptyText: "No matching stations"
                     value: root.radio.stationId
                     options: root.radio.stationOptions
-                    showFavoritesShortcut: root.radio.playbackKind !== "recording"
-                    favoriteOrder: root.radio.favoriteIds
                     onFavoriteRequested: value => root.radio.toggleFavorite(value)
                     foreground: root.barForeground
                     hasCursor: root.virtualFocus && root.cursor === 0
-                    hasFavoritesCursor: root.virtualFocus && root.cursor === 25
                     onHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 0 } }
-                    onFavoritesHovered: hovered => { if (hovered) { root.keyboardNavigation = false; root.cursor = 25 } }
                     onPopupOpenChanged: if (!popupOpen && root.opened && !root.auxiliaryView) {
-                      if (root.cursor === 25 && !favoritesControl.visible) root.cursor = 0
                       Qt.callLater(function() { if (root.opened && !root.auxiliaryView) keyCatcher.forceActiveFocus() })
                     }
                     onChanged: value => { root.radio.selectStation(value); Qt.callLater(function() { keyCatcher.forceActiveFocus() }) }
