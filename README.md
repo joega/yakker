@@ -333,6 +333,15 @@ start ends the next day; recordings can last up to 12 hours. Daylight saving
 follows the saved timezone. Schedules start empty; create and enable the ones
 you want.
 
+Use **Start early** and **End late** to add up to 10 minutes on either side of a
+show. New schedules suggest 30 seconds early and 1 minute late; existing
+schedules keep their saved timing with padding off until you edit it. The review
+and upcoming list show the resulting **Captures** window, including seconds.
+Padding follows the resolved timezone/DST occurrence and can cross midnight.
+It counts toward the same storage and simultaneous-recording limits, so allow
+for overlaps between adjacent shows. Changes apply to future captures; an active
+recording and any linked remainder keep their original capture window.
+
 Schedules appear in upcoming order, with **Next up** highlighted and paused
 schedules grouped at the bottom. **Edit schedule** opens the saved values;
 use the enabled switch to pause a schedule or the confirmed delete action to
@@ -406,6 +415,8 @@ boundaries depend on the source: buffered feeds and HLS segments can contain
 audio from before the connection, so a file's audio duration can exceed the
 scheduled interval. **Duration** measures retained audio; the **Recorded** range
 tracks the encoder process, excluding later file inspection and finalization.
+Details also show the intended **Capture window** when padding is enabled,
+separately from the show's scheduled interval and the recorded process times.
 Neither guarantees the broadcaster's program-clock boundaries. Early cutoffs
 are retained as partial recordings. A forced encoder stop also warns that ending
 audio may be missing, even when the remaining file is playable. Audio quality

@@ -34,6 +34,8 @@ Column {
   property int editRevision: 0
   property var days: []
   property bool scheduleEnabled: true
+  property int preRollSeconds: 30
+  property int postRollSeconds: 60
   property bool timezoneEditing: false
   property int pendingSerial: 0
   property int playbackSerial: 0
@@ -50,6 +52,7 @@ Column {
   property int previewSerial: 0
   property string previewKey: ""
   property string previewText: ""
+  property string previewCaptureText: ""
   property string tab: "library"
   property bool nowEditing: false
   readonly property string viewMode: settingsTabbed ? "storage" : editing ? "editor" : storageEditing ? "storage" : nowEditing ? "now" : tab
@@ -73,7 +76,7 @@ Column {
     const rank = function(s) { return s.enabled && s.nextStart ? 0 : s.enabled ? 1 : 2 }
     const order = rank(a) - rank(b)
     if (order) return order
-    const time = function(s) { const n = Date.parse(s.nextStart); return isFinite(n) ? n : Infinity }
+    const time = function(s) { const n = Date.parse(s.nextCaptureStart || s.nextStart); return isFinite(n) ? n : Infinity }
     if (time(a) !== time(b)) return time(a) < time(b) ? -1 : 1
     return String(a.label || a.stationName).localeCompare(String(b.label || b.stationName))
   })
@@ -117,7 +120,7 @@ Column {
   onSearchTextChanged: { confirmation = ""; libraryPage = 0; refreshRows() }
   onStatusFilterChanged: { confirmation = ""; libraryPage = 0; refreshRows() }
   Component.onCompleted: refreshRows()
-  onFormKeyChanged: { previewSerial = 0; previewText = ""; if (editing) previewDelay.restart() }
+  onFormKeyChanged: { previewSerial = 0; previewText = ""; previewCaptureText = ""; if (editing) previewDelay.restart() }
   onEditingChanged: { if (editing) previewDelay.restart(); else previewDelay.stop() }
   Timer {
     id: previewDelay
@@ -221,6 +224,8 @@ Column {
     endField.text = s.endTime || "14:20"
     zoneField.text = s.timezone || snapshot.localTimezone || "UTC"
     scheduleEnabled = s.enabled === undefined ? true : s.enabled
+    preRollSeconds = s.id ? Number(s.preRollSeconds || 0) : 30
+    postRollSeconds = s.id ? Number(s.postRollSeconds || 0) : 60
     localError = ""; confirmation = ""; editing = true
     focusItem(labelField)
   }
@@ -238,7 +243,12 @@ Column {
     localError = ""
   }
   function scheduleForm() {
-    return {id: editingId, stationId: stationValue, label: labelField.text.trim(), kind: scheduleKind, date: scheduleKind === "once" ? dateField.text.trim() : "", weekdays: scheduleKind === "weekly" ? days : [], startTime: startField.text.trim(), endTime: endField.text.trim(), timezone: zoneField.text.trim(), enabled: scheduleEnabled}
+    return {id: editingId, stationId: stationValue, label: labelField.text.trim(), kind: scheduleKind, date: scheduleKind === "once" ? dateField.text.trim() : "", weekdays: scheduleKind === "weekly" ? days : [], startTime: startField.text.trim(), endTime: endField.text.trim(), timezone: zoneField.text.trim(), enabled: scheduleEnabled, preRollSeconds: preRollSeconds, postRollSeconds: postRollSeconds}
+  }
+  function paddingOptions(value) {
+    const values = [0, 15, 30, 60, 120, 300, 600]
+    if (values.indexOf(value) < 0) { values.push(value); values.sort(function(a,b) { return a-b }) }
+    return values.map(function(n) { return {value:String(n), label:n === 0 ? "Off" : n < 60 ? n + " sec" : n % 60 === 0 ? n/60 + " min" : n + " sec"} })
   }
   function previewNext() {
     previewDelay.stop()
@@ -317,16 +327,16 @@ Column {
     const old = snapshot.settings || {}
     submit(radio.recordingSettings(storageRevision, {folder: folderField.text, storageCapBytes: Math.round(Number(capField.text) * 1073741824), freeSpaceReserveBytes: old.freeSpaceReserveBytes, concurrency: old.concurrency}), "settings")
   }
-  function timeText(hours, minutes) {
+  function timeText(hours, minutes, seconds) {
     const locale = Qt.locale(Commons.I18n.formatLocale)
     return String(hours % 12 || 12).padStart(2, "0") + ":" + String(minutes).padStart(2, "0")
-      + (hours < 12 ? locale.amText : locale.pmText).toUpperCase()
+      + (seconds === undefined ? "" : ":" + String(seconds).padStart(2, "0")) + (hours < 12 ? locale.amText : locale.pmText).toUpperCase()
   }
   function scheduleTimeText(value) {
     const parts = /^(\d{2}):(\d{2})$/.exec(String(value || ""))
     return parts ? timeText(Number(parts[1]), Number(parts[2])) : String(value || "")
   }
-  function dateText(value, sourceTime) {
+  function dateText(value, sourceTime, precise) {
     if (!value) return ""
     let d = new Date(value)
     if (isNaN(d.getTime())) return String(value)
@@ -342,14 +352,14 @@ Column {
     const minutes = sourceTime ? d.getUTCMinutes() : d.getMinutes()
     const locale = Qt.locale(Commons.I18n.formatLocale)
     return locale.dayName(day, Locale.ShortFormat) + " " + locale.monthName(month, Locale.ShortFormat)
-      + " " + date + " " + year + " " + timeText(hours, minutes)
+      + " " + date + " " + year + " " + timeText(hours, minutes, precise ? (sourceTime ? d.getUTCSeconds() : d.getSeconds()) : undefined)
   }
-  function recordingRangeText(start, end, ongoing) {
+  function recordingRangeText(start, end, ongoing, precise) {
     const a = new Date(start), b = new Date(end)
     if (!start || isNaN(a.getTime())) return "Time unavailable"
-    if (!end || isNaN(b.getTime())) return dateText(start) + (ongoing ? " · In progress" : " · End time unavailable")
+    if (!end || isNaN(b.getTime())) return dateText(start, false, precise) + (ongoing ? " · In progress" : " · End time unavailable")
     const sameDay = a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-    return dateText(start) + " – " + (sameDay ? timeText(b.getHours(), b.getMinutes()) : "\n" + dateText(end))
+    return dateText(start, false, precise) + " – " + (sameDay ? timeText(b.getHours(), b.getMinutes(), precise ? b.getSeconds() : undefined) : "\n" + dateText(end, false, precise))
   }
 
   function shortDateText(value) {
@@ -375,15 +385,15 @@ Column {
     if (days.length === 7) return "Every day"
     return days.map(function(day) { return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day] }).join(", ") || "No days selected"
   }
-  function occurrenceText(start, end) {
+  function occurrenceText(start, end, precise) {
     // Keep saved schedule wall-clock fields, including their timezone offset.
     const wall = function(value) { return new Date(String(value).replace(/(?:Z|[+-]\d{2}:\d{2})$/, "Z")) }
     const a = wall(start), b = wall(end)
     if (isNaN(a.getTime())) return "Time unavailable"
     const locale = Qt.locale(Commons.I18n.formatLocale)
     const day = function(d) { return locale.dayName(d.getUTCDay(), Locale.ShortFormat) + " " + locale.monthName(d.getUTCMonth(), Locale.ShortFormat) + " " + d.getUTCDate() + (d.getUTCFullYear() !== new Date().getFullYear() ? " " + d.getUTCFullYear() : "") }
-    return day(a) + " · " + timeText(a.getUTCHours(), a.getUTCMinutes())
-      + (isNaN(b.getTime()) ? "" : "–" + (a.getUTCDate() !== b.getUTCDate() || a.getUTCMonth() !== b.getUTCMonth() || a.getUTCFullYear() !== b.getUTCFullYear() ? day(b) + " · " : "") + timeText(b.getUTCHours(), b.getUTCMinutes()))
+    return day(a) + " · " + timeText(a.getUTCHours(), a.getUTCMinutes(), precise ? a.getUTCSeconds() : undefined)
+      + (isNaN(b.getTime()) ? "" : "–" + (a.getUTCDate() !== b.getUTCDate() || a.getUTCMonth() !== b.getUTCMonth() || a.getUTCFullYear() !== b.getUTCFullYear() ? day(b) + " · " : "") + timeText(b.getUTCHours(), b.getUTCMinutes(), precise ? b.getUTCSeconds() : undefined))
   }
   function durationText() {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startField.text) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(endField.text)) return ""
@@ -410,6 +420,7 @@ Column {
       root.previewSerial = 0
       const p = root.radio.schedulePreview || {}
       root.previewText = root.radio.schedulePreviewError || (p.nextStart ? root.occurrenceText(p.nextStart, p.nextEnd) + " · " + p.timezone : (root.scheduleEnabled ? "No upcoming occurrence." : "This schedule is disabled."))
+      root.previewCaptureText = !root.radio.schedulePreviewError && p.nextCaptureStart && (root.preRollSeconds || root.postRollSeconds) ? "Captures " + root.occurrenceText(p.nextCaptureStart, p.nextCaptureEnd, true) : ""
     }
     function onRecordingMutationSerialChanged() {
       if (!root.pendingSerial || root.radio.recordingMutationSerial !== root.pendingSerial) return
@@ -563,6 +574,7 @@ Column {
           wrapMode: Text.Wrap
         }
         Hint { text: root.repeatText(scheduleRow.rowData) + (scheduleRow.upcoming ? "" : " · " + root.scheduleTimeText(scheduleRow.rowData.startTime) + "–" + root.scheduleTimeText(scheduleRow.rowData.endTime)) + " · " + scheduleRow.rowData.timezone }
+        Hint { visible: scheduleRow.upcoming && !!(scheduleRow.rowData.preRollSeconds || scheduleRow.rowData.postRollSeconds); text: "Captures " + root.occurrenceText(scheduleRow.rowData.nextCaptureStart, scheduleRow.rowData.nextCaptureEnd, true); font.pixelSize: Style.fontPx(0.917) }
         Radio.FocusButton {
           id: scheduleEditButton
           text: "Edit schedule"
@@ -624,6 +636,12 @@ Column {
       }
       Hint { text: root.durationText() || "Enter start and end times." }
       Row {
+        width: parent.width; spacing: Style.space(12)
+        Radio.FocusDropdown { id: startPadding; width: (parent.width-parent.spacing)/2; label: "Start early"; value: String(root.preRollSeconds); options: root.paddingOptions(root.preRollSeconds); foreground: root.foreground; onChanged: value => { root.preRollSeconds = Number(value) }; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+        Radio.FocusDropdown { id: endPadding; width: (parent.width-parent.spacing)/2; label: "End late"; value: String(root.postRollSeconds); options: root.paddingOptions(root.postRollSeconds); foreground: root.foreground; onChanged: value => { root.postRollSeconds = Number(value) }; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this) }
+      }
+      Hint { text: "Extra time helps keep the beginning and ending. Padding counts toward recording limits."; font.pixelSize: Style.fontPx(0.917) }
+      Row {
         width: parent.width; spacing: Style.space(8)
         Hint { width: Math.max(0, parent.width - changeZone.width - parent.spacing); anchors.verticalCenter: parent.verticalCenter; text: zoneField.text }
         Radio.FocusButton { id: changeZone; text: root.timezoneEditing ? "Done" : "Change zone"; fontSize: Style.fontPx(1); horizontalPadding: Style.space(6); foreground: root.foreground; focusable: true; onClicked: { root.timezoneEditing = !root.timezoneEditing; if (root.timezoneEditing) root.focusItem(zoneField) } }
@@ -656,6 +674,7 @@ Column {
         x: Style.space(10); y: Style.space(10); width: parent.width - Style.space(20); spacing: Style.space(5)
         FieldLabel { text: "Next recording" }
         Hint { text: !root.scheduleEnabled ? "Paused · enable this schedule to record automatically." : root.previewText || (root.previewSerial ? "Checking next recording…" : root.scheduleKind === "weekly" && !root.days.length ? "Choose at least one day." : "Your next recording time will appear here."); color: Qt.alpha(root.foreground, 0.8) }
+        Hint { visible: root.scheduleEnabled && !!root.previewCaptureText; text: root.previewCaptureText; color: Qt.alpha(root.foreground, 0.8) }
       }
     }
     Radio.FocusButton { id: refreshDraftButton; width: parent.width; visible: root.editRevision !== Number(root.snapshot.revision); text: "Refresh and keep this draft"; foreground: root.foreground; focusable: true; enabled: !root.pending; onActiveFocusChanged: if (activeFocus) root.ensureVisible(this); onClicked: root.refreshDraft() }
@@ -883,6 +902,7 @@ Column {
               width: parent.width
               spacing: Style.space(8)
               DetailLine { id: detailsScheduled; label: "Scheduled"; value: root.recordingRangeText(recordRow.rowData.plannedStart, recordRow.rowData.plannedEnd, false) }
+              DetailLine { label: "Capture window"; visible: !!recordRow.rowData.captureStart && (recordRow.rowData.captureStart !== recordRow.rowData.plannedStart || recordRow.rowData.captureEnd !== recordRow.rowData.plannedEnd); value: root.recordingRangeText(recordRow.rowData.captureStart, recordRow.rowData.captureEnd, false, true) }
               DetailLine { id: detailsCaptured; label: "Recorded"; value: recordRow.rowData.startedAt ? root.recordingRangeText(recordRow.rowData.startedAt, recordRow.rowData.endedAt, recordRow.capturing) : ["missed", "error"].indexOf(recordRow.rowData.status) >= 0 ? "No capture started" : "Time unavailable" }
               Hint { text: "Times shown in local time."; font.pixelSize: Style.fontPx(0.833) }
             }

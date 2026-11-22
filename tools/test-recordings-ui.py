@@ -146,6 +146,8 @@ def main():
   property alias testLabel: labelField
   property alias testStart: startField
   property alias testEnd: endField
+  property alias testStartPadding: startPadding
+  property alias testEndPadding: endPadding
   property alias testStorageContent: storageSettings
   property alias testAlertsContent: notificationSettings
   property alias testRecordingAlerts: recordingAlertsToggle
